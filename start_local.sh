@@ -4,6 +4,9 @@
 # Exit on any error
 set -e
 
+# Ensure ~/.local/bin is in PATH
+export PATH="$HOME/.local/bin:$PATH"
+
 echo "[kali-mcp-webui] Checking for required tools..."
 
 # 1. Check for npm (required to run the Kali server)
@@ -31,7 +34,11 @@ echo "[kali-mcp-webui] Setting up python virtual environment via uv..."
 if ! command -v uv &> /dev/null; then
     echo "Installing uv..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
-    source $HOME/.cargo/env
+    if [ -f "$HOME/.local/bin/env" ]; then
+        source "$HOME/.local/bin/env"
+    elif [ -f "$HOME/.cargo/env" ]; then
+        source "$HOME/.cargo/env"
+    fi
 fi
 
 # Use uv to run the flask application automatically handling requirements
