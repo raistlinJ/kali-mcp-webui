@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kali MCP WebUI</title>
+    <!-- Google Fonts for typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Phosphor Icons for sleek iconography -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+
+<body>
+    <div class="background-decorations">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <main class="container">
+        <header class="header">
+            <div class="logo">
+                <i class="ph ph-terminal-window"></i>
+                <h1>Kali MCP WebUI</h1>
+            </div>
+            <p class="subtitle">Connect your local models to the Model Context Protocol</p>
+        </header>
+
+        <div class="glass-panel">
+
+            <form id="mcp-form" class="mcp-form">
+
+                <!-- Connection Section -->
+                <div class="form-section">
+                    <h2 class="section-title">
+                        <i class="ph ph-plugs-connected"></i>
+                        Ollama Instance
+                    </h2>
+
+                    <div class="input-group">
+                        <label for="ollama-url">Instance URL</label>
+                        <div class="input-with-icon">
+                            <i class="ph ph-link"></i>
+                            <input type="url" id="ollama-url" value="http://localhost:11434" required
+                                placeholder="http://localhost:11434">
+                        </div>
+                    </div>
+
+                    <button type="button" id="fetch-models-btn" class="btn btn-secondary">
+                        <i class="ph ph-arrows-clockwise reload-icon"></i>
+                        <span>Fetch Available LLMs</span>
+                    </button>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- MCP Kali Server Section -->
+                <div class="form-section">
+                    <h2 class="section-title" title="Configure the command used to launch the mcp-kali-server">
+                        <i class="ph ph-shield-check"></i>
+                        Kali Server Integration
+                    </h2>
+
+                    <div class="input-group">
+                        <label for="kali-command-type">Server Launch Method</label>
+                        <div class="select-wrapper">
+                            <i class="ph ph-terminal icon-left"></i>
+                            <select id="kali-command-type">
+                                <option value="npx" selected>NPX (@smithery/cli run mcp-kali-server)</option>
+                                <option value="docker">Docker (mcpmarket/mcp-kali-server)</option>
+                                <option value="custom">Custom Command</option>
+                            </select>
+                            <i class="ph ph-caret-down icon-right"></i>
+                        </div>
+                    </div>
+
+                    <div class="input-group" id="custom-command-group" style="display: none;">
+                        <label for="kali-custom-command">Command</label>
+                        <div class="input-with-icon">
+                            <i class="ph ph-code"></i>
+                            <input type="text" id="kali-custom-command" placeholder="Enter Full Command">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Model Configuration Section -->
+                <div class="form-section">
+                    <h2 class="section-title">
+                        <i class="ph ph-cpu"></i>
+                        Model Configuration
+                    </h2>
+
+                    <div class="input-group">
+                        <label for="model-select">Select Model</label>
+                        <div class="select-wrapper">
+                            <i class="ph ph-robot icon-left"></i>
+                            <select id="model-select" disabled>
+                                <option value="" disabled selected>Click 'Fetch' to load models</option>
+                            </select>
+                            <i class="ph ph-caret-down icon-right"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-footer">
+                    <button type="submit" id="connect-btn" class="btn btn-primary" disabled>
+                        <i class="ph ph-lightning"></i>
+                        <span>Connect ollmcp</span>
+                    </button>
+
+                    <div id="status-badge" class="status-badge hidden">
+                        <div class="status-dot"></div>
+                        <span class="status-text">Disconnected</span>
+                    </div>
+                </div>
+
+            </form>
+
+            <!-- Alerts Container -->
+            <div id="alerts-container" class="alerts-container"></div>
+
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+
+</html>
