@@ -51,17 +51,20 @@ def connect_ollmcp():
             }
         }
         
-        # Save JSON to a known temp location or just a file in current dir
-        # If in Docker, we save it inside the container.
+        # Save JSON inside the container for debugging purposes
         config_path = os.path.abspath('server_config.json')
         with open(config_path, 'w') as f:
             json.dump(server_config, f)
             
-        # Instead of launching a Mac Terminal directly (which fails inside Docker),
-        # we return the exact command the user needs to run on their host.
-        cmd_string = f"cat << 'EOF' > {config_path}\n"
+        # We return the exact command the user needs to run on their host.
+        # Use a safe temporary path for the host OS instead of the Docker container's /app path
+        host_config_path = '/tmp/kali_mcp_config.json'
+        
+        cmd_string = f"cat << 'EOF' > {host_config_path}\n"
         cmd_string += json.dumps(server_config, indent=2)
-        cmd_string += f"\nEOF\n\nollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json {config_path}"
+        cmd_string += f"\nEOF\n\n"
+        cmd_string += f"# Note: Ensure your Python virtual environment is activated before running (e.g., 'source venv/bin/activate')\n"
+        cmd_string += f"ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json {host_config_path}"
         
         return jsonify({
             'success': True, 
