@@ -125,6 +125,29 @@
         </div>
     </main>
 
+    <!-- Modal Overlay -->
+    <div id="command-modal" class="modal-overlay hidden">
+        <div class="modal-content glass-panel">
+            <header class="modal-header">
+                <h2><i class="ph ph-terminal-window"></i> Terminal Ready</h2>
+                <button id="close-modal-btn" class="icon-btn"><i class="ph ph-x"></i></button>
+            </header>
+            <div class="modal-body">
+                <p>Because the WebUI is running in Docker, it cannot open a native Mac terminal automatically. Please
+                    copy the command below and paste it into your host terminal to start the session:</p>
+                <div class="code-block-wrapper">
+                    <pre><code id="generated-command"></code></pre>
+                    <button id="copy-command-btn" class="btn btn-secondary btn-sm" title="Copy to clipboard">
+                        <i class="ph ph-copy"></i> Copy
+                    </button>
+                </div>
+            </div>
+            <footer class="modal-footer">
+                <button id="done-modal-btn" class="btn btn-primary">Done</button>
+            </footer>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 

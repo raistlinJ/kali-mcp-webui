@@ -151,8 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.success) {
-                updateStatus('success', `Launched ${model}`);
-                showAlert('Terminal launched with ollmcp and Kali server connected!', 'success');
+                updateStatus('success', `Launch Configured`);
+                // Open the modal and set the command
+                document.getElementById('generated-command').textContent = data.command;
+                document.getElementById('command-modal').classList.remove('hidden');
             } else {
                 throw new Error(data.error || 'Failed to connect');
             }
@@ -164,6 +166,29 @@ document.addEventListener('DOMContentLoaded', () => {
             icon.classList.remove('ph-spinner-gap', 'spin');
             icon.classList.add('ph-lightning');
             connectBtn.disabled = false;
+        }
+    });
+
+    // Modal logic
+    const modal = document.getElementById('command-modal');
+    const copyBtn = document.getElementById('copy-command-btn');
+
+    document.getElementById('close-modal-btn').addEventListener('click', () => modal.classList.add('hidden'));
+    document.getElementById('done-modal-btn').addEventListener('click', () => modal.classList.add('hidden'));
+
+    copyBtn.addEventListener('click', async () => {
+        const cmd = document.getElementById('generated-command').textContent;
+        try {
+            await navigator.clipboard.writeText(cmd);
+            copyBtn.innerHTML = '<i class="ph ph-check"></i> Copied!';
+            copyBtn.classList.add('btn-success');
+            setTimeout(() => {
+                copyBtn.innerHTML = '<i class="ph ph-copy"></i> Copy';
+                copyBtn.classList.remove('btn-success');
+            }, 2000);
+        } catch (err) {
+            console.error('Failed to copy: ', err);
+            showAlert('Failed to copy command to clipboard');
         }
     });
 });

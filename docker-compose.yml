@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  kali-webui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kali-mcp-webui
+    ports:
+      - "5055:5055"
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_ENV=development
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

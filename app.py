@@ -52,38 +52,23 @@ def connect_ollmcp():
         }
         
         # Save JSON to a known temp location or just a file in current dir
+        # If in Docker, we save it inside the container.
         config_path = os.path.abspath('server_config.json')
         with open(config_path, 'w') as f:
             json.dump(server_config, f)
             
-        venv_activate = os.path.abspath('venv/bin/activate')
+        # Instead of launching a Mac Terminal directly (which fails inside Docker),
+        # we return the exact command the user needs to run on their host.
+        cmd_string = f"cat << 'EOF' > {config_path}\n"
+        cmd_string += json.dumps(server_config, indent=2)
+        cmd_string += f"\nEOF\n\nollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json {config_path}"
         
-        # AppleScript to launch a native terminal window running ollmcp
-        script = f'''
-        tell application "Terminal"
-            activate
-            do script "source {shlex.quote(venv_activate)} && ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json {shlex.quote(config_path)}"
-        end tell
-        '''
-        
-        process = subprocess.run(
-            ['osascript', '-e', script], 
-            capture_output=True, 
-            text=True, 
-            timeout=10
-        )
-        
-        if process.returncode == 0:
-            return jsonify({
-                'success': True, 
-                'message': f'Launched ollmcp terminal with {model}',
-                'status': 'connected'
-            })
-        else:
-            return jsonify({
-                'success': False, 
-                'error': f'AppleScript failed: {process.stderr}'
-            }), 500
+        return jsonify({
+            'success': True, 
+            'message': 'Command generated successfully',
+            'status': 'connected',
+            'command': cmd_string
+        })
             
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
