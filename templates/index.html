@@ -94,6 +94,50 @@
 
                 <div class="divider"></div>
 
+                <!-- Kali Tools Configurator -->
+                <div class="form-section">
+                    <h2 class="section-title">
+                        <i class="ph ph-toolbox"></i>
+                        Kali Tools Configuration
+                    </h2>
+
+                    <div class="input-group">
+                        <label>Enable Quick Tools</label>
+                        <div class="tools-grid">
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/nmap"
+                                    value="nmap" class="tool-checkbox"> nmap</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/gobuster"
+                                    value="gobuster" class="tool-checkbox"> gobuster</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/sqlmap"
+                                    value="sqlmap" class="tool-checkbox"> sqlmap</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/sbin/john"
+                                    value="john" class="tool-checkbox"> john d. ripper</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/hydra"
+                                    value="hydra" class="tool-checkbox"> hydra</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/dirb"
+                                    value="dirb" class="tool-checkbox"> dirb</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/wfuzz"
+                                    value="wfuzz" class="tool-checkbox"> wfuzz</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/sbin/aircrack-ng"
+                                    value="aircrack-ng" class="tool-checkbox"> aircrack-ng</label>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="kali-tools-json"
+                            style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="ph ph-file-code"></i> kali_tools.json Editor</span>
+                            <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(Auto-saves
+                                on Connect)</span>
+                        </label>
+                        <textarea id="kali-tools-json" rows="8" spellcheck="false">{
+  "tools": []
+}</textarea>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
                 <!-- Model Configuration Section -->
                 <div class="form-section">
                     <h2 class="section-title">

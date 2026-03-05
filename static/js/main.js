@@ -57,6 +57,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Tools Configuration Logic
+    const toolCheckboxes = document.querySelectorAll('.tool-checkbox');
+    const toolsJsonArea = document.getElementById('kali-tools-json');
+
+    function updateToolsJson() {
+        const selectedTools = [];
+        toolCheckboxes.forEach(cb => {
+            if (cb.checked) {
+                selectedTools.push({
+                    name: cb.value,
+                    command: cb.dataset.cmd,
+                    args: ["{args}"],
+                    allow_args: true
+                });
+            }
+        });
+
+        try {
+            const currentJson = JSON.parse(toolsJsonArea.value || '{"tools": []}');
+            currentJson.tools = selectedTools;
+            toolsJsonArea.value = JSON.stringify(currentJson, null, 2);
+        } catch (e) {
+            const newJson = { tools: selectedTools };
+            toolsJsonArea.value = JSON.stringify(newJson, null, 2);
+        }
+    }
+
+    toolCheckboxes.forEach(cb => cb.addEventListener('change', updateToolsJson));
+
     // Fetch Models logic
     fetchBtn.addEventListener('click', async () => {
         const url = ollamaUrlInput.value.trim();
@@ -132,6 +161,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (extraArgs) {
             command += " " + extraArgs;
+        }
+
+        const toolsConfigStr = document.getElementById('kali-tools-json').value;
+        let toolsConfig = null;
+        try {
+            toolsConfig = JSON.parse(toolsConfigStr);
+        } catch (e) {
+            showAlert('Invalid JSON formatting in kali_tools.json editor.', 'error');
+            return;
         }
 
         if (!model) return;

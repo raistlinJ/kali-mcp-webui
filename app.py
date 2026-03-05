@@ -32,6 +32,7 @@ def connect_ollmcp():
     ollama_url = data.get('url', 'http://localhost:11434')
     model = data.get('model')
     server_command = data.get('server_command')
+    tools_config = data.get('tools_config')
     
     if not model:
         return jsonify({'success': False, 'error': 'No model selected'}), 400
@@ -51,20 +52,20 @@ def connect_ollmcp():
             }
         }
         
-        # Save JSON inside the container for debugging purposes
-        config_path = os.path.abspath('server_config.json')
-        with open(config_path, 'w') as f:
-            json.dump(server_config, f)
+        # Save JSON files to the local directory (which maps back to the host via Docker Volumes)
+        # 1. tools config
+        if tools_config:
+            with open(os.path.abspath('kali_tools.json'), 'w') as f:
+                json.dump(tools_config, f, indent=2)
+
+        # 2. server config
+        with open(os.path.abspath('server_config.json'), 'w') as f:
+            json.dump(server_config, f, indent=2)
             
         # We return the exact command the user needs to run on their host.
-        # Use a safe temporary path for the host OS instead of the Docker container's /app path
-        host_config_path = '/tmp/kali_mcp_config.json'
-        
-        cmd_string = f"cat << 'EOF' > {host_config_path}\n"
-        cmd_string += json.dumps(server_config, indent=2)
-        cmd_string += f"\nEOF\n\n"
-        cmd_string += f"# Note: Ensure your Python virtual environment is activated before running (e.g., 'source venv/bin/activate')\n"
-        cmd_string += f"ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json {host_config_path}"
+        # Since files are saved dynamically, we only output the execution line.
+        cmd_string = f"# Note: Ensure your Python virtual environment is activated before running (e.g., 'source venv/bin/activate')\n"
+        cmd_string += f"ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
         
         return jsonify({
             'success': True, 
