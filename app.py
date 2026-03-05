@@ -40,36 +40,30 @@ def connect_ollmcp():
         return jsonify({'success': False, 'error': 'No server command provided'}), 400
         
     try:
-        # Create a temporary JSON configuration for the server
-        command_parts = shlex.split(server_command)
-        
-        # mcp-kali-server expects the raw JSON string directly in the args instead of a file path
-        if tools_config:
-            tools_json_str = json.dumps(tools_config)
-            for i, part in enumerate(command_parts):
-                if part.endswith('kali_tools.json'):
-                    command_parts[i] = tools_json_str
-
-        server_config = {
-            "mcpServers": {
-                "mcp-kali-server": {
-                    "command": command_parts[0],
-                    "args": command_parts[1:]
-                }
-            }
-        }
-        
-        # Save JSON files to the local directory (which maps back to the host via Docker Volumes)
-        # 1. tools config
         if tools_config:
             with open(os.path.abspath('kali_tools.json'), 'w') as f:
                 json.dump(tools_config, f, indent=2)
-
-        # 2. server config
-        with open(os.path.abspath('server_config.json'), 'w') as f:
-            json.dump(server_config, f, indent=2)
             
         # We return the exact command the user needs to run on their host.
+        # Use uv run to ensure the mcp SDK is available dynamically
+        server_config = {
+            "mcpServers": {
+                "mcp-kali-server": {
+                    "command": "uv",
+                    "args": [
+                        "run",
+                        "--with",
+                        "mcp",
+                        "mcp_kali.py"
+                    ]
+                }
+            }
+        }
+
+        # Save JSON files to the local directory (which maps back to the host via Docker Volumes)
+        with open(os.path.abspath('server_config.json'), 'w') as f:
+            json.dump(server_config, f, indent=2)
+
         # Since files are saved dynamically, we only output the execution line.
         cmd_string = f"# Note: Ensure your Python virtual environment is activated before running (e.g., 'source venv/bin/activate')\n"
         cmd_string += f"ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"

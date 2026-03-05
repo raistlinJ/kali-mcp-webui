@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let command = "";
 
         if (cmdType === 'npx') {
-            command = "npx -y @smithery/cli run mcp-kali-server";
+            command = "npx -y -p @atimevil/mcp-kali-server mcp-kali-server";
         } else if (cmdType === 'docker') {
             command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
         } else {
