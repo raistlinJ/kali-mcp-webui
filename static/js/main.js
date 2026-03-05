@@ -164,13 +164,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const extraArgs = document.getElementById('kali-args').value.trim();
         let command = "";
 
-        // Sudo environments often mismatch $HOME. Check absolute root paths first, then try the user's home aliased paths
-        const uvResolver = "$( [ -f /root/.local/bin/uv ] && echo /root/.local/bin/uv || [ -f /root/.cargo/bin/uv ] && echo /root/.cargo/bin/uv || [ -f ~/.local/bin/uv ] && echo ~/.local/bin/uv || echo ~/.cargo/bin/uv )";
-
+        // Tools are now globally installed into /usr/local/bin, making them natively accessible to sudo and all shell environments
         if (cmdType === 'python') {
-            command = `bash -c '${uvResolver} run --with mcp mcp_kali.py'`;
+            command = "/usr/local/bin/uv run --with mcp mcp_kali.py";
         } else if (cmdType === 'apt') {
-            command = `bash -c '${uvResolver} run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py'`;
+            command = "/usr/local/bin/uv run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py";
         } else if (cmdType === 'docker') {
             command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
         } else {
