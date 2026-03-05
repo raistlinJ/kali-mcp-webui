@@ -61,7 +61,7 @@ def connect_ollmcp():
 
         # Since files are saved dynamically, we only output the execution line.
         cmd_string = f"# Note: Ensure your Python virtual environment is activated before running (e.g., 'source venv/bin/activate')\n"
-        if "kali-server.py" in server_command:
+        if "kali_server.py" in server_command:
             cmd_string += f"# (The background Kali REST API will be launched automatically by ollmcp via server_config.json)\n"
         cmd_string += f"ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
         
