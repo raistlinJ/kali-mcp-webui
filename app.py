@@ -42,29 +42,28 @@ def connect_ollmcp():
     try:
         # Create a temporary JSON configuration for the server
         command_parts = shlex.split(server_command)
-        args_list = command_parts[1:]
         
-        # 1. tools config: Save to local directory
+        # mcp-kali-server expects the raw JSON string directly in the args instead of a file path
         if tools_config:
-            with open(os.path.abspath('kali_tools.json'), 'w') as f:
-                json.dump(tools_config, f, indent=2)
-                
-            # 'mcp-kali-server' expects the --config argument to be a raw JSON string, not a filepath!
             tools_json_str = json.dumps(tools_config)
-            for i, arg in enumerate(args_list):
-                if arg == './kali_tools.json' or arg == 'kali_tools.json':
-                    args_list[i] = tools_json_str
-        
+            for i, part in enumerate(command_parts):
+                if part.endswith('kali_tools.json'):
+                    command_parts[i] = tools_json_str
+
         server_config = {
             "mcpServers": {
                 "mcp-kali-server": {
                     "command": command_parts[0],
-                    "args": args_list
+                    "args": command_parts[1:]
                 }
             }
         }
         
-        # 2. server config: Save to local directory
+        # Save JSON files to the local directory (which maps back to the host via Docker Volumes)
+        # 1. tools config
+        if tools_config:
+            with open(os.path.abspath('kali_tools.json'), 'w') as f:
+                json.dump(tools_config, f, indent=2)
 
         # 2. server config
         with open(os.path.abspath('server_config.json'), 'w') as f:
