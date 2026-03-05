@@ -8,17 +8,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const kaliCommandType = document.getElementById('kali-command-type');
     const customCommandGroup = document.getElementById('custom-command-group');
     const kaliCustomCommand = document.getElementById('kali-custom-command');
+    const toolsConfigSection = document.getElementById('tools-config-section');
 
     const statusBadge = document.getElementById('status-badge');
     const statusText = statusBadge.querySelector('.status-text');
     const alertsContainer = document.getElementById('alerts-container');
 
-    // UI toggle for custom command
+    // UI toggle for custom command & tools config
     kaliCommandType.addEventListener('change', (e) => {
-        if (e.target.value === 'custom') {
+        const selected = e.target.value;
+
+        // Show/hide custom command input
+        if (selected === 'custom') {
             customCommandGroup.style.display = 'flex';
         } else {
             customCommandGroup.style.display = 'none';
+        }
+
+        // Hide Kali Tools Builder if using the pre-bundled apt/docker packages
+        if (selected === 'apt' || selected === 'docker') {
+            toolsConfigSection.style.display = 'none';
+        } else {
+            toolsConfigSection.style.display = 'block';
         }
     });
 
@@ -169,11 +180,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const toolsConfigStr = document.getElementById('kali-tools-json').value;
         let toolsConfig = null;
-        try {
-            toolsConfig = JSON.parse(toolsConfigStr);
-        } catch (e) {
-            showAlert('Invalid JSON formatting in kali_tools.json editor.', 'error');
-            return;
+
+        // Only parse and pass the tools JSON if we are using an engine that requires it (Native Python or Custom)
+        if (cmdType !== 'apt' && cmdType !== 'docker') {
+            try {
+                toolsConfig = JSON.parse(toolsConfigStr);
+            } catch (e) {
+                showAlert('Invalid JSON formatting in kali_tools.json editor.', 'error');
+                return;
+            }
         }
 
         if (!model) return;
