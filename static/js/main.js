@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = ollamaUrlInput.value.trim();
         const model = modelSelect.value;
         const cmdType = kaliCommandType.value;
+        const extraArgs = document.getElementById('kali-args').value.trim();
         let command = "";
 
         if (cmdType === 'npx') {
@@ -127,6 +128,10 @@ document.addEventListener('DOMContentLoaded', () => {
             command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
         } else {
             command = kaliCustomCommand.value.trim();
+        }
+
+        if (extraArgs) {
+            command += " " + extraArgs;
         }
 
         if (!model) return;
