@@ -170,9 +170,9 @@ document.addEventListener('DOMContentLoaded', () => {
             command = "/usr/local/bin/uv run --with mcp mcp_kali.py";
         } else if (cmdType === 'apt') {
             // The APT package requires both the port 5000 API backend and the MCP client to be running concurrently.
-            // We MUST use `nohup` to completely detach the API's file descriptors from the active terminal pipe so Flask's logging 
-            // doesn't cause a BrokenPipeError when colliding with ollmcp's strict JSON-RPC stdout consumption.
-            command = "bash -c \"nohup /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/dev/null 2>&1 & sleep 2 && /usr/local/bin/uv run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py\"";
+            // We redirect all API I/O to a file (/tmp/kali_server.log) and cut off stdin (</dev/null) to completely
+            // isolate Flask's logging engine from the MCP stdout pipe, preventing BrokenPipeErrors.
+            command = "bash -c \"/usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py </dev/null >/tmp/kali_server.log 2>&1 & sleep 2 && /usr/local/bin/uv run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py\"";
         } else if (cmdType === 'docker') {
             command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
         } else {
