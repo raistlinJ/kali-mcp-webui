@@ -169,10 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cmdType === 'python') {
             command = "/usr/local/bin/uv run --with mcp mcp_kali.py";
         } else if (cmdType === 'apt') {
-            // For the APT package: only mcp_server.py goes in server_config.json.
-            // kali_server.py (Flask API) is started separately as a pre-step shown in the copy-paste snippet.
-            // Mixing both in one process chain causes Flask/werkzeug to contaminate the MCP stdio pipe.
-            command = "/usr/local/bin/uv run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py";
+            // apt_logger_wrapper.py proxies mcp_server.py while logging all tool calls to runs/.
+            // kali_server.py (Flask API) is started separately as a pre-step in the copy-paste snippet.
+            command = "python3 apt_logger_wrapper.py";
         } else if (cmdType === 'docker') {
             command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
         } else {

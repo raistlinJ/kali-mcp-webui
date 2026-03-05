@@ -22,7 +22,10 @@ from session_logger import SessionLogger, make_run_id
 # Session setup
 # ---------------------------------------------------------------------------
 
-_run_id = os.environ.get("MCP_RUN_ID") or make_run_id("apt")
+# Always generate a fresh run ID per invocation so each ollmcp launch gets its own directory.
+# MCP_RUN_ID from the Web UI snippet is used as a label/prefix, not the full ID.
+_label = os.environ.get("MCP_RUN_ID", "apt")
+_run_id = make_run_id(_label)
 _logger = SessionLogger(
     run_id=_run_id,
     metadata={
