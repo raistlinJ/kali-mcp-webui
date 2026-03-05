@@ -66,7 +66,7 @@ def connect_ollmcp():
             # APT package mode: kali_server.py must run separately as a background daemon.
             # It cannot share the same process chain as ollmcp because Flask's logger contaminates the MCP stdio pipe.
             cmd_string += f"# Step 1: Start the Kali REST API in the background (run once, reuse across sessions)\n"
-            cmd_string += f"setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 </dev/null &\n\n"
+            cmd_string += f"setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n\n"
             cmd_string += f"# Step 2: Wait 2 seconds for the API to start, then connect the MCP client\n"
             cmd_string += f"sleep 2 && "
         
