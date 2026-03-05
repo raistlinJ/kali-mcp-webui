@@ -25,8 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
             customCommandGroup.style.display = 'none';
         }
 
-        // Hide Kali Tools Builder if using the pre-bundled apt/docker packages
-        if (selected === 'apt' || selected === 'docker') {
+        // Hide Kali Tools Builder if using the pre-bundled docker packages
+        if (selected === 'docker') {
             toolsConfigSection.style.display = 'none';
         } else {
             toolsConfigSection.style.display = 'block';
@@ -181,8 +181,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const toolsConfigStr = document.getElementById('kali-tools-json').value;
         let toolsConfig = null;
 
-        // Only parse and pass the tools JSON if we are using an engine that requires it (Native Python or Custom)
-        if (cmdType !== 'apt' && cmdType !== 'docker') {
+        // Only parse and pass the tools JSON if we are using an engine that requires it (Native Python, APT, or Custom)
+        if (cmdType !== 'docker') {
             try {
                 toolsConfig = JSON.parse(toolsConfigStr);
             } catch (e) {
