@@ -64,15 +64,17 @@ class SessionLogger:
         }
         self._write_metadata()
 
-        # Init transcript
-        with open(self._transcript_path, "w") as f:
-            started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"# MCP Session Transcript\n\n")
-            f.write(f"**Run ID:** `{run_id}`  \n")
-            f.write(f"**Started:** {started}  \n")
-            f.write(f"**Model:** {metadata.get('model', 'unknown')}  \n")
-            f.write(f"**Server:** {metadata.get('server_type', 'unknown')}  \n\n")
-            f.write("---\n\n")
+        # Init transcript (append mode so multiple processes share safely)
+        is_new = not os.path.exists(self._transcript_path)
+        with open(self._transcript_path, "a") as f:
+            if is_new:
+                started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"# MCP Session Transcript\n\n")
+                f.write(f"**Run ID:** `{run_id}`  \n")
+                f.write(f"**Started:** {started}  \n")
+                f.write(f"**Model:** {metadata.get('model', 'unknown')}  \n")
+                f.write(f"**Server:** {metadata.get('server_type', 'unknown')}  \n\n")
+                f.write("---\n\n")
 
     # ------------------------------------------------------------------
     # Public API
