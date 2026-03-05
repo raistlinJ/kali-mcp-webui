@@ -169,10 +169,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cmdType === 'python') {
             command = "/usr/local/bin/uv run --with mcp mcp_kali.py";
         } else if (cmdType === 'apt') {
-            // The APT package requires both the port 5000 API backend and the MCP client to be running concurrently.
-            // Because Flask's internal logger aggressively inherits the active terminal process pipe and crashes when
-            // colliding with ollmcp, we MUST execute it using a Python daemonizer to legally detach it from the session.
-            command = "bash -c \"python3 -c 'import subprocess; subprocess.Popen([\\\"/usr/local/bin/uv\\\", \\\"run\\\", \\\"--with\\\", \\\"flask\\\", \\\"/usr/share/mcp-kali-server/kali_server.py\\\"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)' && sleep 2 && /usr/local/bin/uv run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py\"";
+            // For the APT package: only mcp_server.py goes in server_config.json.
+            // kali_server.py (Flask API) is started separately as a pre-step shown in the copy-paste snippet.
+            // Mixing both in one process chain causes Flask/werkzeug to contaminate the MCP stdio pipe.
+            command = "/usr/local/bin/uv run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py";
         } else if (cmdType === 'docker') {
             command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
         } else {

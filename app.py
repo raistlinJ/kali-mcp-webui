@@ -61,8 +61,15 @@ def connect_ollmcp():
 
         # Since files are saved dynamically, we only output the execution line.
         cmd_string = f"# Note: Ensure your Python virtual environment is activated before running (e.g., 'source venv/bin/activate')\n"
-        if "kali_server.py" in server_command:
-            cmd_string += f"# (The background Kali REST API will be launched automatically by ollmcp via server_config.json)\n"
+        
+        if "/usr/share/mcp-kali-server/mcp_server.py" in server_command:
+            # APT package mode: kali_server.py must run separately as a background daemon.
+            # It cannot share the same process chain as ollmcp because Flask's logger contaminates the MCP stdio pipe.
+            cmd_string += f"# Step 1: Start the Kali REST API in the background (run once, reuse across sessions)\n"
+            cmd_string += f"setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 </dev/null &\n\n"
+            cmd_string += f"# Step 2: Wait 2 seconds for the API to start, then connect the MCP client\n"
+            cmd_string += f"sleep 2 && "
+        
         cmd_string += f"ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
         
         return jsonify({
