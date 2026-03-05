@@ -164,10 +164,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const extraArgs = document.getElementById('kali-args').value.trim();
         let command = "";
 
+        // Since uv installation locations vary based on whether sudo/root was used, dynamically find it before running
+        const uvResolver = "$( [ -f ~/.local/bin/uv ] && echo ~/.local/bin/uv || echo ~/.cargo/bin/uv )";
+
         if (cmdType === 'python') {
-            command = "~/.cargo/bin/uv run --with mcp mcp_kali.py";
+            command = `bash -c '${uvResolver} run --with mcp mcp_kali.py'`;
         } else if (cmdType === 'apt') {
-            command = "~/.cargo/bin/uv run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py";
+            command = `bash -c '${uvResolver} run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py'`;
         } else if (cmdType === 'docker') {
             command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
         } else {

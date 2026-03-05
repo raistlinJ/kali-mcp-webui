@@ -44,9 +44,7 @@ def connect_ollmcp():
             with open(os.path.abspath('kali_tools.json'), 'w') as f:
                 json.dump(tools_config, f, indent=2)
             
-        # Split the user's string and explicitly resolve shortcuts like `~` before passing them to Node
         command_parts = shlex.split(server_command)
-        command_parts = [os.path.expanduser(part) for part in command_parts]
 
         server_config = {
             "mcpServers": {
