@@ -59,10 +59,15 @@ def connect_ollmcp():
         with open(os.path.abspath('server_config.json'), 'w') as f:
             json.dump(server_config, f, indent=2)
 
-        # Since files are saved dynamically, we only output the execution line.
+        # We generate a self-contained shell script that physical builds the exact server_config.json on the user's Kali VM before running ollmcp.
+        # This completely skips the need to rely on git or SCP to transfer the dynamically generated JSON to the VM.
+        json_output = json.dumps(server_config, indent=2)
+        
         cmd_string = f"# Note: Ensure your Python virtual environment is activated before running (e.g., 'source venv/bin/activate')\n"
         if "kali_server.py" in server_command:
             cmd_string += f"# (The background Kali REST API will be launched automatically by ollmcp via server_config.json)\n"
+            
+        cmd_string += f"cat << 'EOF' > ./server_config.json\n{json_output}\nEOF\n\n"
         cmd_string += f"ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
         
         return jsonify({
