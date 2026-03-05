@@ -25,8 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
             customCommandGroup.style.display = 'none';
         }
 
-        // Hide Kali Tools Builder if using the pre-bundled docker packages
-        if (selected === 'docker') {
+        // Hide Kali Tools Builder if using the pre-bundled docker/apt packages
+        if (selected === 'docker' || selected === 'apt') {
             toolsConfigSection.style.display = 'none';
         } else {
             toolsConfigSection.style.display = 'block';
@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cmdType === 'python') {
             command = "uv run --with mcp mcp_kali.py";
         } else if (cmdType === 'apt') {
-            command = "mcp-kali-server --config ./kali_tools.json";
+            command = "mcp_server.py";
         } else if (cmdType === 'docker') {
             command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
         } else {
@@ -181,8 +181,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const toolsConfigStr = document.getElementById('kali-tools-json').value;
         let toolsConfig = null;
 
-        // Only parse and pass the tools JSON if we are using an engine that requires it (Native Python, APT, or Custom)
-        if (cmdType !== 'docker') {
+        // Only parse and pass the tools JSON if we are using an engine that requires it (Native Python or Custom)
+        if (cmdType !== 'apt' && cmdType !== 'docker') {
             try {
                 toolsConfig = JSON.parse(toolsConfigStr);
             } catch (e) {
