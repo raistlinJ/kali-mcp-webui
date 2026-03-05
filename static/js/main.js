@@ -85,6 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     toolCheckboxes.forEach(cb => cb.addEventListener('change', updateToolsJson));
+    // Run once on load to sync any browser-restored checkbox states
+    updateToolsJson();
 
     // Fetch Models logic
     fetchBtn.addEventListener('click', async () => {
