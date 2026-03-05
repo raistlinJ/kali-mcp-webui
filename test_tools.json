@@ -1,0 +1,1 @@
+{"tools": [{"name": "nmap", "command": "/usr/bin/nmap", "args": ["{args}"], "allow_args": true}]}

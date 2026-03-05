@@ -188,7 +188,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/connect', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, model, server_command: command })
+                body: JSON.stringify({
+                    url,
+                    model,
+                    server_command: command,
+                    tools_config: toolsConfig
+                })
             });
 
             const data = await response.json();
