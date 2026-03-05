@@ -44,18 +44,20 @@ def connect_ollmcp():
             with open(os.path.abspath('kali_tools.json'), 'w') as f:
                 json.dump(tools_config, f, indent=2)
             
-        # We return the exact command the user needs to run on their host.
-        # Use uv run to ensure the mcp SDK is available dynamically
+        command_parts = shlex.split(server_command)
+        
+        # The NPM/Apt versions of mcp-kali-server expect the raw JSON string directly in the args instead of a file path
+        if tools_config:
+            tools_json_str = json.dumps(tools_config)
+            for i, part in enumerate(command_parts):
+                if part.endswith('kali_tools.json'):
+                    command_parts[i] = tools_json_str
+
         server_config = {
             "mcpServers": {
                 "mcp-kali-server": {
-                    "command": "uv",
-                    "args": [
-                        "run",
-                        "--with",
-                        "mcp",
-                        "mcp_kali.py"
-                    ]
+                    "command": command_parts[0],
+                    "args": command_parts[1:]
                 }
             }
         }

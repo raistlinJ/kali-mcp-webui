@@ -153,8 +153,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const extraArgs = document.getElementById('kali-args').value.trim();
         let command = "";
 
-        if (cmdType === 'npx') {
-            command = "npx -y -p @atimevil/mcp-kali-server mcp-kali-server";
+        if (cmdType === 'python') {
+            command = "uv run --with mcp mcp_kali.py";
+        } else if (cmdType === 'apt') {
+            command = "mcp-kali-server --config ./kali_tools.json";
         } else if (cmdType === 'docker') {
             command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
         } else {
