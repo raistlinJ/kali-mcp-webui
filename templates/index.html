@@ -103,37 +103,92 @@
                     </h2>
 
                     <div class="input-group">
-                        <label>Enable Quick Tools</label>
+                        <label>Reconnaissance</label>
                         <div class="tools-grid">
                             <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/nmap"
                                     value="nmap" class="tool-checkbox"> nmap</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/rustscan"
+                                    value="rustscan" class="tool-checkbox"> rustscan</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/masscan"
+                                    value="masscan" class="tool-checkbox"> masscan</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/amass"
+                                    value="amass" class="tool-checkbox"> amass</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/subfinder"
+                                    value="subfinder" class="tool-checkbox"> subfinder</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/recon-ng"
+                                    value="recon-ng" class="tool-checkbox"> recon-ng</label>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Web Application Analysis</label>
+                        <div class="tools-grid">
                             <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/gobuster"
                                     value="gobuster" class="tool-checkbox"> gobuster</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/sqlmap"
-                                    value="sqlmap" class="tool-checkbox"> sqlmap</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/sbin/john"
-                                    value="john" class="tool-checkbox"> john d. ripper</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/hydra"
-                                    value="hydra" class="tool-checkbox"> hydra</label>
                             <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/dirb"
                                     value="dirb" class="tool-checkbox"> dirb</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/ffuf"
+                                    value="ffuf" class="tool-checkbox"> ffuf</label>
                             <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/wfuzz"
                                     value="wfuzz" class="tool-checkbox"> wfuzz</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/nikto"
+                                    value="nikto" class="tool-checkbox"> nikto</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/sqlmap"
+                                    value="sqlmap" class="tool-checkbox"> sqlmap</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/wpscan"
+                                    value="wpscan" class="tool-checkbox"> wpscan</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/whatweb"
+                                    value="whatweb" class="tool-checkbox"> whatweb</label>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Password Attacks</label>
+                        <div class="tools-grid">
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/sbin/john"
+                                    value="john" class="tool-checkbox"> john (JtR)</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/hashcat"
+                                    value="hashcat" class="tool-checkbox"> hashcat</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/hydra"
+                                    value="hydra" class="tool-checkbox"> hydra</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/medusa"
+                                    value="medusa" class="tool-checkbox"> medusa</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/crowbar"
+                                    value="crowbar" class="tool-checkbox"> crowbar</label>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Vulnerability & Network</label>
+                        <div class="tools-grid">
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/searchsploit"
+                                    value="searchsploit" class="tool-checkbox"> searchsploit</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/netcat"
+                                    value="netcat" class="tool-checkbox"> netcat (nc)</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/ncat"
+                                    value="ncat" class="tool-checkbox"> ncat</label>
+                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/tcpdump"
+                                    value="tcpdump" class="tool-checkbox"> tcpdump</label>
                             <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/sbin/aircrack-ng"
                                     value="aircrack-ng" class="tool-checkbox"> aircrack-ng</label>
                         </div>
                     </div>
 
                     <div class="input-group">
-                        <label for="kali-tools-json"
-                            style="display: flex; justify-content: space-between; align-items: center;">
-                            <span><i class="ph ph-file-code"></i> kali_tools.json Editor</span>
-                            <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(Auto-saves
-                                on Connect)</span>
-                        </label>
-                        <textarea id="kali-tools-json" rows="8" spellcheck="false">{
+                        <details class="json-editor-details">
+                            <summary>
+                                <div
+                                    style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                    <span><i class="ph ph-file-code"></i> Advanced: kali_tools.json Editor</span>
+                                    <span
+                                        style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(Auto-saves
+                                        on Connect) <i class="ph ph-caret-down"></i></span>
+                                </div>
+                            </summary>
+                            <textarea id="kali-tools-json" rows="8" spellcheck="false" style="margin-top: 1rem;">{
   "tools": []
 }</textarea>
+                        </details>
                     </div>
                 </div>
 
