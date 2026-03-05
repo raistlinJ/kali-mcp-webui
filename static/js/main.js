@@ -33,7 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-
+    // Manually trigger the event once on page load so the UI syncs with preserved dropdown states
+    kaliCommandType.dispatchEvent(new Event('change'));
 
     // Utility to show alerts
     const showAlert = (message, type = 'error') => {
