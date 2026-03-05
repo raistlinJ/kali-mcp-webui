@@ -52,6 +52,18 @@ if ! command -v uv &> /dev/null; then
     fi
 fi
 
+# 4. Globalize tools for sudo compatibility
+echo "[kali-mcp-webui] Symlinking tools globally to /usr/local/bin for sudo support..."
+if [ -f "$REAL_HOME/.local/bin/ollmcp" ]; then
+    sudo ln -sf "$REAL_HOME/.local/bin/ollmcp" /usr/local/bin/ollmcp
+fi
+
+if [ -f "$REAL_HOME/.cargo/bin/uv" ]; then
+    sudo ln -sf "$REAL_HOME/.cargo/bin/uv" /usr/local/bin/uv
+elif [ -f "$REAL_HOME/.local/bin/uv" ]; then
+    sudo ln -sf "$REAL_HOME/.local/bin/uv" /usr/local/bin/uv
+fi
+
 echo "[kali-mcp-webui] Starting Docker Compose..."
 docker-compose up -d --build
 
