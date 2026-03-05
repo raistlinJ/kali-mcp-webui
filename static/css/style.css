@@ -40,7 +40,8 @@ body {
     justify-content: center;
     align-items: center;
     position: relative;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 /* Background Decorations */
@@ -120,6 +121,7 @@ body {
     font-weight: 700;
     letter-spacing: -0.02em;
     background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
