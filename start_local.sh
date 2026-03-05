@@ -4,8 +4,13 @@
 # Exit on any error
 set -e
 
+# Determine the real user and home directory in case the script is run with sudo
+REAL_USER=${SUDO_USER:-$USER}
+# Use getent or eval to find the real home directory safely
+REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+
 # Ensure ~/.local/bin and ~/.cargo/bin are in PATH so we can find pipx and uv
-export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+export PATH="$REAL_HOME/.cargo/bin:$REAL_HOME/.local/bin:$PATH"
 
 echo "[kali-mcp-webui] Checking for required tools..."
 
@@ -17,9 +22,17 @@ if ! command -v ollmcp &> /dev/null; then
     if ! command -v pipx &> /dev/null; then
         echo "Installing pipx..."
         sudo apt update && sudo apt install -y pipx
-        pipx ensurepath
+        if [ -n "$SUDO_USER" ]; then
+            sudo -u "$REAL_USER" pipx ensurepath
+        else
+            pipx ensurepath
+        fi
     fi
-    pipx install mcp-client-for-ollama
+    if [ -n "$SUDO_USER" ]; then
+        sudo -u "$REAL_USER" pipx install mcp-client-for-ollama
+    else
+        pipx install mcp-client-for-ollama
+    fi
 fi
 
 echo "[kali-mcp-webui] Setting up python virtual environment via uv..."
@@ -27,11 +40,15 @@ echo "[kali-mcp-webui] Setting up python virtual environment via uv..."
 # Ensure uv is installed
 if ! command -v uv &> /dev/null; then
     echo "Installing uv..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    if [ -f "$HOME/.local/bin/env" ]; then
-        source "$HOME/.local/bin/env"
-    elif [ -f "$HOME/.cargo/env" ]; then
-        source "$HOME/.cargo/env"
+    if [ -n "$SUDO_USER" ]; then
+        sudo -u "$REAL_USER" sh -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+    else
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+    fi
+    if [ -f "$REAL_HOME/.local/bin/env" ]; then
+        source "$REAL_HOME/.local/bin/env"
+    elif [ -f "$REAL_HOME/.cargo/env" ]; then
+        source "$REAL_HOME/.cargo/env"
     fi
 fi
 
