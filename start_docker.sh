@@ -4,6 +4,9 @@
 # Exit on any error
 set -e
 
+# Ensure ~/.local/bin and ~/.cargo/bin are in PATH so we can find pipx and uv
+export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+
 echo "[kali-mcp-webui] Checking for required host tools..."
 
 
