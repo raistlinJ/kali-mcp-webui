@@ -6,11 +6,6 @@ set -e
 
 echo "[kali-mcp-webui] Checking for required host tools..."
 
-# 1. Check for npm (required to run the Kali server via NPX on the host)
-if ! command -v npm &> /dev/null; then
-    echo "Installing npm on the host..."
-    sudo apt update && sudo apt install -y npm
-fi
 
 # 2. Check for pipx or uv to install ollmcp globally
 echo "[kali-mcp-webui] Checking for ollmcp..."

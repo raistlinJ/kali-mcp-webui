@@ -9,12 +9,6 @@ export PATH="$HOME/.local/bin:$PATH"
 
 echo "[kali-mcp-webui] Checking for required tools..."
 
-# 1. Check for npm (required to run the Kali server)
-if ! command -v npm &> /dev/null; then
-    echo "ERROR: 'npm' is not installed."
-    echo "Please install it via 'sudo apt install npm' before running the local WebUI."
-    exit 1
-fi
 
 # 2. Check for pipx or uv to install ollmcp globally
 echo "[kali-mcp-webui] Checking for ollmcp..."
