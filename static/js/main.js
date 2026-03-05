@@ -164,8 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const extraArgs = document.getElementById('kali-args').value.trim();
         let command = "";
 
-        // Since uv installation locations vary based on whether sudo/root was used, dynamically find it before running
-        const uvResolver = "$( [ -f ~/.local/bin/uv ] && echo ~/.local/bin/uv || echo ~/.cargo/bin/uv )";
+        // Sudo environments often mismatch $HOME. Check absolute root paths first, then try the user's home aliased paths
+        const uvResolver = "$( [ -f /root/.local/bin/uv ] && echo /root/.local/bin/uv || [ -f /root/.cargo/bin/uv ] && echo /root/.cargo/bin/uv || [ -f ~/.local/bin/uv ] && echo ~/.local/bin/uv || echo ~/.cargo/bin/uv )";
 
         if (cmdType === 'python') {
             command = `bash -c '${uvResolver} run --with mcp mcp_kali.py'`;
