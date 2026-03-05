@@ -230,6 +230,34 @@
             <!-- Alerts Container -->
             <div id="alerts-container" class="alerts-container"></div>
 
+            <!-- Sessions Panel -->
+            <div class="sessions-panel" id="sessions-panel">
+                <div class="sessions-header">
+                    <h2><i class="ph ph-clock-countdown"></i> Past Sessions</h2>
+                    <button type="button" id="refresh-sessions-btn" class="btn btn-secondary"
+                        style="width:auto;padding:0.4rem 0.85rem;font-size:0.82rem;">
+                        <i class="ph ph-arrows-clockwise"></i> Refresh
+                    </button>
+                </div>
+                <div class="sessions-list" id="sessions-list">
+                    <div class="empty-state">No sessions yet. Connect to start logging.</div>
+                </div>
+                <!-- Session detail view (hidden until a session is selected) -->
+                <div class="session-detail" id="session-detail" style="display:none;">
+                    <div class="detail-tabs" id="detail-tabs">
+                        <button class="detail-tab active" data-tab="transcript"><i class="ph ph-chat-text"></i>
+                            Transcript</button>
+                        <button class="detail-tab" data-tab="tool_calls"><i class="ph ph-wrench"></i> Tool
+                            Calls</button>
+                        <button class="detail-tab" data-tab="artifacts"><i class="ph ph-file-arrow-down"></i>
+                            Artifacts</button>
+                    </div>
+                    <div class="detail-content" id="detail-content">
+                        <div class="empty-state">Select a session above.</div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 

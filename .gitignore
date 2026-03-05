@@ -51,3 +51,6 @@ server_config.json
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Session logs
+runs/

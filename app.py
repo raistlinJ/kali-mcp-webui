@@ -1,16 +1,27 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, abort
 import requests
 import subprocess
 import os
 import json
 import shlex
 import tempfile
+from datetime import datetime
 
 app = Flask(__name__)
+
+# Path to runs/ directory (co-located with app.py)
+RUNS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs")
+
+
+def _make_run_id(server_type: str) -> str:
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return f"{ts}_{server_type}"
+
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/api/models', methods=['POST'])
 def get_models():
@@ -18,13 +29,13 @@ def get_models():
     ollama_url = data.get('url', 'http://localhost:11434')
     
     try:
-        # Fetch tags from Ollama API
         response = requests.get(f"{ollama_url}/api/tags", timeout=5)
         response.raise_for_status()
         models = [model['name'] for model in response.json().get('models', [])]
         return jsonify({'success': True, 'models': models})
     except requests.exceptions.RequestException as e:
         return jsonify({'success': False, 'error': str(e)}), 400
+
 
 @app.route('/api/connect', methods=['POST'])
 def connect_ollmcp():
@@ -43,7 +54,21 @@ def connect_ollmcp():
         if tools_config:
             with open(os.path.abspath('kali_tools.json'), 'w') as f:
                 json.dump(tools_config, f, indent=2)
-            
+
+        is_apt = "/usr/share/mcp-kali-server/mcp_server.py" in server_command
+        is_native = "mcp_kali.py" in server_command or "apt_logger_wrapper.py" in server_command
+
+        # Generate unique run ID for this session
+        server_type = "apt" if is_apt else "native"
+        run_id = _make_run_id(server_type)
+
+        # Build env var exports to inject into the shell command
+        env_exports = (
+            f"export MCP_RUN_ID={shlex.quote(run_id)} "
+            f"MCP_MODEL={shlex.quote(model)} "
+            f"MCP_OLLAMA_URL={shlex.quote(ollama_url)}"
+        )
+
         command_parts = shlex.split(server_command)
 
         server_config = {
@@ -55,26 +80,27 @@ def connect_ollmcp():
             }
         }
 
-        # Save JSON files to the local directory (which maps back to the host via Docker Volumes)
         with open(os.path.abspath('server_config.json'), 'w') as f:
             json.dump(server_config, f, indent=2)
 
-        # Since files are saved dynamically, we only output the execution line.
+        # Build the copy-paste shell snippet
         cmd_string = f"# Note: Ensure your Python virtual environment is activated before running (e.g., 'source venv/bin/activate')\n"
-        
-        if "/usr/share/mcp-kali-server/mcp_server.py" in server_command:
-            # APT package mode: kali_server.py must run separately as a background daemon.
-            # It cannot share the same process chain as ollmcp because Flask's logger contaminates the MCP stdio pipe.
+        cmd_string += f"# Session run ID: {run_id}\n"
+        cmd_string += f"{env_exports}\n\n"
+
+        if is_apt:
+            # APT package mode: kali_server.py must be a separate background daemon
             cmd_string += f"# Step 1: Kill any stale API instance, then start a fresh one in the background\n"
             cmd_string += f"pkill -f 'kali_server.py' 2>/dev/null; sleep 1\n"
             cmd_string += f"setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n\n"
-            cmd_string += f"# Step 2: Wait 2 seconds for the API to start, then connect the MCP client\n"
+            cmd_string += f"# Step 2: Wait for the API to start, then connect the MCP client (with session logging)\n"
             cmd_string += f"sleep 2 && "
-        
+
         cmd_string += f"ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
         
         return jsonify({
-            'success': True, 
+            'success': True,
+            'run_id': run_id,
             'message': 'Command generated successfully',
             'status': 'connected',
             'command': cmd_string
@@ -82,6 +108,94 @@ def connect_ollmcp():
             
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# -----------------------------------------------------------------------
+# Sessions API
+# -----------------------------------------------------------------------
+
+@app.route('/api/sessions', methods=['GET'])
+def list_sessions():
+    """Return a sorted list of past session metadata."""
+    if not os.path.isdir(RUNS_DIR):
+        return jsonify({'sessions': []})
+    
+    sessions = []
+    for run_id in sorted(os.listdir(RUNS_DIR), reverse=True):
+        meta_path = os.path.join(RUNS_DIR, run_id, "metadata.json")
+        if os.path.isfile(meta_path):
+            try:
+                with open(meta_path) as f:
+                    sessions.append(json.load(f))
+            except Exception:
+                pass
+    return jsonify({'sessions': sessions})
+
+
+@app.route('/api/sessions/<run_id>/transcript', methods=['GET'])
+def get_transcript(run_id):
+    """Return the transcript.md content for a run."""
+    _validate_run_id(run_id)
+    path = os.path.join(RUNS_DIR, run_id, "transcript.md")
+    if not os.path.isfile(path):
+        return jsonify({'content': ''}), 404
+    with open(path) as f:
+        return jsonify({'content': f.read()})
+
+
+@app.route('/api/sessions/<run_id>/tool_calls', methods=['GET'])
+def get_tool_calls(run_id):
+    """Return a list of tool call records for a run."""
+    _validate_run_id(run_id)
+    tc_dir = os.path.join(RUNS_DIR, run_id, "tool_calls")
+    if not os.path.isdir(tc_dir):
+        return jsonify({'tool_calls': []})
+    
+    records = []
+    for fname in sorted(os.listdir(tc_dir)):
+        if fname.endswith(".json"):
+            try:
+                with open(os.path.join(tc_dir, fname)) as f:
+                    records.append(json.load(f))
+            except Exception:
+                pass
+    return jsonify({'tool_calls': records})
+
+
+@app.route('/api/sessions/<run_id>/artifacts', methods=['GET'])
+def list_artifacts(run_id):
+    """Return a list of artifact filenames for a run."""
+    _validate_run_id(run_id)
+    art_dir = os.path.join(RUNS_DIR, run_id, "artifacts")
+    if not os.path.isdir(art_dir):
+        return jsonify({'artifacts': []})
+    return jsonify({'artifacts': sorted(os.listdir(art_dir))})
+
+
+@app.route('/api/sessions/<run_id>/artifacts/<filename>', methods=['GET'])
+def get_artifact(run_id, filename):
+    """Return the raw content of a specific artifact file."""
+    _validate_run_id(run_id)
+    _validate_filename(filename)
+    path = os.path.join(RUNS_DIR, run_id, "artifacts", filename)
+    if not os.path.isfile(path):
+        abort(404)
+    with open(path) as f:
+        return jsonify({'filename': filename, 'content': f.read()})
+
+
+def _validate_run_id(run_id: str):
+    """Prevent path traversal in run_id."""
+    import re
+    if not re.match(r'^[\w\-\.]+$', run_id):
+        abort(400, "Invalid run_id")
+
+
+def _validate_filename(filename: str):
+    """Prevent path traversal in artifact filename."""
+    import re
+    if not re.match(r'^[\w\-\.]+$', filename) or '..' in filename:
+        abort(400, "Invalid filename")
 
 
 if __name__ == '__main__':

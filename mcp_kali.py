@@ -1,10 +1,24 @@
 import json
 import sys
 import subprocess
+import time
+import os
 from mcp.server import Server
 from mcp.types import Tool, TextContent
+from session_logger import SessionLogger, make_run_id
 
 server = Server("mcp-kali")
+
+# Initialize session logger on startup
+_run_id = os.environ.get("MCP_RUN_ID") or make_run_id("native")
+_logger = SessionLogger(
+    run_id=_run_id,
+    metadata={
+        "server_type": "native",
+        "model": os.environ.get("MCP_MODEL", "unknown"),
+        "ollama_url": os.environ.get("MCP_OLLAMA_URL", "unknown"),
+    }
+)
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
@@ -46,18 +60,38 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         cmd.extend(shlex.split(arguments["args"]))
         
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300) # 5 min timeout
+        t0 = time.time()
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        duration_ms = int((time.time() - t0) * 1000)
+
         output = result.stdout
-        if result.stderr:
-            output += f"\nSTDERR:\n{result.stderr}"
+        stderr = result.stderr or ""
+        if stderr:
+            output += f"\nSTDERR:\n{stderr}"
+
+        # Log the tool call
+        _logger.log_tool_call(
+            name=name,
+            args=arguments,
+            result=output or "Command executed successfully (no output)",
+            duration_ms=duration_ms,
+            exit_code=result.returncode,
+            stderr=stderr,
+        )
+
         return [TextContent(type="text", text=output or "Command executed successfully (no output)")]
     except Exception as e:
-        return [TextContent(type="text", text=f"Execution error: {str(e)}")]
+        err_msg = f"Execution error: {str(e)}"
+        _logger.log_tool_call(name=name, args=arguments, result=err_msg, exit_code=-1)
+        return [TextContent(type="text", text=err_msg)]
 
 async def main():
-    from mcp.server.stdio import stdio_server
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+    try:
+        from mcp.server.stdio import stdio_server
+        async with stdio_server() as (read_stream, write_stream):
+            await server.run(read_stream, write_stream, server.create_initialization_options())
+    finally:
+        _logger.finalize()
 
 if __name__ == "__main__":
     import asyncio

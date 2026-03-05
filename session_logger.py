@@ -1,0 +1,194 @@
+"""
+Session Logger for Kali MCP WebUI
+Provides structured, timestamped logging of MCP sessions including
+tool calls, arguments, outputs, and artifacts.
+"""
+
+import json
+import os
+import re
+import time
+from datetime import datetime, timezone
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _sanitize(name: str) -> str:
+    """Make a name safe for use as a filename component."""
+    return re.sub(r'[^\w\-]', '_', name)[:64]
+
+
+class SessionLogger:
+    """
+    Creates and manages a run directory under `runs/` with the structure:
+
+        runs/<run_id>/
+            metadata.json
+            transcript.md
+            tool_calls/
+                001_<tool>.json
+            artifacts/
+                001_<tool>_output.txt   (saved when output > 1KB)
+    """
+
+    def __init__(self, run_id: str, metadata: dict, base_dir: str = None):
+        """
+        Args:
+            run_id:    Unique run identifier, e.g. "2026-03-05_02-15-00_run001"
+            metadata:  Dict with keys like model, server_type, ollama_url, etc.
+            base_dir:  Parent directory for runs/ (defaults to cwd)
+        """
+        if base_dir is None:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+
+        self.run_dir = os.path.join(base_dir, "runs", run_id)
+        self.tool_calls_dir = os.path.join(self.run_dir, "tool_calls")
+        self.artifacts_dir = os.path.join(self.run_dir, "artifacts")
+        self._tool_counter = 0
+
+        os.makedirs(self.tool_calls_dir, exist_ok=True)
+        os.makedirs(self.artifacts_dir, exist_ok=True)
+
+        self._transcript_path = os.path.join(self.run_dir, "transcript.md")
+        self._metadata_path = os.path.join(self.run_dir, "metadata.json")
+
+        # Write initial metadata
+        self._metadata = {
+            "run_id": run_id,
+            "start_time": _now_iso(),
+            "end_time": None,
+            "status": "running",
+            **metadata
+        }
+        self._write_metadata()
+
+        # Init transcript
+        with open(self._transcript_path, "w") as f:
+            started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"# MCP Session Transcript\n\n")
+            f.write(f"**Run ID:** `{run_id}`  \n")
+            f.write(f"**Started:** {started}  \n")
+            f.write(f"**Model:** {metadata.get('model', 'unknown')}  \n")
+            f.write(f"**Server:** {metadata.get('server_type', 'unknown')}  \n\n")
+            f.write("---\n\n")
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def log_prompt(self, text: str):
+        """Append a USER prompt turn to the transcript."""
+        ts = datetime.now().strftime("%H:%M:%S")
+        with open(self._transcript_path, "a") as f:
+            f.write(f"### 👤 User [{ts}]\n\n{text}\n\n")
+
+    def log_response(self, text: str):
+        """Append an ASSISTANT response turn to the transcript."""
+        ts = datetime.now().strftime("%H:%M:%S")
+        with open(self._transcript_path, "a") as f:
+            f.write(f"### 🤖 Assistant [{ts}]\n\n{text}\n\n")
+
+    def log_tool_call(self, name: str, args: dict, result: str,
+                      duration_ms: int = 0, exit_code: int = 0, stderr: str = ""):
+        """
+        Write a timestamped JSON file for a single tool invocation.
+
+        Args:
+            name:        Tool name (e.g. "nmap")
+            args:        Dict of arguments passed to the tool
+            result:      stdout / main result text
+            duration_ms: How long the tool took in milliseconds
+            exit_code:   Process exit code (0 = success)
+            stderr:      stderr output if any
+        """
+        self._tool_counter += 1
+        safe_name = _sanitize(name)
+        filename = f"{self._tool_counter:03d}_{safe_name}.json"
+        path = os.path.join(self.tool_calls_dir, filename)
+
+        record = {
+            "seq": self._tool_counter,
+            "timestamp": _now_iso(),
+            "tool": name,
+            "args": args,
+            "exit_code": exit_code,
+            "duration_ms": duration_ms,
+            "result_length": len(result),
+            "result": result if len(result) <= 4096 else result[:4096] + "\n...[truncated, see artifacts]",
+            "stderr": stderr,
+        }
+
+        with open(path, "w") as f:
+            json.dump(record, f, indent=2)
+
+        # Save large outputs as separate artifact
+        if len(result) > 1024:
+            self.log_artifact(f"{self._tool_counter:03d}_{safe_name}_output.txt", result)
+
+        # Append a brief tool call note to the transcript
+        ts = datetime.now().strftime("%H:%M:%S")
+        args_str = json.dumps(args) if args else "(no args)"
+        with open(self._transcript_path, "a") as f:
+            f.write(f"#### 🔧 Tool Call [{ts}]: `{name}`\n\n")
+            f.write(f"**Args:** `{args_str}`  \n")
+            f.write(f"**Duration:** {duration_ms}ms  \n")
+            f.write(f"**Exit code:** {exit_code}  \n\n")
+            preview = result[:512] + ("..." if len(result) > 512 else "")
+            f.write(f"```\n{preview}\n```\n\n")
+
+        return filename
+
+    def log_artifact(self, name: str, content: str):
+        """Save raw content as an artifact file."""
+        safe_name = _sanitize(name) if not name.endswith(".txt") else name
+        path = os.path.join(self.artifacts_dir, safe_name)
+        with open(path, "w") as f:
+            f.write(content)
+        return safe_name
+
+    def finalize(self, status: str = "completed"):
+        """Mark the session as finished and write end time to metadata."""
+        self._metadata["end_time"] = _now_iso()
+        self._metadata["status"] = status
+        self._metadata["total_tool_calls"] = self._tool_counter
+        self._write_metadata()
+
+        ts = datetime.now().strftime("%H:%M:%S")
+        with open(self._transcript_path, "a") as f:
+            f.write(f"---\n\n**Session ended** [{ts}] — {self._tool_counter} tool call(s)\n")
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+
+    def _write_metadata(self):
+        with open(self._metadata_path, "w") as f:
+            json.dump(self._metadata, f, indent=2)
+
+
+def make_run_id(prefix: str = "") -> str:
+    """Generate a unique run ID based on current timestamp."""
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return f"{ts}_{prefix}" if prefix else ts
+
+
+def load_session_list(base_dir: str = None) -> list:
+    """Return a sorted list of session metadata dicts from the runs/ directory."""
+    if base_dir is None:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+    runs_dir = os.path.join(base_dir, "runs")
+    if not os.path.isdir(runs_dir):
+        return []
+
+    sessions = []
+    for run_id in sorted(os.listdir(runs_dir), reverse=True):
+        meta_path = os.path.join(runs_dir, run_id, "metadata.json")
+        if os.path.isfile(meta_path):
+            try:
+                with open(meta_path) as f:
+                    sessions.append(json.load(f))
+            except Exception:
+                pass
+    return sessions

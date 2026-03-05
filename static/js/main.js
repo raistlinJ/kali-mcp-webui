@@ -263,4 +263,143 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Failed to copy command to clipboard');
         }
     });
+
+    // ---------------------------------------------------------------
+    // Sessions Browser
+    // ---------------------------------------------------------------
+    let _currentRunId = null;
+    let _currentTab = 'transcript';
+
+    const sessionsList = document.getElementById('sessions-list');
+    const sessionDetail = document.getElementById('session-detail');
+    const detailContent = document.getElementById('detail-content');
+
+    async function loadSessions() {
+        try {
+            const res = await fetch('/api/sessions');
+            const data = await res.json();
+            renderSessionList(data.sessions || []);
+        } catch (e) {
+            sessionsList.innerHTML = '<div class="empty-state">Could not load sessions.</div>';
+        }
+    }
+
+    function renderSessionList(sessions) {
+        if (!sessions.length) {
+            sessionsList.innerHTML = '<div class="empty-state">No sessions yet. Connect to start logging.</div>';
+            return;
+        }
+        sessionsList.innerHTML = sessions.map(s => {
+            const startTime = s.start_time ? new Date(s.start_time).toLocaleString() : '—';
+            const tools = s.total_tool_calls != null ? `${s.total_tool_calls} tool call(s)` : '';
+            const status = s.status || 'unknown';
+            return `
+            <div class="session-card ${s.run_id === _currentRunId ? 'active' : ''}" data-run="${s.run_id}">
+                <div class="session-card-left">
+                    <span class="session-run-id">${s.run_id}</span>
+                    <span class="session-meta">${startTime} · ${s.model || '?'} · ${s.server_type || '?'}${tools ? ' · ' + tools : ''}</span>
+                </div>
+                <span class="session-status ${status}">${status}</span>
+            </div>`;
+        }).join('');
+
+        sessionsList.querySelectorAll('.session-card').forEach(card => {
+            card.addEventListener('click', () => openSession(card.dataset.run));
+        });
+    }
+
+    async function openSession(runId) {
+        _currentRunId = runId;
+        sessionDetail.style.display = 'block';
+        // Update active state
+        sessionsList.querySelectorAll('.session-card').forEach(c => {
+            c.classList.toggle('active', c.dataset.run === runId);
+        });
+        await renderTab(_currentTab);
+    }
+
+    async function renderTab(tab) {
+        _currentTab = tab;
+        document.querySelectorAll('.detail-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+
+        if (tab === 'transcript') {
+            try {
+                const res = await fetch(`/api/sessions/${_currentRunId}/transcript`);
+                const data = await res.json();
+                detailContent.innerHTML = `<pre>${escapeHtml(data.content || '(empty)')}</pre>`;
+            } catch { detailContent.innerHTML = '<div class="empty-state">Could not load transcript.</div>'; }
+        } else if (tab === 'tool_calls') {
+            try {
+                const res = await fetch(`/api/sessions/${_currentRunId}/tool_calls`);
+                const data = await res.json();
+                const tcs = data.tool_calls || [];
+                if (!tcs.length) {
+                    detailContent.innerHTML = '<div class="empty-state">No tool calls recorded.</div>';
+                    return;
+                }
+                detailContent.innerHTML = tcs.map(tc => `
+                    <div class="tool-call-card">
+                        <div class="tool-call-header">
+                            <span class="tool-call-name"><i class="ph ph-wrench"></i> ${escapeHtml(tc.tool)}</span>
+                            <span class="tool-call-meta">${tc.duration_ms}ms · exit ${tc.exit_code}</span>
+                        </div>
+                        <div style="font-size:0.78rem;color:var(--text-secondary);">Args: ${escapeHtml(JSON.stringify(tc.args))}</div>
+                        <div class="tool-call-result">${escapeHtml(tc.result || '(no output)')}</div>
+                    </div>`).join('');
+            } catch { detailContent.innerHTML = '<div class="empty-state">Could not load tool calls.</div>'; }
+        } else if (tab === 'artifacts') {
+            try {
+                const res = await fetch(`/api/sessions/${_currentRunId}/artifacts`);
+                const data = await res.json();
+                const arts = data.artifacts || [];
+                if (!arts.length) {
+                    detailContent.innerHTML = '<div class="empty-state">No artifacts saved.</div>';
+                    return;
+                }
+                detailContent.innerHTML = `<ul class="artifact-list">${arts.map(a =>
+                    `<li class="artifact-item" data-artifact="${escapeHtml(a)}"><i class="ph ph-file-text"></i> ${escapeHtml(a)}</li>`
+                ).join('')}</ul>`;
+                detailContent.querySelectorAll('.artifact-item').forEach(el => {
+                    el.addEventListener('click', () => openArtifact(el.dataset.artifact));
+                });
+            } catch { detailContent.innerHTML = '<div class="empty-state">Could not load artifacts.</div>'; }
+        }
+    }
+
+    async function openArtifact(filename) {
+        try {
+            const res = await fetch(`/api/sessions/${_currentRunId}/artifacts/${filename}`);
+            const data = await res.json();
+            detailContent.innerHTML = `
+                <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--text-secondary);">
+                    <button onclick="renderTab('artifacts')" style="background:none;border:none;color:var(--accent-primary);cursor:pointer;font-size:0.8rem;">← Back</button>
+                    &nbsp;${escapeHtml(filename)}
+                </div>
+                <pre>${escapeHtml(data.content || '(empty)')}</pre>`;
+        } catch { detailContent.innerHTML = '<div class="empty-state">Could not load artifact.</div>'; }
+    }
+
+    // Tab click
+    document.getElementById('detail-tabs').addEventListener('click', e => {
+        const tab = e.target.closest('.detail-tab');
+        if (tab && _currentRunId) renderTab(tab.dataset.tab);
+    });
+
+    // Refresh button
+    document.getElementById('refresh-sessions-btn').addEventListener('click', loadSessions);
+
+    // Auto-refresh sessions list after a successful connect
+    const origConnect = document.getElementById('connect-btn');
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // Load sessions on page load
+    loadSessions();
 });
+
