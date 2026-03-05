@@ -169,8 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cmdType === 'python') {
             command = "/usr/local/bin/uv run --with mcp mcp_kali.py";
         } else if (cmdType === 'apt') {
-            // The APT package requires both the port 5000 API backend and the MCP client to be running concurrently
-            command = "bash -c \"/usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py & sleep 2 && /usr/local/bin/uv run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py\"";
+            // The APT package requires both the port 5000 API backend and the MCP client to be running concurrently.
+            // We must silence the background API's stdout (>/dev/null 2>&1) because MCP strictly requires a pure JSON-RPC stdout stream.
+            command = "bash -c \"/usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/dev/null 2>&1 & sleep 2 && /usr/local/bin/uv run --with mcp --with requests /usr/share/mcp-kali-server/mcp_server.py\"";
         } else if (cmdType === 'docker') {
             command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
         } else {
