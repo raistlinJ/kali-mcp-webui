@@ -6,34 +6,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Kali fields
     const kaliCommandType = document.getElementById('kali-command-type');
-    const customCommandGroup = document.getElementById('custom-command-group');
-    const kaliCustomCommand = document.getElementById('kali-custom-command');
     const toolsConfigSection = document.getElementById('tools-config-section');
 
     const statusBadge = document.getElementById('status-badge');
     const statusText = statusBadge.querySelector('.status-text');
     const alertsContainer = document.getElementById('alerts-container');
 
-    // UI toggle for custom command & tools config
+    // Toggle tools config visibility: hide for APT (tools are bundled in mcp_server.py)
     kaliCommandType.addEventListener('change', (e) => {
-        const selected = e.target.value;
-
-        // Show/hide custom command input
-        if (selected === 'custom') {
-            customCommandGroup.style.display = 'flex';
-        } else {
-            customCommandGroup.style.display = 'none';
-        }
-
-        // Hide Kali Tools Builder if using the pre-bundled docker/apt packages
-        if (selected === 'docker' || selected === 'apt') {
-            toolsConfigSection.style.display = 'none';
-        } else {
-            toolsConfigSection.style.display = 'block';
-        }
+        toolsConfigSection.style.display = e.target.value === 'apt' ? 'none' : 'block';
     });
 
-    // Manually trigger the event once on page load so the UI syncs with preserved dropdown states
+    // Sync UI on page load
     kaliCommandType.dispatchEvent(new Event('change'));
 
     // Utility to show alerts
@@ -165,17 +149,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const extraArgs = document.getElementById('kali-args').value.trim();
         let command = "";
 
-        // Tools are now globally installed into /usr/local/bin, making them natively accessible to sudo and all shell environments
+        // Build the server command based on the selected mode
         if (cmdType === 'python') {
             command = "/usr/local/bin/uv run --with mcp mcp_kali.py";
         } else if (cmdType === 'apt') {
             // apt_logger_wrapper.py proxies mcp_server.py while logging all tool calls to runs/.
             // kali_server.py (Flask API) is started separately as a pre-step in the copy-paste snippet.
             command = "python3 apt_logger_wrapper.py";
-        } else if (cmdType === 'docker') {
-            command = "docker run -i --rm -e KALI_HOST=your-host -e KALI_USER=your-user -e KALI_PASS=your-pass mcpmarket/mcp-kali-server"; // Placeholder
-        } else {
-            command = kaliCustomCommand.value.trim();
         }
 
         if (extraArgs) {
@@ -185,8 +165,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const toolsConfigStr = document.getElementById('kali-tools-json').value;
         let toolsConfig = null;
 
-        // Only parse and pass the tools JSON if we are using an engine that requires it (Native Python or Custom)
-        if (cmdType !== 'apt' && cmdType !== 'docker') {
+        // Only parse and pass the tools JSON for Native Python mode (APT bundles its own tool list)
+        if (cmdType !== 'apt') {
             try {
                 toolsConfig = JSON.parse(toolsConfigStr);
             } catch (e) {
