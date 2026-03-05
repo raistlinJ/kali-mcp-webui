@@ -5,20 +5,29 @@ import time
 import os
 from mcp.server import Server
 from mcp.types import Tool, TextContent
-from session_logger import SessionLogger, make_run_id
 
 server = Server("mcp-kali")
 
-# Initialize session logger on startup
-_run_id = os.environ.get("MCP_RUN_ID") or make_run_id("native")
-_logger = SessionLogger(
-    run_id=_run_id,
-    metadata={
-        "server_type": "native",
-        "model": os.environ.get("MCP_MODEL", "unknown"),
-        "ollama_url": os.environ.get("MCP_OLLAMA_URL", "unknown"),
-    }
-)
+# Session logging — optional: if session_logger.py is unavailable the server still works
+try:
+    from session_logger import SessionLogger, make_run_id as _make_run_id
+
+    _run_id = os.environ.get("MCP_RUN_ID") or _make_run_id("native")
+    _logger = SessionLogger(
+        run_id=_run_id,
+        metadata={
+            "server_type": "native",
+            "model": os.environ.get("MCP_MODEL", "unknown"),
+            "ollama_url": os.environ.get("MCP_OLLAMA_URL", "unknown"),
+        }
+    )
+except Exception:
+    # Fallback no-op logger so the server runs even without session_logger
+    class _NoopLogger:
+        def log_tool_call(self, *a, **kw): pass
+        def finalize(self, *a, **kw): pass
+    _logger = _NoopLogger()
+
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:

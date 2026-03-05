@@ -89,12 +89,22 @@ def connect_ollmcp():
         cmd_string += f"{env_exports}\n\n"
 
         if is_apt:
-            # APT package mode: kali_server.py must be a separate background daemon
-            cmd_string += f"# Step 1: Kill any stale API instance, then start a fresh one in the background\n"
-            cmd_string += f"pkill -f 'kali_server.py' 2>/dev/null; sleep 1\n"
-            cmd_string += f"setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n\n"
-            cmd_string += f"# Step 2: Wait for the API to start, then connect the MCP client (with session logging)\n"
-            cmd_string += f"sleep 2 && "
+            # APT package mode: kali_server.py must be a separate background daemon.
+            # Poll /health up to 30s before connecting so we don't race against uv cold-starts.
+            cmd_string += f"# Step 1: Start the Kali REST API in the background (skips restart if already healthy)\n"
+            cmd_string += (
+                f"curl -sf http://localhost:5000/health >/dev/null 2>&1 || {{\n"
+                f"  pkill -f 'kali_server.py' 2>/dev/null\n"
+                f"  setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
+                f"}}\n\n"
+            )
+            cmd_string += f"# Step 2: Wait for the API to be ready (up to 30 s), then connect\n"
+            cmd_string += (
+                f"for i in $(seq 1 30); do\n"
+                f"  curl -sf http://localhost:5000/health >/dev/null 2>&1 && break\n"
+                f"  sleep 1\n"
+                f"done\n"
+            )
 
         cmd_string += f"ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
         
