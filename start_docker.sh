@@ -22,15 +22,21 @@ fi
 # 3. Ensure uv is installed
 echo "[kali-mcp-webui] Checking for uv..."
 if ! command -v uv &> /dev/null; then
-    echo "Installing uv locally..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
+    if [ -x "$HOME/.local/bin/uv" ]; then
+        export PATH="$HOME/.local/bin:$PATH"
+    else
+        echo "Installing uv locally..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
 fi
+
+UV_BIN=$(command -v uv || echo "$HOME/.local/bin/uv")
 
 # 4. Pre-cache uv dependencies for offline support
 if [[ "$*" == *"--build"* ]]; then
     echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
-    "$HOME/.local/bin/uv" run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
+    "$UV_BIN" run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
 fi
 
 echo "[kali-mcp-webui] Starting Docker Compose..."

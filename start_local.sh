@@ -23,15 +23,21 @@ echo "[kali-mcp-webui] Setting up python virtual environment via uv..."
 
 # 3. Ensure uv is installed
 if ! command -v uv &> /dev/null; then
-    echo "Installing uv locally..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
+    if [ -x "$HOME/.local/bin/uv" ]; then
+        export PATH="$HOME/.local/bin:$PATH"
+    else
+        echo "Installing uv locally..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
 fi
+
+UV_BIN=$(command -v uv || echo "$HOME/.local/bin/uv")
 
 # 4. Pre-cache uv dependencies for offline support
 if [[ "$*" == *"--build"* ]]; then
     echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
-    "$HOME/.local/bin/uv" run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
+    "$UV_BIN" run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
 fi
 
 # Start kali_server.py REST API in the background (required for APT package mode)
@@ -52,6 +58,6 @@ fi
 echo "[kali-mcp-webui] Starting Flask server..."
 if [[ "$*" == *"--build"* ]]; then
     echo "[kali-mcp-webui] --build flag detected, reinstalling dependencies..."
-    uv sync --reinstall
+    "$UV_BIN" sync --reinstall
 fi
-uv run --with Flask --with requests --with mcp-client-for-ollama app.py
+"$UV_BIN" run --with Flask --with requests --with mcp-client-for-ollama app.py
