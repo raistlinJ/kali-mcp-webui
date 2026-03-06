@@ -91,11 +91,11 @@ def connect_ollmcp():
 
         if is_apt:
             # APT package mode: kali_server.py must be a separate background daemon.
-            # Use nc -z (port check) instead of curl /health since kali_server.py's
-            # exact endpoints are unknown, and nc works regardless.
+            # Use pgrep to check if kali_server.py is running (NOT nc -z, which passes
+            # if any service is on port 5000 — causing the startup to be silently skipped).
             cmd_string += f"# Step 1: Start the Kali REST API in the background (skips if already running)\n"
             cmd_string += (
-                f"nc -z localhost 5000 2>/dev/null || {{\n"
+                f"pgrep -f 'kali_server.py' > /dev/null 2>&1 || {{\n"
                 f"  pkill -f 'kali_server.py' 2>/dev/null\n"
                 f"  setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
                 f"  echo 'Starting kali_server.py... (first run may take ~60s for uv to install flask)'\n"
