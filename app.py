@@ -97,7 +97,7 @@ def connect_ollmcp():
                 f"nc -z localhost 5000 2>/dev/null || {{\n"
                 f"  echo 'kali_server.py not detected \u2014 starting now...'\n"
                 f"  pkill -f 'kali_server.py' 2>/dev/null; sleep 1\n"
-                f"  setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
+                f"  setsid python3 /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
                 f"}}\n\n"
             )
             cmd_string += f"# Step 2: Wait for port 5000 to be ready (up to 90s)\n"
