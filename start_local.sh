@@ -6,17 +6,21 @@ set -e
 
 echo "[kali-mcp-webui] Checking for required tools..."
 
-# 1. Install pipx globally if missing
+# 1. Install pipx if missing (only attempts if apt is available)
 if ! command -v pipx &> /dev/null; then
-    echo "Installing pipx..."
-    sudo apt update && sudo apt install -y pipx
+    if command -v apt &> /dev/null; then
+        echo "Installing pipx..."
+        sudo apt update && sudo apt install -y pipx || true
+    else
+        echo "[kali-mcp-webui] pipx not found and apt not available. Skipping pipx installation."
+    fi
 fi
 
 # 2. Install ollmcp globally into /usr/local/bin so sudo can see it
 echo "[kali-mcp-webui] Checking for ollmcp..."
-if [ ! -x /usr/local/bin/ollmcp ]; then
+if [ ! -x /usr/local/bin/ollmcp ] && command -v pipx &> /dev/null; then
     echo "Installing ollmcp globally..."
-    sudo env PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install mcp-client-for-ollama
+    sudo env PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install mcp-client-for-ollama || true
 fi
 
 echo "[kali-mcp-webui] Setting up python virtual environment via uv..."
