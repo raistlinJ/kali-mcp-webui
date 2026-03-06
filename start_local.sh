@@ -31,7 +31,7 @@ fi
 # 4. Pre-cache uv dependencies for offline support
 if [[ "$*" == *"--build"* ]]; then
     echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
-    uv run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
+    "$HOME/.local/bin/uv" run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
 fi
 
 # Start kali_server.py REST API in the background (required for APT package mode)
