@@ -29,4 +29,8 @@ fi
 
 # Use uv to run the flask application automatically handling requirements
 echo "[kali-mcp-webui] Starting Flask server..."
+if [[ "$*" == *"--build"* ]]; then
+    echo "[kali-mcp-webui] --build flag detected, reinstalling dependencies..."
+    uv sync --reinstall
+fi
 uv run --with Flask --with requests --with mcp-client-for-ollama app.py

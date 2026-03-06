@@ -27,6 +27,11 @@ if ! command -v uv &> /dev/null; then
 fi
 
 echo "[kali-mcp-webui] Starting Docker Compose..."
-docker-compose up -d --build
+if [[ "$*" == *"--build"* ]]; then
+    echo "[kali-mcp-webui] --build flag detected, rebuilding image..."
+    docker-compose up -d --build
+else
+    docker-compose up -d
+fi
 
 echo "[kali-mcp-webui] WebUI is running on http://localhost:5055"
