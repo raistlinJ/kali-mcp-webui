@@ -90,13 +90,15 @@ def connect_ollmcp():
         cmd_string += f"{env_exports}\n\n"
 
         if is_apt:
-            # APT package mode: always kill any existing instance and start fresh.
-            # Conditional checks proved unreliable (stale processes, zombie uv procs, etc).
-            cmd_string += f"# Step 1: Kill any stale kali_server.py instance and start a fresh one\n"
+            # kali_server.py is now started by start_docker.sh / start_local.sh.
+            # If for some reason it's not up, restart it here; otherwise just wait.
+            cmd_string += f"# Step 1: Ensure kali_server.py REST API is running (started automatically by start_docker/start_local)\n"
             cmd_string += (
-                f"pkill -f 'kali_server.py' 2>/dev/null; sleep 1\n"
-                f"setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
-                f"echo 'kali_server.py started. Waiting for port 5000...'\n\n"
+                f"nc -z localhost 5000 2>/dev/null || {{\n"
+                f"  echo 'kali_server.py not detected \u2014 starting now...'\n"
+                f"  pkill -f 'kali_server.py' 2>/dev/null; sleep 1\n"
+                f"  setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
+                f"}}\n\n"
             )
             cmd_string += f"# Step 2: Wait for port 5000 to be ready (up to 90s)\n"
             cmd_string += (

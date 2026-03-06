@@ -27,6 +27,20 @@ if ! command -v uv &> /dev/null; then
     sudo env UV_UNMANAGED_INSTALL="/usr/local/bin" sh -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
 fi
 
+# Start kali_server.py REST API in the background (required for APT package mode)
+if command -v uv &>/dev/null && [ -f /usr/share/mcp-kali-server/kali_server.py ]; then
+    echo "[kali-mcp-webui] Starting kali_server.py REST API on port 5000..."
+    pkill -f 'kali_server.py' 2>/dev/null; sleep 1
+    setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &
+    # Wait up to 30s for it to be ready
+    for i in $(seq 1 30); do
+        nc -z localhost 5000 2>/dev/null && echo "[kali-mcp-webui] kali_server.py ready on port 5000" && break
+        sleep 1
+    done
+else
+    echo "[kali-mcp-webui] Skipping kali_server.py (not found or uv not installed — APT package mode unavailable)"
+fi
+
 # Use uv to run the flask application automatically handling requirements
 echo "[kali-mcp-webui] Starting Flask server..."
 if [[ "$*" == *"--build"* ]]; then
