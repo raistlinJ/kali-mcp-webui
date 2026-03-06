@@ -21,16 +21,17 @@ fi
 
 echo "[kali-mcp-webui] Setting up python virtual environment via uv..."
 
-# 3. Ensure uv is installed globally in /usr/local/bin
-if [ ! -x /usr/local/bin/uv ]; then
-    echo "Installing uv globally..."
-    sudo env UV_UNMANAGED_INSTALL="/usr/local/bin" sh -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+# 3. Ensure uv is installed
+if ! command -v uv &> /dev/null; then
+    echo "Installing uv locally..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
 fi
 
 # 4. Pre-cache uv dependencies for offline support
 if [[ "$*" == *"--build"* ]]; then
     echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
-    /usr/local/bin/uv run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
+    uv run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
 fi
 
 # Start kali_server.py REST API in the background (required for APT package mode)
