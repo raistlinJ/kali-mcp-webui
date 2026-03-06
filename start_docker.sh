@@ -1,9 +1,6 @@
 #!/bin/bash
 # script to safely initialize host dependencies and run the Kali WebUI in Docker
 
-# Exit on any error
-set -e
-
 echo "[kali-mcp-webui] Checking for required host tools..."
 
 # 1. Install pipx if missing (only attempts if apt is available)

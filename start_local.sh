@@ -1,9 +1,6 @@
 #!/bin/bash
 # script to safely initialize environments and run the Kali WebUI locally
 
-# Exit on any error
-set -e
-
 echo "[kali-mcp-webui] Checking for required tools..."
 
 # 1. Install pipx if missing (only attempts if apt is available)
