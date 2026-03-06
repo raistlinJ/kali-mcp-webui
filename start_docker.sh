@@ -14,20 +14,23 @@ fi
 
 # 2. Install ollmcp globally into /usr/local/bin so sudo can see it
 echo "[kali-mcp-webui] Checking for ollmcp..."
-if ! command -v ollmcp &> /dev/null; then
+if [ ! -x /usr/local/bin/ollmcp ]; then
     echo "Installing ollmcp globally..."
     sudo env PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install mcp-client-for-ollama
 fi
 
 # 3. Install uv globally into /usr/local/bin so sudo can see it dynamically
 echo "[kali-mcp-webui] Checking for uv..."
-if ! command -v uv &> /dev/null; then
+if [ ! -x /usr/local/bin/uv ]; then
     echo "Installing uv globally..."
     sudo env UV_UNMANAGED_INSTALL="/usr/local/bin" sh -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
 fi
+
 # 4. Pre-cache uv dependencies for offline support
-echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
-/usr/local/bin/uv run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
+if [[ "$*" == *"--build"* ]]; then
+    echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
+    /usr/local/bin/uv run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
+fi
 
 echo "[kali-mcp-webui] Starting Docker Compose..."
 if [[ "$*" == *"--build"* ]]; then
