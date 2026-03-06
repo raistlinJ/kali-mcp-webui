@@ -31,7 +31,7 @@ echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
 /usr/local/bin/uv run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
 
 # Start kali_server.py REST API in the background (required for APT package mode)
-if command -v uv &>/dev/null && [ -f /usr/share/mcp-kali-server/kali_server.py ]; then
+if [ -x /usr/local/bin/uv ] && [ -f /usr/share/mcp-kali-server/kali_server.py ]; then
     echo "[kali-mcp-webui] Starting kali_server.py REST API on port 5000..."
     pkill -f 'kali_server.py' 2>/dev/null; sleep 1
     setsid python3 /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &
