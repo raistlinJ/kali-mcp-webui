@@ -44,7 +44,8 @@ def connect_ollmcp():
     model = data.get('model')
     server_command = data.get('server_command')
     tools_config = data.get('tools_config')
-    
+    pty_logging = data.get('pty_logging', False)  # disabled by default
+
     if not model:
         return jsonify({'success': False, 'error': 'No model selected'}), 400
     if not server_command:
@@ -109,7 +110,13 @@ def connect_ollmcp():
                 f"done\n"
             )
 
-        cmd_string += f"python3 ollmcp_logger.py --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
+        # Choose the MCP client launcher
+        if pty_logging:
+            launcher = f"python3 ollmcp_logger.py"
+        else:
+            launcher = f"ollmcp"
+
+        cmd_string += f"{launcher} --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
         
         return jsonify({
             'success': True,

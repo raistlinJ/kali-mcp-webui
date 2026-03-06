@@ -188,6 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateStatus('default', 'Launching Term...');
 
         try {
+            const ptyLogging = document.getElementById('pty-logging-toggle').checked;
             const response = await fetch('/api/connect', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -195,7 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     url,
                     model,
                     server_command: command,
-                    tools_config: toolsConfig
+                    tools_config: toolsConfig,
+                    pty_logging: ptyLogging
                 })
             });
 
