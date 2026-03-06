@@ -140,8 +140,9 @@ async def proxy(proc: asyncio.subprocess.Process):
 
 async def main():
     mcp_server_path = "/usr/share/mcp-kali-server/mcp_server.py"
+    uv_bin = "/usr/local/bin/uv"
 
-    cmd = ["python3", mcp_server_path]
+    cmd = [uv_bin, "run", "--with", "mcp", "--with", "requests", mcp_server_path]
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,

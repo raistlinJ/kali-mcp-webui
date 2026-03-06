@@ -26,6 +26,9 @@ if ! command -v uv &> /dev/null; then
     echo "Installing uv globally..."
     sudo env UV_UNMANAGED_INSTALL="/usr/local/bin" sh -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
 fi
+# 4. Pre-cache uv dependencies for offline support
+echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
+/usr/local/bin/uv run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
 
 # Start kali_server.py REST API in the background (required for APT package mode)
 if command -v uv &>/dev/null && [ -f /usr/share/mcp-kali-server/kali_server.py ]; then
