@@ -90,22 +90,18 @@ def connect_ollmcp():
         cmd_string += f"{env_exports}\n\n"
 
         if is_apt:
-            # APT package mode: kali_server.py must be a separate background daemon.
-            # Use pgrep to check if kali_server.py is running (NOT nc -z, which passes
-            # if any service is on port 5000 — causing the startup to be silently skipped).
-            cmd_string += f"# Step 1: Start the Kali REST API (only skips if process running AND port 5000 responding)\n"
+            # APT package mode: always kill any existing instance and start fresh.
+            # Conditional checks proved unreliable (stale processes, zombie uv procs, etc).
+            cmd_string += f"# Step 1: Kill any stale kali_server.py instance and start a fresh one\n"
             cmd_string += (
-                f"(pgrep -f 'kali_server.py' > /dev/null 2>&1 && nc -z localhost 5000 2>/dev/null) || {{\n"
-                f"  pkill -f 'kali_server.py' 2>/dev/null; sleep 1\n"
-                f"  setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
-                f"  echo 'Starting kali_server.py... (first run may take ~60s for uv to install flask)'\n"
-                f"}}\n\n"
+                f"pkill -f 'kali_server.py' 2>/dev/null; sleep 1\n"
+                f"setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
+                f"echo 'kali_server.py started. Waiting for port 5000...'\n\n"
             )
-            cmd_string += f"# Step 2: Wait for port 5000 to be ready (up to 90s), then connect\n"
+            cmd_string += f"# Step 2: Wait for port 5000 to be ready (up to 90s)\n"
             cmd_string += (
                 f"for i in $(seq 1 90); do\n"
                 f"  nc -z localhost 5000 2>/dev/null && echo 'API ready!' && break\n"
-                f"  [ $i -eq 1 ] && echo 'Waiting for API on port 5000...'\n"
                 f"  sleep 1\n"
                 f"done\n"
             )
