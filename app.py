@@ -109,7 +109,7 @@ def connect_ollmcp():
                 f"done\n"
             )
 
-        cmd_string += f"python3 ollmcp_logger.py --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
+        cmd_string += f"ollmcp --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
         
         return jsonify({
             'success': True,

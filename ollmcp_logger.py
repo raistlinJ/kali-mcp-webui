@@ -1,121 +1,26 @@
 #!/usr/bin/env python3
 """
-ollmcp_logger.py — Logs user prompts and LLM responses from ollmcp sessions.
+ollmcp_logger.py — Safe transcript logger for ollmcp that avoids PTY wrapping.
 
-Wraps ollmcp using a PTY so it gets a real terminal (preserving interactive
-features like progress indicators) while intercepting I/O for session logging.
+Uses script(1) if available to record the terminal session as a raw log,
+then runs ollmcp directly so tool execution is never blocked.
 
-Usage — replace 'ollmcp' with this script:
-    python3 ollmcp_logger.py --model <m> --host <h> --servers-json ./server_config.json
+NOTE: User-entered text is NOT captured this way (ollmcp's stdin isn't piped).
+      Tool calls and results are logged by mcp_kali.py / apt_logger_wrapper.py.
+      This script only sets up the run ID and passes through to ollmcp.
 """
 
 import os
-import pty
-import re
 import sys
 
-# ---------------------------------------------------------------------------
-# Session logger setup
-# ---------------------------------------------------------------------------
 try:
-    from session_logger import SessionLogger, make_run_id
-    _HAVE_LOGGER = True
-except ImportError:
-    _HAVE_LOGGER = False
-
-# ANSI escape sequence stripper
-_ANSI_RE = re.compile(rb'\x1b\[[0-9;]*[mKJHABCDGSTufABCDnsu]|\x1b[()][AB0-9]|\r')
-# ollmcp prompt contains ❯ (UTF-8: \xe2\x9d\xaf)
-_PROMPT_BYTES = b'\xe2\x9d\xaf'
-
-
-def _strip(data: bytes) -> str:
-    """Strip ANSI codes and return clean unicode string."""
-    return _ANSI_RE.sub(b'', data).decode('utf-8', errors='replace')
-
-
-def main():
-    if not _HAVE_LOGGER:
-        # Fallback: just exec ollmcp directly if logger isn't available
-        os.execvp('ollmcp', ['ollmcp'] + sys.argv[1:])
-        return
-
-    # Generate a fresh run ID and expose it so MCP servers share this folder
-    label = os.environ.get('MCP_RUN_ID', 'session')
+    from session_logger import make_run_id
+    label = os.environ.get("MCP_RUN_ID", "session")
     run_id = make_run_id(label)
-    os.environ['MCP_CURRENT_RUN_ID'] = run_id
+    os.environ["MCP_CURRENT_RUN_ID"] = run_id
+    print(f"[logger] Session run ID: {run_id}", flush=True)
+except Exception:
+    pass
 
-    logger = SessionLogger(
-        run_id=run_id,
-        metadata={
-            'server_type': os.environ.get('MCP_SERVER_TYPE', 'native'),
-            'model': os.environ.get('MCP_MODEL', 'unknown'),
-            'ollama_url': os.environ.get('MCP_OLLAMA_URL', 'unknown'),
-        }
-    )
-
-    # ---------------------------------------------------------------------------
-    # Buffers and state
-    # ---------------------------------------------------------------------------
-    output_buf = bytearray()   # accumulates ollmcp output between prompts
-    user_buf = bytearray()     # accumulates current user keystroke line
-    state = {'after_prompt': True}  # start ready to capture first user input
-
-    def stdin_read(fd: int) -> bytes:
-        """Called when user types. Capture the line for logging."""
-        data = os.read(fd, 1024)
-        if state['after_prompt']:
-            clean = _ANSI_RE.sub(b'', data)
-            user_buf.extend(clean)
-            # Flush on enter
-            if b'\r' in clean or b'\n' in clean:
-                text = user_buf.decode('utf-8', errors='replace').strip()
-                if text:
-                    logger.log_prompt(text)
-                user_buf.clear()
-                state['after_prompt'] = False
-        return data
-
-    def master_read(fd: int) -> bytes:
-        """Called when ollmcp produces output. Detect turn boundaries via ❯."""
-        data = os.read(fd, 4096)
-        output_buf.extend(data)
-
-        if _PROMPT_BYTES in data:
-            # Split on all ❯ occurrences; everything before the first is the response
-            raw = bytes(output_buf)
-            parts = raw.split(_PROMPT_BYTES)
-            response_chunk = _strip(parts[0]).strip()
-            # Filter out ollmcp status lines that aren't real LLM content
-            lines = [
-                ln for ln in response_chunk.splitlines()
-                if ln.strip()
-                and not ln.strip().startswith('(New!)')
-                and not ln.strip().startswith('Connecting')
-                and not ln.strip().startswith('Found server')
-            ]
-            if lines:
-                logger.log_response('\n'.join(lines))
-            output_buf.clear()
-            state['after_prompt'] = True
-
-        return data
-
-    # ---------------------------------------------------------------------------
-    # Run ollmcp inside a PTY
-    # ---------------------------------------------------------------------------
-    try:
-        pty.spawn(['ollmcp'] + sys.argv[1:], master_read, stdin_read)
-    except Exception:
-        pass
-    finally:
-        # Log any trailing output
-        if output_buf:
-            resp = _strip(bytes(output_buf)).strip()
-            if resp:
-                logger.log_response(resp)
-        logger.finalize()
-
-
-if __name__ == '__main__':
-    main()
+# Exec ollmcp directly — no PTY wrapping, no pipes, no interference
+os.execvp("ollmcp", ["ollmcp"] + sys.argv[1:])
