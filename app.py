@@ -90,18 +90,21 @@ def connect_ollmcp():
 
         if is_apt:
             # APT package mode: kali_server.py must be a separate background daemon.
-            # Poll /health up to 30s before connecting so we don't race against uv cold-starts.
-            cmd_string += f"# Step 1: Start the Kali REST API in the background (skips restart if already healthy)\n"
+            # Use nc -z (port check) instead of curl /health since kali_server.py's
+            # exact endpoints are unknown, and nc works regardless.
+            cmd_string += f"# Step 1: Start the Kali REST API in the background (skips if already running)\n"
             cmd_string += (
-                f"curl -sf http://localhost:5000/health >/dev/null 2>&1 || {{\n"
+                f"nc -z localhost 5000 2>/dev/null || {{\n"
                 f"  pkill -f 'kali_server.py' 2>/dev/null\n"
                 f"  setsid /usr/local/bin/uv run --with flask /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
+                f"  echo 'Starting kali_server.py... (first run may take ~60s for uv to install flask)'\n"
                 f"}}\n\n"
             )
-            cmd_string += f"# Step 2: Wait for the API to be ready (up to 30 s), then connect\n"
+            cmd_string += f"# Step 2: Wait for port 5000 to be ready (up to 90s), then connect\n"
             cmd_string += (
-                f"for i in $(seq 1 30); do\n"
-                f"  curl -sf http://localhost:5000/health >/dev/null 2>&1 && break\n"
+                f"for i in $(seq 1 90); do\n"
+                f"  nc -z localhost 5000 2>/dev/null && echo 'API ready!' && break\n"
+                f"  [ $i -eq 1 ] && echo 'Waiting for API on port 5000...'\n"
                 f"  sleep 1\n"
                 f"done\n"
             )
