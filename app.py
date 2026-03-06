@@ -96,7 +96,7 @@ def connect_ollmcp():
             cmd_string += (
                 f"nc -z localhost 5000 2>/dev/null || {{\n"
                 f"  echo 'kali_server.py not detected \u2014 starting now...'\n"
-                f"  pkill -f 'kali_server.py' 2>/dev/null; sleep 1\n"
+                f"  pkill -f 'kali_server.py' 2>/dev/null || true; sleep 1\n"
                 f"  setsid uv run --with flask python3 /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
                 f"}}\n\n"
             )

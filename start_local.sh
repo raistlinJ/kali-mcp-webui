@@ -43,7 +43,7 @@ fi
 # Start kali_server.py REST API in the background (required for APT package mode)
 if [ -f /usr/share/mcp-kali-server/kali_server.py ]; then
     echo "[kali-mcp-webui] Starting kali_server.py REST API on port 5000..."
-    pkill -f 'kali_server.py' 2>/dev/null; sleep 1
+    pkill -f 'kali_server.py' 2>/dev/null || true; sleep 1
     setsid "$HOME/.local/bin/uv" run --with flask python3 /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &
     # Wait up to 30s for it to be ready
     for i in $(seq 1 30); do
