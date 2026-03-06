@@ -34,7 +34,7 @@ if [[ "$*" == *"--build"* ]]; then
 fi
 
 # Start kali_server.py REST API in the background (required for APT package mode)
-if [ -x /usr/local/bin/uv ] && [ -f /usr/share/mcp-kali-server/kali_server.py ]; then
+if [ -f /usr/share/mcp-kali-server/kali_server.py ]; then
     echo "[kali-mcp-webui] Starting kali_server.py REST API on port 5000..."
     pkill -f 'kali_server.py' 2>/dev/null; sleep 1
     setsid python3 /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &
@@ -44,7 +44,7 @@ if [ -x /usr/local/bin/uv ] && [ -f /usr/share/mcp-kali-server/kali_server.py ];
         sleep 1
     done
 else
-    echo "[kali-mcp-webui] Skipping kali_server.py (not found or uv not installed — APT package mode unavailable)"
+    echo "[kali-mcp-webui] Skipping kali_server.py (not found — APT package mode unavailable)"
 fi
 
 # Use uv to run the flask application automatically handling requirements
