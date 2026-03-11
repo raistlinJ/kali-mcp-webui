@@ -101,10 +101,9 @@ def _estimate_tokens(messages: list[dict]) -> int:
         content = msg.get("content", "")
         if isinstance(content, str):
             total_chars += len(content)
-        # tool_calls can add content too
         tcs = msg.get("tool_calls")
         if tcs:
-            total_chars += len(json.dumps(tcs))
+            total_chars += len(str(tcs))
     return total_chars // _CHARS_PER_TOKEN
 
 
@@ -118,6 +117,36 @@ def _truncate_tool_output(text: str, max_chars: int = 8000) -> str:
         + f"\n\n... [truncated {len(text) - max_chars} chars] ...\n\n"
         + text[-half:]
     )
+
+
+def _extract_tool_info(tc) -> tuple[str, dict]:
+    """Safely extract function name and arguments from a tool call (dict or object)."""
+    func = getattr(tc, "function", None)
+    if func is None and hasattr(tc, "get"):
+        func = tc.get("function", tc)
+    if func is None:
+        func = tc
+        
+    name = getattr(func, "name", None)
+    if name is None and hasattr(func, "get"):
+        name = func.get("name", "unknown")
+        
+    args = getattr(func, "arguments", None)
+    if args is None and hasattr(func, "get"):
+        args = func.get("arguments", {})
+        
+    if not isinstance(args, dict):
+        try:
+            if hasattr(args, "model_dump"):
+                args = args.model_dump()
+            elif hasattr(args, "dict"):
+                args = args.dict()
+            else:
+                args = dict(args)
+        except Exception:
+            pass
+            
+    return str(name or "unknown"), (args if isinstance(args, dict) else {})
 
 
 async def _maybe_summarise(
@@ -162,8 +191,12 @@ async def _maybe_summarise(
         tcs = msg.get("tool_calls")
         if tcs:
             for tc in tcs:
-                func = tc.get("function", tc)
-                history_text += f"[tool_call]: {func.get('name', '?')}({json.dumps(func.get('arguments', {}))})\n"
+                name, args = _extract_tool_info(tc)
+                try:
+                    args_str = json.dumps(args)
+                except Exception:
+                    args_str = str(args)
+                history_text += f"[tool_call]: {name}({args_str})\n"
 
     # Ask the LLM to summarise
     try:
@@ -419,9 +452,7 @@ class MCPSession:
                     _emit(self.event_callback, "status", {"message": "Chat cancelled by user."})
                     return
 
-                func = tc.get("function", tc)
-                tool_name = func.get("name", "unknown")
-                tool_args = func.get("arguments", {})
+                tool_name, tool_args = _extract_tool_info(tc)
 
                 _emit(self.event_callback, "tool_call", {
                     "tool": tool_name,
