@@ -1137,7 +1137,7 @@ option {
 }
 
 #chat-prompt-input {
-    flex: 1;
+    flex: 0 0 calc(90% - 0.5rem);
     border-radius: 12px;
     padding: 0.85rem 1.25rem;
     background: rgba(255, 255, 255, 0.05);
@@ -1167,7 +1167,11 @@ option {
 }
 
 #chat-send-btn {
-    padding: 0.85rem 1.5rem;
+    flex: 0 0 calc(10% - 0.5rem);
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     height: auto;
     align-self: stretch;
     border-radius: 12px;
