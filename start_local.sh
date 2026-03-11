@@ -3,26 +3,9 @@
 
 echo "[kali-mcp-webui] Checking for required tools..."
 
-# 1. Install pipx if missing (only attempts if apt is available)
-if ! command -v pipx &> /dev/null; then
-    if command -v apt &> /dev/null; then
-        echo "Installing pipx..."
-        sudo apt update && sudo apt install -y pipx || true
-    else
-        echo "[kali-mcp-webui] pipx not found and apt not available. Skipping pipx installation."
-    fi
-fi
-
-# 2. Install ollmcp globally into /usr/local/bin so sudo can see it
-echo "[kali-mcp-webui] Checking for ollmcp..."
-if [ ! -x /usr/local/bin/ollmcp ] && command -v pipx &> /dev/null; then
-    echo "Installing ollmcp globally..."
-    sudo env PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install mcp-client-for-ollama || true
-fi
-
 echo "[kali-mcp-webui] Setting up python virtual environment via uv..."
 
-# 3. Ensure uv is installed
+# 1. Ensure uv is installed
 if ! command -v uv &> /dev/null; then
     if [ -x "$HOME/.local/bin/uv" ]; then
         export PATH="$HOME/.local/bin:$PATH"
@@ -35,10 +18,10 @@ fi
 
 UV_BIN=$(command -v uv || echo "$HOME/.local/bin/uv")
 
-# 4. Pre-cache uv dependencies for offline support
+# 2. Pre-cache uv dependencies for offline support
 if [[ "$*" == *"--build"* ]]; then
     echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
-    "$UV_BIN" run --with mcp --with requests --with flask python3 -c "print('Dependencies cached.')" 2>/dev/null || true
+    "$UV_BIN" run --with mcp --with requests --with flask --with ollama python3 -c "print('Dependencies cached.')" 2>/dev/null || true
 fi
 
 # Start kali_server.py REST API in the background (required for APT package mode)
@@ -60,7 +43,7 @@ echo "[kali-mcp-webui] Starting Flask server..."
 if [[ "$*" == *"--build"* ]]; then
     echo "[kali-mcp-webui] --build flag detected, reinstalling dependencies..."
     "$UV_BIN" sync --reinstall
-    "$UV_BIN" run --with Flask --with requests --with mcp-client-for-ollama app.py
+    "$UV_BIN" run --with Flask --with requests --with mcp --with ollama app.py
 else
-    "$UV_BIN" run --offline --with Flask --with requests --with mcp-client-for-ollama app.py
+    "$UV_BIN" run --offline --with Flask --with requests --with mcp --with ollama app.py
 fi

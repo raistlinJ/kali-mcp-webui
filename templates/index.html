@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kali MCP WebUI</title>
+    <meta name="description" content="Run Kali Linux MCP tools with local LLMs via the Model Context Protocol">
     <!-- Google Fonts for typography -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -24,7 +25,7 @@
                 <i class="ph ph-terminal-window"></i>
                 <h1>Kali MCP WebUI</h1>
             </div>
-            <p class="subtitle">Connect your local models to the Model Context Protocol</p>
+            <p class="subtitle">Run Kali tools with local LLMs via the Model Context Protocol</p>
         </header>
 
         <div class="glass-panel">
@@ -150,7 +151,7 @@
                     </div>
 
                     <div class="input-group">
-                        <label>Vulnerability & Network</label>
+                        <label>Vulnerability &amp; Network</label>
                         <div class="tools-grid">
                             <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/searchsploit"
                                     value="searchsploit" class="tool-checkbox"> searchsploit</label>
@@ -173,7 +174,7 @@
                                     <span><i class="ph ph-file-code"></i> Advanced: kali_tools.json Editor</span>
                                     <span
                                         style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(Auto-saves
-                                        on Connect) <i class="ph ph-caret-down"></i></span>
+                                        on Run) <i class="ph ph-caret-down"></i></span>
                                 </div>
                             </summary>
                             <textarea id="kali-tools-json" rows="8" spellcheck="false" style="margin-top: 1rem;">{
@@ -185,11 +186,11 @@
 
                 <div class="divider"></div>
 
-                <!-- Model Configuration Section -->
+                <!-- Model & Prompt Section -->
                 <div class="form-section">
                     <h2 class="section-title">
                         <i class="ph ph-cpu"></i>
-                        Model Configuration
+                        Model &amp; Prompt
                     </h2>
 
                     <div class="input-group">
@@ -203,26 +204,41 @@
                         </div>
                     </div>
 
-                    <div class="input-group" style="margin-top:0.75rem;">
-                        <label class="checkbox-container" style="font-size:0.9rem;gap:0.5rem;cursor:pointer;"
-                            title="Wraps ollmcp in a PTY to log user prompts and LLM responses. Disable if you experience terminal issues.">
-                            <input type="checkbox" id="pty-logging-toggle">
-                            <i class="ph ph-record"></i> Enable conversation logging (PTY wrapper)
-                            <span style="font-size:0.75rem;color:var(--text-secondary);">&nbsp;— captures prompts &amp;
-                                responses in transcript</span>
-                        </label>
+                    <div class="input-group">
+                        <label for="context-window">Context Window (tokens)</label>
+                        <div class="select-wrapper">
+                            <i class="ph ph-brain icon-left"></i>
+                            <select id="context-window">
+                                <option value="2048">2K</option>
+                                <option value="4096">4K</option>
+                                <option value="8192" selected>8K (default)</option>
+                                <option value="16384">16K</option>
+                                <option value="32768">32K</option>
+                                <option value="65536">64K</option>
+                                <option value="131072">128K</option>
+                            </select>
+                            <i class="ph ph-caret-down icon-right"></i>
+                        </div>
+                        <span class="input-hint">Older messages are auto-summarised when approaching this limit</span>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="prompt-input">Prompt</label>
+                        <textarea id="prompt-input" rows="4"
+                            placeholder="e.g. Scan 192.168.1.0/24 with nmap and summarise the findings…"
+                            spellcheck="false"></textarea>
                     </div>
                 </div>
 
                 <div class="action-footer">
-                    <button type="submit" id="connect-btn" class="btn btn-primary" disabled>
-                        <i class="ph ph-lightning"></i>
-                        <span>Connect ollmcp</span>
+                    <button type="submit" id="run-btn" class="btn btn-primary" disabled>
+                        <i class="ph ph-play"></i>
+                        <span>Run Agent</span>
                     </button>
 
                     <div id="status-badge" class="status-badge hidden">
                         <div class="status-dot"></div>
-                        <span class="status-text">Disconnected</span>
+                        <span class="status-text">Idle</span>
                     </div>
                 </div>
 
@@ -230,6 +246,28 @@
 
             <!-- Alerts Container -->
             <div id="alerts-container" class="alerts-container"></div>
+
+            <!-- Live Session Log -->
+            <div class="live-log-panel hidden" id="live-log-panel">
+                <div class="live-log-header">
+                    <h2><i class="ph ph-pulse"></i> Live Session</h2>
+                    <button type="button" id="stop-session-btn" class="btn btn-danger btn-sm">
+                        <i class="ph ph-stop-circle"></i> Stop
+                    </button>
+                </div>
+                <div class="context-usage-bar" id="context-usage-bar" style="display:none;">
+                    <div class="context-usage-labels">
+                        <span id="context-usage-text">0 / 8192 tokens</span>
+                        <span id="context-model-max" class="context-model-max"></span>
+                    </div>
+                    <div class="context-usage-track">
+                        <div class="context-usage-fill" id="context-usage-fill" style="width:0%"></div>
+                    </div>
+                </div>
+                <div class="live-log-viewer" id="live-log-viewer">
+                    <div class="log-entry log-status">Waiting for events…</div>
+                </div>
+            </div>
 
             <!-- Sessions Panel -->
             <div class="sessions-panel" id="sessions-panel">
@@ -241,7 +279,7 @@
                     </button>
                 </div>
                 <div class="sessions-list" id="sessions-list">
-                    <div class="empty-state">No sessions yet. Connect to start logging.</div>
+                    <div class="empty-state">No sessions yet. Run an agent to start logging.</div>
                 </div>
                 <!-- Session detail view (hidden until a session is selected) -->
                 <div class="session-detail" id="session-detail" style="display:none;">
@@ -261,29 +299,6 @@
 
         </div>
     </main>
-
-    <!-- Modal Overlay -->
-    <div id="command-modal" class="modal-overlay hidden">
-        <div class="modal-content glass-panel">
-            <header class="modal-header">
-                <h2><i class="ph ph-terminal-window"></i> Terminal Ready</h2>
-                <button id="close-modal-btn" class="icon-btn"><i class="ph ph-x"></i></button>
-            </header>
-            <div class="modal-body">
-                <p>Because the WebUI is running in Docker, it cannot open a host terminal window automatically. Please
-                    copy the command below and paste it into your local terminal to start the session:</p>
-                <div class="code-block-wrapper">
-                    <pre><code id="generated-command"></code></pre>
-                    <button id="copy-command-btn" class="btn btn-secondary btn-sm" title="Copy to clipboard">
-                        <i class="ph ph-copy"></i> Copy
-                    </button>
-                </div>
-            </div>
-            <footer class="modal-footer">
-                <button id="done-modal-btn" class="btn btn-primary">Done</button>
-            </footer>
-        </div>
-    </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>

@@ -33,13 +33,18 @@ class SessionLogger:
                 001_<tool>_output.txt   (saved when output > 1KB)
     """
 
-    def __init__(self, run_id: str, metadata: dict, base_dir: str = None):
+    def __init__(self, run_id: str, metadata: dict, base_dir: str = None,
+                 event_callback=None):
         """
         Args:
-            run_id:    Unique run identifier, e.g. "2026-03-05_02-15-00_run001"
-            metadata:  Dict with keys like model, server_type, ollama_url, etc.
-            base_dir:  Parent directory for runs/ (defaults to cwd)
+            run_id:         Unique run identifier, e.g. "2026-03-05_02-15-00_run001"
+            metadata:       Dict with keys like model, server_type, ollama_url, etc.
+            base_dir:       Parent directory for runs/ (defaults to cwd)
+            event_callback: Optional callable(dict) invoked for every log event
+                            to enable real-time SSE broadcasting.
         """
+        self._event_callback = event_callback
+
         if base_dir is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -77,6 +82,18 @@ class SessionLogger:
                 f.write("---\n\n")
 
     # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _emit_event(self, event_type: str, data: dict):
+        """Push a structured event to the callback if registered."""
+        if self._event_callback:
+            try:
+                self._event_callback({"type": event_type, **data})
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
@@ -85,12 +102,14 @@ class SessionLogger:
         ts = datetime.now().strftime("%H:%M:%S")
         with open(self._transcript_path, "a") as f:
             f.write(f"### 👤 User [{ts}]\n\n{text}\n\n")
+        self._emit_event("prompt", {"text": text})
 
     def log_response(self, text: str):
         """Append an ASSISTANT response turn to the transcript."""
         ts = datetime.now().strftime("%H:%M:%S")
         with open(self._transcript_path, "a") as f:
             f.write(f"### 🤖 Assistant [{ts}]\n\n{text}\n\n")
+        self._emit_event("response", {"text": text})
 
     def log_tool_call(self, name: str, args: dict, result: str,
                       duration_ms: int = 0, exit_code: int = 0, stderr: str = ""):
@@ -139,6 +158,14 @@ class SessionLogger:
             f.write(f"**Exit code:** {exit_code}  \n\n")
             preview = result[:512] + ("..." if len(result) > 512 else "")
             f.write(f"```\n{preview}\n```\n\n")
+
+        self._emit_event("tool_result", {
+            "tool": name,
+            "args": args,
+            "result": result[:1024],
+            "duration_ms": duration_ms,
+            "exit_code": exit_code,
+        })
 
         return filename
 

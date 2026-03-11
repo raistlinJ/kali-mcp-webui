@@ -12,7 +12,7 @@ server = Server("mcp-kali")
 try:
     from session_logger import SessionLogger, make_run_id as _make_run_id
 
-    # If ollmcp_logger.py is wrapping this session, use its exact run ID so all
+    # If the web UI is driving this session, use its exact run ID so all
     # logs end up in the same folder. Otherwise generate a fresh ID per invocation.
     if "MCP_CURRENT_RUN_ID" in os.environ:
         _run_id = os.environ["MCP_CURRENT_RUN_ID"]

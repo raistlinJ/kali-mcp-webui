@@ -1,16 +1,26 @@
-from flask import Flask, render_template, request, jsonify, abort
+from flask import Flask, render_template, request, jsonify, abort, Response
 import requests
 import subprocess
 import os
 import json
 import shlex
-import tempfile
+import threading
+import asyncio
+import queue
+import time
 from datetime import datetime
 
 app = Flask(__name__)
 
 # Path to runs/ directory (co-located with app.py)
 RUNS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs")
+
+# ---------------------------------------------------------------------------
+# Active session tracking
+# ---------------------------------------------------------------------------
+# run_id → {"thread", "cancel_event", "queue", "status"}
+_active_sessions: dict[str, dict] = {}
+_sessions_lock = threading.Lock()
 
 
 def _make_run_id(server_type: str) -> str:
@@ -27,7 +37,7 @@ def index():
 def get_models():
     data = request.json
     ollama_url = data.get('url', 'http://localhost:11434')
-    
+
     try:
         response = requests.get(f"{ollama_url}/api/tags", timeout=5)
         response.raise_for_status()
@@ -37,99 +47,156 @@ def get_models():
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
-@app.route('/api/connect', methods=['POST'])
-def connect_ollmcp():
+# -----------------------------------------------------------------------
+# Agent Run API
+# -----------------------------------------------------------------------
+
+@app.route('/api/run', methods=['POST'])
+def start_run():
+    """Launch the MCP agent loop in a background thread."""
     data = request.json
     ollama_url = data.get('url', 'http://localhost:11434')
     model = data.get('model')
     server_command = data.get('server_command')
     tools_config = data.get('tools_config')
-    pty_logging = data.get('pty_logging', False)  # disabled by default
+    prompt = data.get('prompt', '').strip()
+    context_window = int(data.get('context_window', 8192))
 
     if not model:
         return jsonify({'success': False, 'error': 'No model selected'}), 400
     if not server_command:
         return jsonify({'success': False, 'error': 'No server command provided'}), 400
-        
+    if not prompt:
+        return jsonify({'success': False, 'error': 'No prompt provided'}), 400
+
     try:
+        # Write tools config if provided
         if tools_config:
             with open(os.path.abspath('kali_tools.json'), 'w') as f:
                 json.dump(tools_config, f, indent=2)
 
         is_apt = "/usr/share/mcp-kali-server/mcp_server.py" in server_command
-        is_native = "mcp_kali.py" in server_command or "apt_logger_wrapper.py" in server_command
-
-        # Generate unique run ID for this session
         server_type = "apt" if is_apt else "native"
         run_id = _make_run_id(server_type)
 
-        # Build env var exports to inject into the shell command
-        env_exports = (
-            f"export MCP_RUN_ID={shlex.quote(run_id)} "
-            f"MCP_MODEL={shlex.quote(model)} "
-            f"MCP_OLLAMA_URL={shlex.quote(ollama_url)}"
-        )
+        # Thread-safe event queue for SSE
+        event_queue = queue.Queue(maxsize=500)
+        cancel_event_async = None  # Will be set inside the thread
 
-        command_parts = shlex.split(server_command)
+        def event_callback(event: dict):
+            event["timestamp"] = datetime.now().isoformat()
+            try:
+                event_queue.put_nowait(event)
+            except queue.Full:
+                pass  # drop if consumer is too slow
 
-        server_config = {
-            "mcpServers": {
-                "mcp-kali-server": {
-                    "command": command_parts[0],
-                    "args": command_parts[1:]
-                }
+        def run_in_thread():
+            import mcp_client
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            cancel_evt = asyncio.Event()
+
+            with _sessions_lock:
+                _active_sessions[run_id]["cancel_event_async"] = cancel_evt
+                _active_sessions[run_id]["loop"] = loop
+
+            try:
+                loop.run_until_complete(mcp_client.run_agent(
+                    ollama_url=ollama_url,
+                    model=model,
+                    server_command=server_command,
+                    prompt=prompt,
+                    run_id=run_id,
+                    event_callback=event_callback,
+                    cancel_event=cancel_evt,
+                    context_window=context_window,
+                ))
+            except Exception as exc:
+                event_callback({"type": "error", "message": str(exc)})
+            finally:
+                event_callback({"type": "done", "message": "Session ended."})
+                with _sessions_lock:
+                    if run_id in _active_sessions:
+                        _active_sessions[run_id]["status"] = "finished"
+                loop.close()
+
+        thread = threading.Thread(target=run_in_thread, daemon=True)
+
+        with _sessions_lock:
+            _active_sessions[run_id] = {
+                "thread": thread,
+                "queue": event_queue,
+                "status": "running",
+                "cancel_event_async": None,
+                "loop": None,
             }
-        }
 
-        with open(os.path.abspath('server_config.json'), 'w') as f:
-            json.dump(server_config, f, indent=2)
+        thread.start()
 
-        # Build the copy-paste shell snippet
-        cmd_string = f"# Note: Ensure your Python virtual environment is activated before running (e.g., 'source venv/bin/activate')\n"
-        cmd_string += f"# Session run ID: {run_id}\n"
-        cmd_string += f"{env_exports}\n\n"
-
-        if is_apt:
-            # kali_server.py is now started by start_docker.sh / start_local.sh.
-            # If for some reason it's not up, restart it here; otherwise just wait.
-            cmd_string += f"# Step 1: Ensure kali_server.py REST API is running (started automatically by start_docker/start_local)\n"
-            cmd_string += (
-                f"nc -z localhost 5000 2>/dev/null || {{\n"
-                f"  echo 'kali_server.py not detected \u2014 starting now...'\n"
-                f"  pkill -f 'kali_server.py' 2>/dev/null || true; sleep 1\n"
-                f"  setsid uv run --offline --with flask python3 /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &\n"
-                f"}}\n\n"
-            )
-            cmd_string += f"# Step 2: Wait for port 5000 to be ready (up to 90s)\n"
-            cmd_string += (
-                f"for i in $(seq 1 90); do\n"
-                f"  nc -z localhost 5000 2>/dev/null && echo 'API ready!' && break\n"
-                f"  sleep 1\n"
-                f"done\n"
-            )
-
-        # Choose the MCP client launcher
-        if pty_logging:
-            launcher = f"python3 ollmcp_logger.py"
-        else:
-            launcher = f"ollmcp"
-
-        cmd_string += f"{launcher} --model {shlex.quote(model)} --host {shlex.quote(ollama_url)} --servers-json ./server_config.json"
-        
         return jsonify({
             'success': True,
             'run_id': run_id,
-            'message': 'Command generated successfully',
-            'status': 'connected',
-            'command': cmd_string
+            'message': 'Agent session started.',
         })
-            
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/run/<run_id>/stop', methods=['POST'])
+def stop_run(run_id):
+    """Cancel a running agent session."""
+    _validate_run_id(run_id)
+    with _sessions_lock:
+        session = _active_sessions.get(run_id)
+    if not session:
+        return jsonify({'success': False, 'error': 'Session not found'}), 404
+
+    cancel_evt = session.get("cancel_event_async")
+    loop = session.get("loop")
+    if cancel_evt and loop:
+        loop.call_soon_threadsafe(cancel_evt.set)
+    return jsonify({'success': True, 'message': 'Stop signal sent.'})
+
+
+@app.route('/api/logs/<run_id>/stream')
+def stream_logs(run_id):
+    """SSE endpoint — streams real-time events for a run."""
+    _validate_run_id(run_id)
+    with _sessions_lock:
+        session = _active_sessions.get(run_id)
+    if not session:
+        return jsonify({'error': 'Session not found'}), 404
+
+    event_queue = session["queue"]
+
+    def generate():
+        while True:
+            try:
+                event = event_queue.get(timeout=30)
+            except queue.Empty:
+                # Send keep-alive comment
+                yield ": keepalive\n\n"
+                continue
+
+            yield f"data: {json.dumps(event)}\n\n"
+
+            if event.get("type") == "done":
+                break
+
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive',
+        }
+    )
+
+
 # -----------------------------------------------------------------------
-# Sessions API
+# Sessions API (unchanged)
 # -----------------------------------------------------------------------
 
 @app.route('/api/sessions', methods=['GET'])
@@ -137,7 +204,7 @@ def list_sessions():
     """Return a sorted list of past session metadata."""
     if not os.path.isdir(RUNS_DIR):
         return jsonify({'sessions': []})
-    
+
     sessions = []
     for run_id in sorted(os.listdir(RUNS_DIR), reverse=True):
         meta_path = os.path.join(RUNS_DIR, run_id, "metadata.json")
@@ -168,7 +235,7 @@ def get_tool_calls(run_id):
     tc_dir = os.path.join(RUNS_DIR, run_id, "tool_calls")
     if not os.path.isdir(tc_dir):
         return jsonify({'tool_calls': []})
-    
+
     records = []
     for fname in sorted(os.listdir(tc_dir)):
         if fname.endswith(".json"):
