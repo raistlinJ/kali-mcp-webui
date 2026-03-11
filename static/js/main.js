@@ -20,13 +20,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const liveLogViewer = document.getElementById('live-log-viewer');
     const toolsBadge = document.getElementById('service-tools-badge');
 
-    // Modal UI
-    const fabPromptBtn = document.getElementById('fab-prompt-btn');
-    const headerPromptBtn = document.getElementById('header-prompt-btn');
-    const promptModalOverlay = document.getElementById('prompt-modal-overlay');
-    const closePromptModalBtn = document.getElementById('close-prompt-modal');
-    const promptInputModal = document.getElementById('chat-prompt-input-modal');
-    const sendPromptBtn = document.getElementById('chat-send-btn-modal');
+    // Chat Console UI
+    const chatConsoleBar = document.getElementById('chat-console-bar');
+    const chatPromptInput = document.getElementById('chat-prompt-input');
+    const sendPromptBtn = document.getElementById('chat-send-btn');
 
     let _eventSource = null;
     let _serviceRunning = false;
@@ -37,26 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
         toolsConfigSection.style.display = e.target.value === 'apt' ? 'none' : 'block';
     });
     kaliCommandType.dispatchEvent(new Event('change'));
-
-    // ---------------------------------------------------------------
-    // Modal Logic
-    // ---------------------------------------------------------------
-    function openModal() {
-        if (!_serviceRunning || _chatBusy) return;
-        promptModalOverlay.classList.remove('hidden');
-        setTimeout(() => promptInputModal.focus(), 100);
-    }
-
-    function closeModal() {
-        promptModalOverlay.classList.add('hidden');
-    }
-
-    fabPromptBtn.addEventListener('click', openModal);
-    headerPromptBtn.addEventListener('click', openModal);
-    closePromptModalBtn.addEventListener('click', closeModal);
-    promptModalOverlay.addEventListener('click', (e) => {
-        if (e.target === promptModalOverlay) closeModal();
-    });
 
     // ---------------------------------------------------------------
     // Utility Alerts & Status
@@ -232,13 +209,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 startBtn.style.display = 'none';
                 stopBtn.style.display = 'inline-flex';
                 
-                // Show Prompt UI
-                fabPromptBtn.classList.remove('hidden');
-                headerPromptBtn.style.display = 'inline-flex';
+                // Show Console UI
+                chatConsoleBar.classList.remove('hidden');
 
                 openSseStream();
-                showAlert('Service started! Use the Prompt button to chat.', 'success');
-                setTimeout(() => openModal(), 500); // Auto-open modal
+                showAlert('Service started! Use the Prompt console to chat.', 'success');
+                setTimeout(() => chatPromptInput.focus(), 500);
             } else { throw new Error(data.error || 'Failed to start service'); }
         } catch (error) {
             console.error('Start error:', error);
@@ -299,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Send Chat
     // ---------------------------------------------------------------
     sendPromptBtn.addEventListener('click', sendChat);
-    promptInputModal.addEventListener('keydown', (e) => {
+    chatPromptInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendChat();
@@ -307,16 +283,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function sendChat() {
-        const prompt = promptInputModal.value.trim();
+        const prompt = chatPromptInput.value.trim();
         if (!prompt || _chatBusy || !_serviceRunning) return;
 
         _chatBusy = true;
-        closeModal();
-        promptInputModal.value = '';
+        chatPromptInput.value = '';
         
-        // Hide FAB temporarily while chat is busy
-        fabPromptBtn.classList.add('hidden');
-        headerPromptBtn.disabled = true;
+        chatPromptInput.disabled = true;
+        sendPromptBtn.disabled = true;
 
         appendLog(`<span class="log-label">👤 You</span> ${escapeHtml(prompt)}`, 'log-prompt');
 
@@ -339,8 +313,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function setChatReady() {
         _chatBusy = false;
         if (_serviceRunning) {
-            fabPromptBtn.classList.remove('hidden');
-            headerPromptBtn.disabled = false;
+            chatPromptInput.disabled = false;
+            sendPromptBtn.disabled = false;
+            chatPromptInput.focus();
         }
     }
 
@@ -365,11 +340,10 @@ document.addEventListener('DOMContentLoaded', () => {
         setConfigEnabled(true);
         toolsBadge.style.display = 'none';
         
-        // Hide Prompt UI
-        closeModal();
-        fabPromptBtn.classList.add('hidden');
-        headerPromptBtn.style.display = 'none';
-        headerPromptBtn.disabled = false;
+        // Hide Console UI
+        chatConsoleBar.classList.add('hidden');
+        chatPromptInput.disabled = false;
+        sendPromptBtn.disabled = false;
 
         loadSessions();
     }

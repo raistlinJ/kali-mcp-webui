@@ -288,9 +288,6 @@
                             <h2><i class="ph ph-pulse"></i> Live Session</h2>
                             <div class="live-log-header-actions">
                                 <span id="service-tools-badge" class="tools-badge" style="display:none;"></span>
-                                <button type="button" id="header-prompt-btn" class="btn btn-primary btn-sm" style="display:none;">
-                                    <i class="ph ph-chat-teardrop-dots"></i> Prompt
-                                </button>
                             </div>
                         </div>
                         <div class="context-usage-bar" id="context-usage-bar" style="display:none;">
@@ -313,24 +310,13 @@
         </div>
     </main>
 
-    <!-- Floating Action Button for Prompts -->
-    <button type="button" id="fab-prompt-btn" class="fab-btn hidden" title="New Prompt">
-        <i class="ph ph-chat-teardrop-dots"></i>
-    </button>
-
-    <!-- Prompt Modal Window -->
-    <div id="prompt-modal-overlay" class="modal-overlay hidden">
-        <div class="modal-content glass-panel" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; max-width: 640px;">
-            <div class="modal-header" style="margin-bottom: 0;">
-                <h2 style="font-size: 1.15rem;"><i class="ph ph-terminal-window"></i> Agent Prompt</h2>
-                <button type="button" id="close-prompt-modal" class="icon-btn"><i class="ph ph-x"></i></button>
-            </div>
-            <textarea id="chat-prompt-input-modal" placeholder="Type your prompt and press Enter..." rows="4" spellcheck="false"></textarea>
-            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
-                <button type="button" id="chat-send-btn-modal" class="btn btn-primary" style="width: auto; padding: 0.75rem 1.5rem;">
-                    <i class="ph ph-paper-plane-tilt"></i> Send to Agent
-                </button>
-            </div>
+    <!-- Full Width Chat Console -->
+    <div id="chat-console-bar" class="chat-console-bar hidden">
+        <div class="chat-console-wrapper">
+            <textarea id="chat-prompt-input" placeholder="Type your prompt and press Enter to run..." rows="2" spellcheck="false"></textarea>
+            <button type="button" id="chat-send-btn" class="btn btn-primary">
+                <i class="ph ph-paper-plane-tilt"></i> Send
+            </button>
         </div>
     </div>
 

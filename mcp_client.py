@@ -353,7 +353,12 @@ class MCPSession:
 
         # Serialise chat calls so two prompts don't overlap
         async with self._chat_lock:
-            await self._run_agent_loop(prompt, cancel_event)
+            try:
+                await self._run_agent_loop(prompt, cancel_event)
+            except Exception as e:
+                err_msg = f"Crash in agent loop: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+                _emit(self.event_callback, "error", {"message": err_msg})
+                print(err_msg)
 
     async def _run_agent_loop(self, prompt: str, cancel_event: asyncio.Event | None):
         """Core agent loop for a single chat turn."""
@@ -450,6 +455,7 @@ class MCPSession:
                     self.messages.append({
                         "role": "tool",
                         "content": context_result,
+                        "name": tool_name,
                     })
 
                 except Exception as exc:
