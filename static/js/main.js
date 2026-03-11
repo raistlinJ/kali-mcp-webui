@@ -18,23 +18,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const configPanel = document.getElementById('config-panel');
     const liveLogPanel = document.getElementById('live-log-panel');
     const liveLogViewer = document.getElementById('live-log-viewer');
-    const chatInputBar = document.getElementById('chat-input-bar');
-    const chatPromptInput = document.getElementById('chat-prompt-input');
-    const chatSendBtn = document.getElementById('chat-send-btn');
     const toolsBadge = document.getElementById('service-tools-badge');
+
+    // Modal UI
+    const fabPromptBtn = document.getElementById('fab-prompt-btn');
+    const headerPromptBtn = document.getElementById('header-prompt-btn');
+    const promptModalOverlay = document.getElementById('prompt-modal-overlay');
+    const closePromptModalBtn = document.getElementById('close-prompt-modal');
+    const promptInputModal = document.getElementById('chat-prompt-input-modal');
+    const sendPromptBtn = document.getElementById('chat-send-btn-modal');
 
     let _eventSource = null;
     let _serviceRunning = false;
     let _chatBusy = false;
 
-    // Toggle tools config visibility: hide for APT (tools are bundled in mcp_server.py)
+    // Toggle tools config visibility
     kaliCommandType.addEventListener('change', (e) => {
         toolsConfigSection.style.display = e.target.value === 'apt' ? 'none' : 'block';
     });
     kaliCommandType.dispatchEvent(new Event('change'));
 
     // ---------------------------------------------------------------
-    // Utility: Alerts
+    // Modal Logic
+    // ---------------------------------------------------------------
+    function openModal() {
+        if (!_serviceRunning || _chatBusy) return;
+        promptModalOverlay.classList.remove('hidden');
+        setTimeout(() => promptInputModal.focus(), 100);
+    }
+
+    function closeModal() {
+        promptModalOverlay.classList.add('hidden');
+    }
+
+    fabPromptBtn.addEventListener('click', openModal);
+    headerPromptBtn.addEventListener('click', openModal);
+    closePromptModalBtn.addEventListener('click', closeModal);
+    promptModalOverlay.addEventListener('click', (e) => {
+        if (e.target === promptModalOverlay) closeModal();
+    });
+
+    // ---------------------------------------------------------------
+    // Utility Alerts & Status
     // ---------------------------------------------------------------
     const showAlert = (message, type = 'error') => {
         const alertEl = document.createElement('div');
@@ -49,9 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 5000);
     };
 
-    // ---------------------------------------------------------------
-    // Utility: Status Badge
-    // ---------------------------------------------------------------
     const updateStatus = (state, message) => {
         statusBadge.classList.remove('hidden', 'success', 'error', 'running');
         if (state === 'success') {
@@ -69,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ---------------------------------------------------------------
-    // Tools Configuration Logic
+    // Tools Config JSON
     // ---------------------------------------------------------------
     const toolCheckboxes = document.querySelectorAll('.tool-checkbox');
     const toolsJsonArea = document.getElementById('kali-tools-json');
@@ -78,12 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedTools = [];
         toolCheckboxes.forEach(cb => {
             if (cb.checked) {
-                selectedTools.push({
-                    name: cb.value,
-                    command: cb.dataset.cmd,
-                    args: ["{args}"],
-                    allow_args: true
-                });
+                selectedTools.push({ name: cb.value, command: cb.dataset.cmd, args: ["{args}"], allow_args: true });
             }
         });
         try {
@@ -94,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
             toolsJsonArea.value = JSON.stringify({ tools: selectedTools }, null, 2);
         }
     }
-
     toolCheckboxes.forEach(cb => cb.addEventListener('change', updateToolsJson));
     updateToolsJson();
 
@@ -135,11 +151,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     startBtn.disabled = false;
                     showAlert(`Successfully fetched ${data.models.length} models.`, 'success');
                 }
-            } else {
-                throw new Error(data.error || 'Failed to fetch models');
-            }
+            } else { throw new Error(data.error || 'Failed to fetch models'); }
         } catch (error) {
-            console.error('Error fetching models:', error);
             showAlert(error.message);
             modelSelect.innerHTML = '<option value="" disabled selected>Failed to load models</option>';
             modelSelect.disabled = true;
@@ -160,9 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         liveLogViewer.appendChild(entry);
         liveLogViewer.scrollTop = liveLogViewer.scrollHeight;
     }
-
     function clearLog() { liveLogViewer.innerHTML = ''; }
-
     function closeSse() {
         if (_eventSource) { _eventSource.close(); _eventSource = null; }
     }
@@ -185,70 +196,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (extraArgs) command += ' ' + extraArgs;
 
-        const toolsConfigStr = toolsJsonArea.value;
         let toolsConfig = null;
         if (cmdType !== 'apt') {
-            try {
-                toolsConfig = JSON.parse(toolsConfigStr);
-            } catch (e) {
-                showAlert('Invalid JSON formatting in kali_tools.json editor.', 'error');
-                return;
-            }
+            try { toolsConfig = JSON.parse(toolsJsonArea.value); }
+            catch (e) { showAlert('Invalid JSON formatting in kali_tools.json editor.', 'error'); return; }
         }
 
-        if (!model) { showAlert('Please select a model first.'); return; }
-        if (!command) { showAlert('Please specify a server command.'); return; }
+        if (!model || !command) return;
 
-        // Disable config, show loading
         setConfigEnabled(false);
         startBtn.querySelector('i').classList.remove('ph-power');
         startBtn.querySelector('i').classList.add('ph-spinner-gap', 'spin');
         startBtn.disabled = true;
         updateStatus('running', 'Starting service…');
 
-        // Show log panel
         clearLog();
+        liveLogPanel.style.display = 'flex';
         appendLog('<i class="ph ph-spinner-gap spin"></i> Launching MCP service…', 'log-status');
-        liveLogPanel.classList.remove('hidden');
 
         try {
             const response = await fetch('/api/session/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    url, model, server_command: command,
-                    tools_config: toolsConfig,
-                    context_window: contextWindow,
-                })
+                body: JSON.stringify({ url, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow })
             });
             const data = await response.json();
 
             if (data.success) {
                 _serviceRunning = true;
-
-                // Show tools badge
                 if (data.tools && data.tools.length) {
                     toolsBadge.textContent = `${data.tools.length} tool(s): ${data.tools.join(', ')}`;
                     toolsBadge.style.display = 'inline-block';
                 }
-
                 updateStatus('running', 'Service Running');
-
-                // Switch buttons: hide Start, show Stop
                 startBtn.style.display = 'none';
                 stopBtn.style.display = 'inline-flex';
+                
+                // Show Prompt UI
+                fabPromptBtn.classList.remove('hidden');
+                headerPromptBtn.style.display = 'inline-flex';
 
-                // Show chat input
-                chatInputBar.style.display = 'block';
-                chatPromptInput.focus();
-
-                // Open SSE stream
                 openSseStream();
-
-                showAlert('Service started! Type a prompt below.', 'success');
-            } else {
-                throw new Error(data.error || 'Failed to start service');
-            }
+                showAlert('Service started! Use the Prompt button to chat.', 'success');
+                setTimeout(() => openModal(), 500); // Auto-open modal
+            } else { throw new Error(data.error || 'Failed to start service'); }
         } catch (error) {
             console.error('Start error:', error);
             updateStatus('error', 'Start Failed');
@@ -266,9 +257,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setConfigEnabled(enabled) {
-        // Disable/enable all inputs in the config panel
         const inputs = configPanel.querySelectorAll('input, select, textarea, button');
         inputs.forEach(el => {
+            if (el.id === 'start-service-btn' || el.id === 'stop-service-btn') return;
+            
             if (enabled) {
                 el.removeAttribute('data-service-disabled');
                 el.disabled = el.hasAttribute('data-originally-disabled');
@@ -287,38 +279,27 @@ document.addEventListener('DOMContentLoaded', () => {
     function openSseStream() {
         closeSse();
         _eventSource = new EventSource('/api/session/stream');
-
         _eventSource.onmessage = (ev) => {
             try {
                 const event = JSON.parse(ev.data);
                 renderEvent(event);
-
-                if (event.type === 'done') {
-                    closeSse();
-                    handleServiceStopped();
-                }
-            } catch (err) {
-                console.error('SSE parse error:', err);
-            }
+                if (event.type === 'done') { closeSse(); handleServiceStopped(); }
+            } catch (err) {}
         };
-
         _eventSource.onerror = () => {
-            // SSE connection lost — check if service is still running
             closeSse();
             if (_serviceRunning) {
                 appendLog('<span class="log-label">⚠️</span> SSE connection lost. Reconnecting…', 'log-status');
-                setTimeout(() => {
-                    if (_serviceRunning) openSseStream();
-                }, 2000);
+                setTimeout(() => { if (_serviceRunning) openSseStream(); }, 2000);
             }
         };
     }
 
     // ---------------------------------------------------------------
-    // Chat Send
+    // Send Chat
     // ---------------------------------------------------------------
-    chatSendBtn.addEventListener('click', sendChat);
-    chatPromptInput.addEventListener('keydown', (e) => {
+    sendPromptBtn.addEventListener('click', sendChat);
+    promptInputModal.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendChat();
@@ -326,15 +307,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function sendChat() {
-        const prompt = chatPromptInput.value.trim();
-        if (!prompt || _chatBusy) return;
+        const prompt = promptInputModal.value.trim();
+        if (!prompt || _chatBusy || !_serviceRunning) return;
 
         _chatBusy = true;
-        chatSendBtn.disabled = true;
-        chatPromptInput.disabled = true;
-        chatPromptInput.value = '';
+        closeModal();
+        promptInputModal.value = '';
+        
+        // Hide FAB temporarily while chat is busy
+        fabPromptBtn.classList.add('hidden');
+        headerPromptBtn.disabled = true;
 
-        // Show the user prompt in the log
         appendLog(`<span class="log-label">👤 You</span> ${escapeHtml(prompt)}`, 'log-prompt');
 
         try {
@@ -344,11 +327,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ prompt })
             });
             const data = await response.json();
-
             if (!data.success) {
                 appendLog(`<span class="log-label">❌ Error</span> ${escapeHtml(data.error || 'Chat failed.')}`, 'log-error');
             }
-            // Results will arrive via SSE — chat_done event will re-enable input
         } catch (error) {
             appendLog(`<span class="log-label">❌ Error</span> ${escapeHtml(error.message)}`, 'log-error');
             setChatReady();
@@ -357,9 +338,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setChatReady() {
         _chatBusy = false;
-        chatSendBtn.disabled = false;
-        chatPromptInput.disabled = false;
-        chatPromptInput.focus();
+        if (_serviceRunning) {
+            fabPromptBtn.classList.remove('hidden');
+            headerPromptBtn.disabled = false;
+        }
     }
 
     // ---------------------------------------------------------------
@@ -368,37 +350,27 @@ document.addEventListener('DOMContentLoaded', () => {
     stopBtn.addEventListener('click', async () => {
         stopBtn.disabled = true;
         appendLog('<span class="log-label">⏹️</span> Stopping service…', 'log-status');
-
-        try {
-            await fetch('/api/session/stop', { method: 'POST' });
-        } catch (err) {
-            showAlert('Failed to send stop signal.');
-        }
-        // Service stopped event will come through SSE → handleServiceStopped()
+        try { await fetch('/api/session/stop', { method: 'POST' }); } 
+        catch (err) { showAlert('Failed to send stop signal.'); }
     });
 
     function handleServiceStopped() {
         _serviceRunning = false;
         _chatBusy = false;
         updateStatus('success', 'Service Stopped');
-
-        // Switch buttons
+        
         stopBtn.style.display = 'none';
         stopBtn.disabled = false;
         resetStartBtn();
-
-        // Hide chat input
-        chatInputBar.style.display = 'none';
-        chatSendBtn.disabled = false;
-        chatPromptInput.disabled = false;
-
-        // Re-enable config
         setConfigEnabled(true);
-
-        // Hide tools badge
         toolsBadge.style.display = 'none';
+        
+        // Hide Prompt UI
+        closeModal();
+        fabPromptBtn.classList.add('hidden');
+        headerPromptBtn.style.display = 'none';
+        headerPromptBtn.disabled = false;
 
-        // Refresh sessions list
         loadSessions();
     }
 
@@ -408,50 +380,27 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderEvent(event) {
         switch (event.type) {
             case 'prompt':
-                appendLog(`<span class="log-label">👤 Prompt</span> ${escapeHtml(event.text)}`, 'log-prompt');
-                break;
+                appendLog(`<span class="log-label">👤 Prompt</span> ${escapeHtml(event.text)}`, 'log-prompt'); break;
             case 'response':
-                appendLog(`<span class="log-label">🤖 Response</span>\n<pre class="log-pre">${escapeHtml(event.text)}</pre>`, 'log-response');
-                break;
+                appendLog(`<span class="log-label">🤖 Response</span>\n<pre class="log-pre">${escapeHtml(event.text)}</pre>`, 'log-response'); break;
             case 'tool_call':
-                appendLog(`<span class="log-label">🔧 Tool Call</span> <strong>${escapeHtml(event.tool)}</strong> — args: <code>${escapeHtml(JSON.stringify(event.args))}</code>`, 'log-tool-call');
-                break;
+                appendLog(`<span class="log-label">🔧 Tool Call</span> <strong>${escapeHtml(event.tool)}</strong> — args: <code>${escapeHtml(JSON.stringify(event.args))}</code>`, 'log-tool-call'); break;
             case 'tool_result': {
-                const exitBadge = event.exit_code === 0
-                    ? `<span class="exit-ok">exit 0</span>`
-                    : `<span class="exit-err">exit ${event.exit_code}</span>`;
-                appendLog(
-                    `<span class="log-label">📋 Result</span> <strong>${escapeHtml(event.tool)}</strong> ${exitBadge} (${event.duration_ms}ms)\n<pre class="log-pre">${escapeHtml(event.result || '(no output)')}</pre>`,
-                    'log-tool-result'
-                );
+                const exitBadge = event.exit_code === 0 ? `<span class="exit-ok">exit 0</span>` : `<span class="exit-err">exit ${event.exit_code}</span>`;
+                appendLog(`<span class="log-label">📋 Result</span> <strong>${escapeHtml(event.tool)}</strong> ${exitBadge} (${event.duration_ms}ms)\n<pre class="log-pre">${escapeHtml(event.result || '(no output)')}</pre>`, 'log-tool-result');
                 break;
             }
-            case 'status':
-                appendLog(`<span class="log-label">ℹ️ Status</span> ${escapeHtml(event.message)}`, 'log-status');
-                break;
-            case 'context_usage':
-                updateContextBar(event);
-                break;
-            case 'service_started':
-                appendLog(`<span class="log-label">🟢 Service Started</span> ${event.tools ? event.tools.length + ' tool(s) available' : ''}`, 'log-done');
-                break;
-            case 'service_stopped':
-                appendLog(`<span class="log-label">🔴 Service Stopped</span> ${escapeHtml(event.message || '')}`, 'log-status');
-                break;
+            case 'status': appendLog(`<span class="log-label">ℹ️ Status</span> ${escapeHtml(event.message)}`, 'log-status'); break;
+            case 'context_usage': updateContextBar(event); break;
+            case 'service_started': appendLog(`<span class="log-label">🟢 Service Started</span>`, 'log-done'); break;
+            case 'service_stopped': appendLog(`<span class="log-label">🔴 Service Stopped</span>`, 'log-status'); break;
             case 'chat_done':
                 appendLog(`<span class="log-label">✅ Turn Complete</span> ${escapeHtml(event.message || 'Ready for next prompt.')}`, 'log-done');
-                setChatReady();
-                break;
+                setChatReady(); break;
             case 'error':
                 appendLog(`<span class="log-label">❌ Error</span>\n<pre class="log-pre log-error-text">${escapeHtml(event.message)}</pre>`, 'log-error');
-                updateStatus('error', 'Error');
-                setChatReady();
-                break;
-            case 'done':
-                appendLog(`<span class="log-label">⏹️ Done</span> ${escapeHtml(event.message || 'Session ended.')}`, 'log-done');
-                break;
-            default:
-                appendLog(`<span class="log-label">${escapeHtml(event.type)}</span> ${escapeHtml(JSON.stringify(event))}`, 'log-status');
+                updateStatus('error', 'Error'); setChatReady(); break;
+            case 'done': appendLog(`<span class="log-label">⏹️ Done</span>`, 'log-done'); break;
         }
     }
 
@@ -460,17 +409,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const fill = document.getElementById('context-usage-fill');
         const text = document.getElementById('context-usage-text');
         const modelMaxEl = document.getElementById('context-model-max');
-
         bar.style.display = 'block';
-
         const used = event.used || 0;
         const budget = event.budget || 8192;
-        const modelMax = event.model_max || budget;
         const pct = Math.min(100, Math.round((used / budget) * 100));
-
         text.textContent = `${used.toLocaleString()} / ${budget.toLocaleString()} tokens (${pct}%)`;
-        modelMaxEl.textContent = `model max: ${modelMax.toLocaleString()}`;
-
+        modelMaxEl.textContent = `model max: ${(event.model_max || budget).toLocaleString()}`;
         fill.style.width = pct + '%';
         fill.classList.remove('ctx-green', 'ctx-amber', 'ctx-red');
         if (pct < 50) fill.classList.add('ctx-green');
@@ -481,134 +425,65 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------------
     // Sessions Browser
     // ---------------------------------------------------------------
-    let _browseRunId = null;
-    let _currentTab = 'transcript';
-
-    const sessionsList = document.getElementById('sessions-list');
-    const sessionDetail = document.getElementById('session-detail');
-    const detailContent = document.getElementById('detail-content');
+    let _browseRunId = null, _currentTab = 'transcript';
+    const sessionsList = document.getElementById('sessions-list'), sessionDetail = document.getElementById('session-detail'), detailContent = document.getElementById('detail-content');
 
     async function loadSessions() {
         try {
-            const res = await fetch('/api/sessions');
-            const data = await res.json();
+            const res = await fetch('/api/sessions'); const data = await res.json();
             renderSessionList(data.sessions || []);
-        } catch (e) {
-            sessionsList.innerHTML = '<div class="empty-state">Could not load sessions.</div>';
-        }
+        } catch (e) { sessionsList.innerHTML = '<div class="empty-state">Could not load sessions.</div>'; }
     }
 
     function renderSessionList(sessions) {
-        if (!sessions.length) {
-            sessionsList.innerHTML = '<div class="empty-state">No sessions yet. Run an agent to start logging.</div>';
-            return;
-        }
+        if (!sessions.length) { sessionsList.innerHTML = '<div class="empty-state">No sessions yet. Run an agent to start logging.</div>'; return; }
         sessionsList.innerHTML = sessions.map(s => {
-            const startTime = s.start_time ? new Date(s.start_time).toLocaleString() : '—';
-            const tools = s.total_tool_calls != null ? `${s.total_tool_calls} tool call(s)` : '';
-            const status = s.status || 'unknown';
             return `
             <div class="session-card ${s.run_id === _browseRunId ? 'active' : ''}" data-run="${s.run_id}">
                 <div class="session-card-left">
                     <span class="session-run-id">${s.run_id}</span>
-                    <span class="session-meta">${startTime} · ${s.model || '?'} · ${s.server_type || '?'}${tools ? ' · ' + tools : ''}</span>
+                    <span class="session-meta">${s.start_time ? new Date(s.start_time).toLocaleString() : '—'}</span>
                 </div>
-                <span class="session-status ${status}">${status}</span>
+                <span class="session-status ${s.status || 'unknown'}">${s.status || 'unknown'}</span>
             </div>`;
         }).join('');
-
-        sessionsList.querySelectorAll('.session-card').forEach(card => {
-            card.addEventListener('click', () => openSession(card.dataset.run));
-        });
+        sessionsList.querySelectorAll('.session-card').forEach(card => card.addEventListener('click', () => openSession(card.dataset.run)));
     }
 
     async function openSession(runId) {
-        _browseRunId = runId;
-        sessionDetail.style.display = 'block';
-        sessionsList.querySelectorAll('.session-card').forEach(c => {
-            c.classList.toggle('active', c.dataset.run === runId);
-        });
+        _browseRunId = runId; sessionDetail.style.display = 'block';
+        sessionsList.querySelectorAll('.session-card').forEach(c => c.classList.toggle('active', c.dataset.run === runId));
         await renderTab(_currentTab);
     }
 
     async function renderTab(tab) {
         _currentTab = tab;
         document.querySelectorAll('.detail-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-
         if (tab === 'transcript') {
-            try {
-                const res = await fetch(`/api/sessions/${_browseRunId}/transcript`);
-                const data = await res.json();
-                detailContent.innerHTML = `<pre>${escapeHtml(data.content || '(empty)')}</pre>`;
-            } catch { detailContent.innerHTML = '<div class="empty-state">Could not load transcript.</div>'; }
+            try { const res = await fetch(`/api/sessions/${_browseRunId}/transcript`); const data = await res.json(); detailContent.innerHTML = `<pre>${escapeHtml(data.content || '(empty)')}</pre>`; } catch { detailContent.innerHTML = '<div class="empty-state">Could not load transcript.</div>'; }
         } else if (tab === 'tool_calls') {
-            try {
-                const res = await fetch(`/api/sessions/${_browseRunId}/tool_calls`);
-                const data = await res.json();
-                const tcs = data.tool_calls || [];
-                if (!tcs.length) {
-                    detailContent.innerHTML = '<div class="empty-state">No tool calls recorded.</div>';
-                    return;
-                }
-                detailContent.innerHTML = tcs.map(tc => `
-                    <div class="tool-call-card">
-                        <div class="tool-call-header">
-                            <span class="tool-call-name"><i class="ph ph-wrench"></i> ${escapeHtml(tc.tool)}</span>
-                            <span class="tool-call-meta">${tc.duration_ms}ms · exit ${tc.exit_code}</span>
-                        </div>
-                        <div style="font-size:0.78rem;color:var(--text-secondary);">Args: ${escapeHtml(JSON.stringify(tc.args))}</div>
-                        <div class="tool-call-result">${escapeHtml(tc.result || '(no output)')}</div>
-                    </div>`).join('');
+            try { 
+                const res = await fetch(`/api/sessions/${_browseRunId}/tool_calls`); const data = await res.json(); const tcs = data.tool_calls || [];
+                if (!tcs.length) { detailContent.innerHTML = '<div class="empty-state">No tool calls recorded.</div>'; return; }
+                detailContent.innerHTML = tcs.map(tc => `<div class="tool-call-card"><div class="tool-call-header"><span class="tool-call-name"><i class="ph ph-wrench"></i> ${escapeHtml(tc.tool)}</span><span class="tool-call-meta">${tc.duration_ms}ms</span></div><div class="tool-call-result">${escapeHtml(tc.result || '(no output)')}</div></div>`).join('');
             } catch { detailContent.innerHTML = '<div class="empty-state">Could not load tool calls.</div>'; }
         } else if (tab === 'artifacts') {
             try {
-                const res = await fetch(`/api/sessions/${_browseRunId}/artifacts`);
-                const data = await res.json();
-                const arts = data.artifacts || [];
-                if (!arts.length) {
-                    detailContent.innerHTML = '<div class="empty-state">No artifacts saved.</div>';
-                    return;
-                }
-                detailContent.innerHTML = `<ul class="artifact-list">${arts.map(a =>
-                    `<li class="artifact-item" data-artifact="${escapeHtml(a)}"><i class="ph ph-file-text"></i> ${escapeHtml(a)}</li>`
-                ).join('')}</ul>`;
-                detailContent.querySelectorAll('.artifact-item').forEach(el => {
-                    el.addEventListener('click', () => openArtifact(el.dataset.artifact));
-                });
+                const res = await fetch(`/api/sessions/${_browseRunId}/artifacts`); const data = await res.json(); const arts = data.artifacts || [];
+                if (!arts.length) { detailContent.innerHTML = '<div class="empty-state">No artifacts saved.</div>'; return; }
+                detailContent.innerHTML = `<ul class="artifact-list">${arts.map(a => `<li class="artifact-item" data-artifact="${escapeHtml(a)}"><i class="ph ph-file-text"></i> ${escapeHtml(a)}</li>`).join('')}</ul>`;
+                detailContent.querySelectorAll('.artifact-item').forEach(el => el.addEventListener('click', () => openArtifact(el.dataset.artifact)));
             } catch { detailContent.innerHTML = '<div class="empty-state">Could not load artifacts.</div>'; }
         }
     }
 
     async function openArtifact(filename) {
-        try {
-            const res = await fetch(`/api/sessions/${_browseRunId}/artifacts/${filename}`);
-            const data = await res.json();
-            detailContent.innerHTML = `
-                <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--text-secondary);">
-                    <button onclick="renderTab('artifacts')" style="background:none;border:none;color:var(--accent-primary);cursor:pointer;font-size:0.8rem;">← Back</button>
-                    &nbsp;${escapeHtml(filename)}
-                </div>
-                <pre>${escapeHtml(data.content || '(empty)')}</pre>`;
-        } catch { detailContent.innerHTML = '<div class="empty-state">Could not load artifact.</div>'; }
+        try { const res = await fetch(`/api/sessions/${_browseRunId}/artifacts/${filename}`); const data = await res.json(); detailContent.innerHTML = `<div style="margin-bottom:0.5rem;"><button onclick="renderTab('artifacts')" style="background:none;border:none;color:var(--accent-primary);cursor:pointer;">← Back</button> &nbsp;${escapeHtml(filename)}</div><pre>${escapeHtml(data.content || '(empty)')}</pre>`; } catch { detailContent.innerHTML = '<div class="empty-state">Could not load artifact.</div>'; }
     }
 
-    // Tab click
-    document.getElementById('detail-tabs').addEventListener('click', e => {
-        const tab = e.target.closest('.detail-tab');
-        if (tab && _browseRunId) renderTab(tab.dataset.tab);
-    });
-
-    // Refresh button
+    document.getElementById('detail-tabs').addEventListener('click', e => { const tab = e.target.closest('.detail-tab'); if (tab && _browseRunId) renderTab(tab.dataset.tab); });
     document.getElementById('refresh-sessions-btn').addEventListener('click', loadSessions);
 
-    function escapeHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    // Load sessions on page load
+    function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     loadSessions();
 });

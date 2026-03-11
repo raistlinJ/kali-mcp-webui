@@ -29,289 +29,311 @@
         </header>
 
         <div class="glass-panel">
+            <div class="panel-columns">
 
-            <!-- Config Form — disabled while service is running -->
-            <div id="config-panel">
+                <!-- LEFT COLUMN -->
+                <div class="panel-col">
 
-                <!-- Connection Section -->
-                <div class="form-section">
-                    <h2 class="section-title">
-                        <i class="ph ph-plugs-connected"></i>
-                        Ollama Instance
-                    </h2>
+                    <!-- Config Form — disabled while service is running -->
+                    <div id="config-panel">
 
-                    <div class="input-group">
-                        <label for="ollama-url">Instance URL</label>
-                        <div class="input-with-icon">
-                            <i class="ph ph-link"></i>
-                            <input type="url" id="ollama-url" value="http://localhost:11434" required
-                                placeholder="http://localhost:11434">
-                        </div>
-                    </div>
+                        <!-- Connection Section -->
+                        <div class="form-section">
+                            <h2 class="section-title">
+                                <i class="ph ph-plugs-connected"></i>
+                                Ollama Instance
+                            </h2>
 
-                    <button type="button" id="fetch-models-btn" class="btn btn-secondary">
-                        <i class="ph ph-arrows-clockwise reload-icon"></i>
-                        <span>Fetch Available LLMs</span>
-                    </button>
-                </div>
-
-                <div class="divider"></div>
-
-                <!-- MCP Kali Server Section -->
-                <div class="form-section">
-                    <h2 class="section-title" title="Configure the command used to launch the mcp-kali-server">
-                        <i class="ph ph-shield-check"></i>
-                        Kali Server Integration
-                    </h2>
-
-                    <div class="input-group">
-                        <label for="kali-command-type">Server Launch Method</label>
-                        <div class="select-wrapper">
-                            <i class="ph ph-terminal icon-left"></i>
-                            <select id="kali-command-type">
-                                <option value="python" selected>Native Python (uv run mcp_kali.py)</option>
-                                <option value="apt">APT Package (mcp-kali-server)</option>
-                            </select>
-                            <i class="ph ph-caret-down icon-right"></i>
-                        </div>
-                    </div>
-
-
-                    <div class="input-group">
-                        <label for="kali-args">Server Arguments / Config Paths</label>
-                        <div class="input-with-icon">
-                            <i class="ph ph-sliders"></i>
-                            <input type="text" id="kali-args" value="" placeholder="Optional Server Arguments">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="divider"></div>
-
-                <!-- Kali Tools Configurator -->
-                <div class="form-section" id="tools-config-section">
-                    <h2 class="section-title">
-                        <i class="ph ph-toolbox"></i>
-                        Kali Tools Configuration
-                    </h2>
-
-                    <div class="input-group">
-                        <label>Reconnaissance</label>
-                        <div class="tools-grid">
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/nmap"
-                                    value="nmap" class="tool-checkbox"> nmap</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/rustscan"
-                                    value="rustscan" class="tool-checkbox"> rustscan</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/masscan"
-                                    value="masscan" class="tool-checkbox"> masscan</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/amass"
-                                    value="amass" class="tool-checkbox"> amass</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/subfinder"
-                                    value="subfinder" class="tool-checkbox"> subfinder</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/recon-ng"
-                                    value="recon-ng" class="tool-checkbox"> recon-ng</label>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label>Web Application Analysis</label>
-                        <div class="tools-grid">
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/gobuster"
-                                    value="gobuster" class="tool-checkbox"> gobuster</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/dirb"
-                                    value="dirb" class="tool-checkbox"> dirb</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/ffuf"
-                                    value="ffuf" class="tool-checkbox"> ffuf</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/wfuzz"
-                                    value="wfuzz" class="tool-checkbox"> wfuzz</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/nikto"
-                                    value="nikto" class="tool-checkbox"> nikto</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/sqlmap"
-                                    value="sqlmap" class="tool-checkbox"> sqlmap</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/wpscan"
-                                    value="wpscan" class="tool-checkbox"> wpscan</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/whatweb"
-                                    value="whatweb" class="tool-checkbox"> whatweb</label>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label>Password Attacks</label>
-                        <div class="tools-grid">
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/sbin/john"
-                                    value="john" class="tool-checkbox"> john (JtR)</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/hashcat"
-                                    value="hashcat" class="tool-checkbox"> hashcat</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/hydra"
-                                    value="hydra" class="tool-checkbox"> hydra</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/medusa"
-                                    value="medusa" class="tool-checkbox"> medusa</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/crowbar"
-                                    value="crowbar" class="tool-checkbox"> crowbar</label>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label>Vulnerability &amp; Network</label>
-                        <div class="tools-grid">
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/searchsploit"
-                                    value="searchsploit" class="tool-checkbox"> searchsploit</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/netcat"
-                                    value="netcat" class="tool-checkbox"> netcat (nc)</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/ncat"
-                                    value="ncat" class="tool-checkbox"> ncat</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/tcpdump"
-                                    value="tcpdump" class="tool-checkbox"> tcpdump</label>
-                            <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/sbin/aircrack-ng"
-                                    value="aircrack-ng" class="tool-checkbox"> aircrack-ng</label>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <details class="json-editor-details">
-                            <summary>
-                                <div
-                                    style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                    <span><i class="ph ph-file-code"></i> Advanced: kali_tools.json Editor</span>
-                                    <span
-                                        style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(Auto-saves
-                                        on Start) <i class="ph ph-caret-down"></i></span>
+                            <div class="input-group">
+                                <label for="ollama-url">Instance URL</label>
+                                <div class="input-with-icon">
+                                    <i class="ph ph-link"></i>
+                                    <input type="url" id="ollama-url" value="http://localhost:11434" required
+                                        placeholder="http://localhost:11434">
                                 </div>
-                            </summary>
-                            <textarea id="kali-tools-json" rows="8" spellcheck="false" style="margin-top: 1rem;">{
+                            </div>
+
+                            <button type="button" id="fetch-models-btn" class="btn btn-secondary">
+                                <i class="ph ph-arrows-clockwise reload-icon"></i>
+                                <span>Fetch Available LLMs</span>
+                            </button>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <!-- MCP Kali Server Section -->
+                        <div class="form-section">
+                            <h2 class="section-title" title="Configure the command used to launch the mcp-kali-server">
+                                <i class="ph ph-shield-check"></i>
+                                Kali Server Integration
+                            </h2>
+
+                            <div class="input-group">
+                                <label for="kali-command-type">Server Launch Method</label>
+                                <div class="select-wrapper">
+                                    <i class="ph ph-terminal icon-left"></i>
+                                    <select id="kali-command-type">
+                                        <option value="python" selected>Native Python (uv run mcp_kali.py)</option>
+                                        <option value="apt">APT Package (mcp-kali-server)</option>
+                                    </select>
+                                    <i class="ph ph-caret-down icon-right"></i>
+                                </div>
+                            </div>
+
+
+                            <div class="input-group">
+                                <label for="kali-args">Server Arguments / Config Paths</label>
+                                <div class="input-with-icon">
+                                    <i class="ph ph-sliders"></i>
+                                    <input type="text" id="kali-args" value="" placeholder="Optional Server Arguments">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <!-- Kali Tools Configurator -->
+                        <div class="form-section" id="tools-config-section">
+                            <h2 class="section-title">
+                                <i class="ph ph-toolbox"></i>
+                                Kali Tools Configuration
+                            </h2>
+
+                            <div class="input-group">
+                                <label>Reconnaissance</label>
+                                <div class="tools-grid">
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/nmap"
+                                            value="nmap" class="tool-checkbox"> nmap</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/rustscan"
+                                            value="rustscan" class="tool-checkbox"> rustscan</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/masscan"
+                                            value="masscan" class="tool-checkbox"> masscan</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/amass"
+                                            value="amass" class="tool-checkbox"> amass</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/subfinder"
+                                            value="subfinder" class="tool-checkbox"> subfinder</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/recon-ng"
+                                            value="recon-ng" class="tool-checkbox"> recon-ng</label>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Web Application Analysis</label>
+                                <div class="tools-grid">
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/gobuster"
+                                            value="gobuster" class="tool-checkbox"> gobuster</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/dirb"
+                                            value="dirb" class="tool-checkbox"> dirb</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/ffuf"
+                                            value="ffuf" class="tool-checkbox"> ffuf</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/wfuzz"
+                                            value="wfuzz" class="tool-checkbox"> wfuzz</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/nikto"
+                                            value="nikto" class="tool-checkbox"> nikto</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/sqlmap"
+                                            value="sqlmap" class="tool-checkbox"> sqlmap</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/wpscan"
+                                            value="wpscan" class="tool-checkbox"> wpscan</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/whatweb"
+                                            value="whatweb" class="tool-checkbox"> whatweb</label>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Password Attacks</label>
+                                <div class="tools-grid">
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/sbin/john"
+                                            value="john" class="tool-checkbox"> john (JtR)</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/hashcat"
+                                            value="hashcat" class="tool-checkbox"> hashcat</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/hydra"
+                                            value="hydra" class="tool-checkbox"> hydra</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/medusa"
+                                            value="medusa" class="tool-checkbox"> medusa</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/crowbar"
+                                            value="crowbar" class="tool-checkbox"> crowbar</label>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Vulnerability &amp; Network</label>
+                                <div class="tools-grid">
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/searchsploit"
+                                            value="searchsploit" class="tool-checkbox"> searchsploit</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/netcat"
+                                            value="netcat" class="tool-checkbox"> netcat (nc)</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/ncat"
+                                            value="ncat" class="tool-checkbox"> ncat</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/tcpdump"
+                                            value="tcpdump" class="tool-checkbox"> tcpdump</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/sbin/aircrack-ng"
+                                            value="aircrack-ng" class="tool-checkbox"> aircrack-ng</label>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <details class="json-editor-details">
+                                    <summary>
+                                        <div
+                                            style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                            <span><i class="ph ph-file-code"></i> Advanced: kali_tools.json Editor</span>
+                                            <span
+                                                style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(Auto-saves
+                                                on Start) <i class="ph ph-caret-down"></i></span>
+                                        </div>
+                                    </summary>
+                                    <textarea id="kali-tools-json" rows="8" spellcheck="false" style="margin-top: 1rem;">{
   "tools": []
 }</textarea>
-                        </details>
+                                </details>
+                            </div>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <!-- Model & Context Section -->
+                        <div class="form-section">
+                            <h2 class="section-title">
+                                <i class="ph ph-cpu"></i>
+                                Model &amp; Context
+                            </h2>
+
+                            <div class="input-group">
+                                <label for="model-select">Select Model</label>
+                                <div class="select-wrapper">
+                                    <i class="ph ph-robot icon-left"></i>
+                                    <select id="model-select" disabled>
+                                        <option value="" disabled selected>Click 'Fetch' to load models</option>
+                                    </select>
+                                    <i class="ph ph-caret-down icon-right"></i>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label for="context-window">Context Window (tokens)</label>
+                                <div class="select-wrapper">
+                                    <i class="ph ph-brain icon-left"></i>
+                                    <select id="context-window">
+                                        <option value="2048">2K</option>
+                                        <option value="4096">4K</option>
+                                        <option value="8192" selected>8K (default)</option>
+                                        <option value="16384">16K</option>
+                                        <option value="32768">32K</option>
+                                        <option value="65536">64K</option>
+                                        <option value="131072">128K</option>
+                                    </select>
+                                    <i class="ph ph-caret-down icon-right"></i>
+                                </div>
+                                <span class="input-hint">Older messages are auto-summarised when approaching limit</span>
+                            </div>
+                        </div>
+
+                        <!-- Service Action Buttons -->
+                        <div class="action-footer">
+                            <button type="button" id="start-service-btn" class="btn btn-primary" disabled>
+                                <i class="ph ph-power"></i>
+                                <span>Start Service</span>
+                            </button>
+                            <button type="button" id="stop-service-btn" class="btn btn-danger" style="display:none;">
+                                <i class="ph ph-stop-circle"></i>
+                                <span>Stop Service</span>
+                            </button>
+
+                            <div id="status-badge" class="status-badge hidden">
+                                <div class="status-dot"></div>
+                                <span class="status-text">Idle</span>
+                            </div>
+                        </div>
+
                     </div>
-                </div>
 
-                <div class="divider"></div>
-
-                <!-- Model & Context Section -->
-                <div class="form-section">
-                    <h2 class="section-title">
-                        <i class="ph ph-cpu"></i>
-                        Model &amp; Context
-                    </h2>
-
-                    <div class="input-group">
-                        <label for="model-select">Select Model</label>
-                        <div class="select-wrapper">
-                            <i class="ph ph-robot icon-left"></i>
-                            <select id="model-select" disabled>
-                                <option value="" disabled selected>Click 'Fetch' to load models</option>
-                            </select>
-                            <i class="ph ph-caret-down icon-right"></i>
+                    <!-- Sessions Panel (moved to left column) -->
+                    <div class="sessions-panel" id="sessions-panel">
+                        <div class="sessions-header">
+                            <h2><i class="ph ph-clock-countdown"></i> Past Sessions</h2>
+                            <button type="button" id="refresh-sessions-btn" class="btn btn-secondary"
+                                style="width:auto;padding:0.4rem 0.85rem;font-size:0.82rem;">
+                                <i class="ph ph-arrows-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="sessions-list" id="sessions-list">
+                            <div class="empty-state">No sessions yet. Run an agent to start logging.</div>
+                        </div>
+                        <div class="session-detail" id="session-detail" style="display:none;">
+                            <div class="detail-tabs" id="detail-tabs">
+                                <button class="detail-tab active" data-tab="transcript"><i class="ph ph-chat-text"></i>
+                                    Transcript</button>
+                                <button class="detail-tab" data-tab="tool_calls"><i class="ph ph-wrench"></i>
+                                    Tools</button>
+                                <button class="detail-tab" data-tab="artifacts"><i class="ph ph-file-arrow-down"></i>
+                                    Artifacts</button>
+                            </div>
+                            <div class="detail-content" id="detail-content">
+                                <div class="empty-state">Select a session above.</div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="input-group">
-                        <label for="context-window">Context Window (tokens)</label>
-                        <div class="select-wrapper">
-                            <i class="ph ph-brain icon-left"></i>
-                            <select id="context-window">
-                                <option value="2048">2K</option>
-                                <option value="4096">4K</option>
-                                <option value="8192" selected>8K (default)</option>
-                                <option value="16384">16K</option>
-                                <option value="32768">32K</option>
-                                <option value="65536">64K</option>
-                                <option value="131072">128K</option>
-                            </select>
-                            <i class="ph ph-caret-down icon-right"></i>
+                </div> <!-- END LEFT COLUMN -->
+
+                <!-- RIGHT COLUMN -->
+                <div class="panel-col">
+
+                    <!-- Alerts Container -->
+                    <div id="alerts-container" class="alerts-container"></div>
+
+                    <!-- Live Session Log container -->
+                    <div class="live-log-panel" id="live-log-panel" style="display:none; height: 100%; display: flex; flex-direction: column;">
+                        <div class="live-log-header">
+                            <h2><i class="ph ph-pulse"></i> Live Session</h2>
+                            <div class="live-log-header-actions">
+                                <span id="service-tools-badge" class="tools-badge" style="display:none;"></span>
+                                <button type="button" id="header-prompt-btn" class="btn btn-primary btn-sm" style="display:none;">
+                                    <i class="ph ph-chat-teardrop-dots"></i> Prompt
+                                </button>
+                            </div>
                         </div>
-                        <span class="input-hint">Older messages are auto-summarised when approaching this limit</span>
+                        <div class="context-usage-bar" id="context-usage-bar" style="display:none;">
+                            <div class="context-usage-labels">
+                                <span id="context-usage-text">0 / 8192 tokens</span>
+                                <span id="context-model-max" class="context-model-max"></span>
+                            </div>
+                            <div class="context-usage-track">
+                                <div class="context-usage-fill" id="context-usage-fill" style="width:0%"></div>
+                            </div>
+                        </div>
+                        <div class="live-log-viewer" id="live-log-viewer" style="flex: 1; min-height: 480px; max-height: none;">
+                            <div class="log-entry log-status">Waiting for events…</div>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Service Action Buttons -->
-                <div class="action-footer">
-                    <button type="button" id="start-service-btn" class="btn btn-primary" disabled>
-                        <i class="ph ph-power"></i>
-                        <span>Start Service</span>
-                    </button>
-                    <button type="button" id="stop-service-btn" class="btn btn-danger" style="display:none;">
-                        <i class="ph ph-stop-circle"></i>
-                        <span>Stop Service</span>
-                    </button>
+                </div> <!-- END RIGHT COLUMN -->
 
-                    <div id="status-badge" class="status-badge hidden">
-                        <div class="status-dot"></div>
-                        <span class="status-text">Idle</span>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Alerts Container -->
-            <div id="alerts-container" class="alerts-container"></div>
-
-            <!-- Live Session Log + Chat -->
-            <div class="live-log-panel hidden" id="live-log-panel">
-                <div class="live-log-header">
-                    <h2><i class="ph ph-pulse"></i> Live Session</h2>
-                    <div class="live-log-header-actions">
-                        <span id="service-tools-badge" class="tools-badge" style="display:none;"></span>
-                    </div>
-                </div>
-                <div class="context-usage-bar" id="context-usage-bar" style="display:none;">
-                    <div class="context-usage-labels">
-                        <span id="context-usage-text">0 / 8192 tokens</span>
-                        <span id="context-model-max" class="context-model-max"></span>
-                    </div>
-                    <div class="context-usage-track">
-                        <div class="context-usage-fill" id="context-usage-fill" style="width:0%"></div>
-                    </div>
-                </div>
-                <div class="live-log-viewer" id="live-log-viewer">
-                    <div class="log-entry log-status">Waiting for events…</div>
-                </div>
-
-                <!-- Chat Input Bar (shown when service is running) -->
-                <div class="chat-input-bar" id="chat-input-bar" style="display:none;">
-                    <div class="chat-input-wrapper">
-                        <input type="text" id="chat-prompt-input"
-                            placeholder="Type your prompt and press Enter…"
-                            autocomplete="off" spellcheck="false">
-                        <button type="button" id="chat-send-btn" class="btn btn-primary btn-sm" title="Send prompt">
-                            <i class="ph ph-paper-plane-tilt"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sessions Panel -->
-            <div class="sessions-panel" id="sessions-panel">
-                <div class="sessions-header">
-                    <h2><i class="ph ph-clock-countdown"></i> Past Sessions</h2>
-                    <button type="button" id="refresh-sessions-btn" class="btn btn-secondary"
-                        style="width:auto;padding:0.4rem 0.85rem;font-size:0.82rem;">
-                        <i class="ph ph-arrows-clockwise"></i> Refresh
-                    </button>
-                </div>
-                <div class="sessions-list" id="sessions-list">
-                    <div class="empty-state">No sessions yet. Run an agent to start logging.</div>
-                </div>
-                <!-- Session detail view (hidden until a session is selected) -->
-                <div class="session-detail" id="session-detail" style="display:none;">
-                    <div class="detail-tabs" id="detail-tabs">
-                        <button class="detail-tab active" data-tab="transcript"><i class="ph ph-chat-text"></i>
-                            Transcript</button>
-                        <button class="detail-tab" data-tab="tool_calls"><i class="ph ph-wrench"></i> Tool
-                            Calls</button>
-                        <button class="detail-tab" data-tab="artifacts"><i class="ph ph-file-arrow-down"></i>
-                            Artifacts</button>
-                    </div>
-                    <div class="detail-content" id="detail-content">
-                        <div class="empty-state">Select a session above.</div>
-                    </div>
-                </div>
-            </div>
-
+            </div> <!-- END PANEL COLUMNS -->
         </div>
     </main>
 
+    <!-- Floating Action Button for Prompts -->
+    <button type="button" id="fab-prompt-btn" class="fab-btn hidden" title="New Prompt">
+        <i class="ph ph-chat-teardrop-dots"></i>
+    </button>
+
+    <!-- Prompt Modal Window -->
+    <div id="prompt-modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content glass-panel" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; max-width: 640px;">
+            <div class="modal-header" style="margin-bottom: 0;">
+                <h2 style="font-size: 1.15rem;"><i class="ph ph-terminal-window"></i> Agent Prompt</h2>
+                <button type="button" id="close-prompt-modal" class="icon-btn"><i class="ph ph-x"></i></button>
+            </div>
+            <textarea id="chat-prompt-input-modal" placeholder="Type your prompt and press Enter..." rows="4" spellcheck="false"></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+                <button type="button" id="chat-send-btn-modal" class="btn btn-primary" style="width: auto; padding: 0.75rem 1.5rem;">
+                    <i class="ph ph-paper-plane-tilt"></i> Send to Agent
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
-
 </html>

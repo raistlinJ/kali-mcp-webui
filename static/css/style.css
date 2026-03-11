@@ -93,9 +93,28 @@ body {
 /* Main Container */
 .container {
     width: 100%;
-    max-width: 560px;
+    max-width: 1120px;
     padding: 2rem;
     z-index: 10;
+}
+
+.panel-columns {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+
+@media (min-width: 900px) {
+    .panel-columns {
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+    }
+}
+
+.panel-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
 .header {
@@ -576,7 +595,9 @@ option {
 .code-block-wrapper pre {
     overflow-x: auto;
     white-space: pre-wrap;
-    word-break: break-all;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
     font-family: monospace;
     font-size: 0.85rem;
     color: var(--success);
@@ -744,7 +765,9 @@ option {
 
 .detail-content pre {
     white-space: pre-wrap;
-    word-break: break-all;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
     font-family: monospace;
     font-size: 0.82rem;
     color: var(--text-secondary);
@@ -779,7 +802,9 @@ option {
     font-size: 0.78rem;
     color: var(--text-secondary);
     white-space: pre-wrap;
-    word-break: break-all;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
     max-height: 140px;
     overflow-y: auto;
     background: var(--input-bg);
@@ -966,7 +991,9 @@ option {
 .log-pre {
     margin: 0.35rem 0 0;
     white-space: pre-wrap;
-    word-break: break-all;
+    word-wrap: break-word;
+    word-break: break-word; /* Prevents breaking midway through standard words but breaks long unbroken strings */
+    overflow-wrap: break-word;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.78rem;
     color: var(--text-secondary);
@@ -1077,56 +1104,71 @@ option {
 }
 
 /* ============================================================
-   Chat Input Bar
+   Chat Prompt Modal & FAB
    ============================================================ */
 
-.chat-input-bar {
-    padding: 0.75rem 1rem;
-    background: rgba(0, 0, 0, 0.4);
-    border-top: 1px solid rgba(59, 130, 246, 0.15);
-}
-
-.chat-input-wrapper {
+.fab-btn {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    color: white;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    font-size: 2rem;
+    border: none;
+    cursor: pointer;
+    z-index: 100;
+    transition: all var(--transition-fast);
 }
 
-.chat-input-wrapper input[type="text"] {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    padding-left: 1rem;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(59, 130, 246, 0.2);
+.fab-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.5);
+}
+
+.fab-btn:active {
+    transform: translateY(0) scale(1);
+}
+
+.fab-btn.hidden {
+    display: none;
+    pointer-events: none;
+}
+
+#chat-prompt-input-modal {
+    width: 100%;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    background: var(--input-bg);
+    border: 1px solid rgba(59, 130, 246, 0.25);
     color: var(--text-primary);
-    font-size: 0.92rem;
+    resize: vertical;
     outline: none;
+    font-size: 1rem;
+    line-height: 1.5;
+    font-family: 'Inter', sans-serif;
     transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.chat-input-wrapper input[type="text"]:focus {
+#chat-prompt-input-modal:focus {
     border-color: var(--accent-primary);
     box-shadow: 0 0 0 3px var(--accent-secondary);
 }
 
-.chat-input-wrapper input[type="text"]::placeholder {
+#chat-prompt-input-modal::placeholder {
     color: var(--text-secondary);
-    opacity: 0.7;
 }
 
-.chat-input-wrapper input[type="text"]:disabled {
+#chat-prompt-input-modal:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
-
-.chat-input-wrapper .btn-sm {
-    position: static;
-    padding: 0.65rem 1rem;
-    font-size: 0.9rem;
-    border-radius: 10px;
-    width: auto;
-    flex-shrink: 0;
 }
 
 /* ============================================================
