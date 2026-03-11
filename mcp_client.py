@@ -430,9 +430,26 @@ class MCPSession:
                 options={"num_ctx": self.context_window},
             )
 
-            assistant_message = response.get("message", response)
-            content = assistant_message.get("content", "") or ""
-            tool_calls = assistant_message.get("tool_calls", None)
+            # Parse original message output
+            original_msg = response.get("message", response)
+            content = original_msg.get("content", getattr(original_msg, "content", "")) or ""
+            tool_calls = original_msg.get("tool_calls", getattr(original_msg, "tool_calls", None))
+
+            # The Ollama PyPI client returns a `Message` object. We must convert it
+            # cleanly back to a dict with primitive values so it can be fed back in.
+            assistant_message = {"role": "assistant", "content": content}
+            if tool_calls:
+                # Reconstruct tool_calls cleanly as dicts
+                clean_tcs = []
+                for tc in tool_calls:
+                    tname, targs = _extract_tool_info(tc)
+                    clean_tcs.append({
+                        "function": {
+                            "name": tname,
+                            "arguments": targs
+                        }
+                    })
+                assistant_message["tool_calls"] = clean_tcs
 
             self.messages.append(assistant_message)
 
