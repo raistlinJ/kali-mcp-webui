@@ -30,7 +30,8 @@
 
         <div class="glass-panel">
 
-            <form id="mcp-form" class="mcp-form">
+            <!-- Config Form — disabled while service is running -->
+            <div id="config-panel">
 
                 <!-- Connection Section -->
                 <div class="form-section">
@@ -174,7 +175,7 @@
                                     <span><i class="ph ph-file-code"></i> Advanced: kali_tools.json Editor</span>
                                     <span
                                         style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(Auto-saves
-                                        on Run) <i class="ph ph-caret-down"></i></span>
+                                        on Start) <i class="ph ph-caret-down"></i></span>
                                 </div>
                             </summary>
                             <textarea id="kali-tools-json" rows="8" spellcheck="false" style="margin-top: 1rem;">{
@@ -186,11 +187,11 @@
 
                 <div class="divider"></div>
 
-                <!-- Model & Prompt Section -->
+                <!-- Model & Context Section -->
                 <div class="form-section">
                     <h2 class="section-title">
                         <i class="ph ph-cpu"></i>
-                        Model &amp; Prompt
+                        Model &amp; Context
                     </h2>
 
                     <div class="input-group">
@@ -221,19 +222,17 @@
                         </div>
                         <span class="input-hint">Older messages are auto-summarised when approaching this limit</span>
                     </div>
-
-                    <div class="input-group">
-                        <label for="prompt-input">Prompt</label>
-                        <textarea id="prompt-input" rows="4"
-                            placeholder="e.g. Scan 192.168.1.0/24 with nmap and summarise the findings…"
-                            spellcheck="false"></textarea>
-                    </div>
                 </div>
 
+                <!-- Service Action Buttons -->
                 <div class="action-footer">
-                    <button type="submit" id="run-btn" class="btn btn-primary" disabled>
-                        <i class="ph ph-play"></i>
-                        <span>Run Agent</span>
+                    <button type="button" id="start-service-btn" class="btn btn-primary" disabled>
+                        <i class="ph ph-power"></i>
+                        <span>Start Service</span>
+                    </button>
+                    <button type="button" id="stop-service-btn" class="btn btn-danger" style="display:none;">
+                        <i class="ph ph-stop-circle"></i>
+                        <span>Stop Service</span>
                     </button>
 
                     <div id="status-badge" class="status-badge hidden">
@@ -242,18 +241,18 @@
                     </div>
                 </div>
 
-            </form>
+            </div>
 
             <!-- Alerts Container -->
             <div id="alerts-container" class="alerts-container"></div>
 
-            <!-- Live Session Log -->
+            <!-- Live Session Log + Chat -->
             <div class="live-log-panel hidden" id="live-log-panel">
                 <div class="live-log-header">
                     <h2><i class="ph ph-pulse"></i> Live Session</h2>
-                    <button type="button" id="stop-session-btn" class="btn btn-danger btn-sm">
-                        <i class="ph ph-stop-circle"></i> Stop
-                    </button>
+                    <div class="live-log-header-actions">
+                        <span id="service-tools-badge" class="tools-badge" style="display:none;"></span>
+                    </div>
                 </div>
                 <div class="context-usage-bar" id="context-usage-bar" style="display:none;">
                     <div class="context-usage-labels">
@@ -266,6 +265,18 @@
                 </div>
                 <div class="live-log-viewer" id="live-log-viewer">
                     <div class="log-entry log-status">Waiting for events…</div>
+                </div>
+
+                <!-- Chat Input Bar (shown when service is running) -->
+                <div class="chat-input-bar" id="chat-input-bar" style="display:none;">
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="chat-prompt-input"
+                            placeholder="Type your prompt and press Enter…"
+                            autocomplete="off" spellcheck="false">
+                        <button type="button" id="chat-send-btn" class="btn btn-primary btn-sm" title="Send prompt">
+                            <i class="ph ph-paper-plane-tilt"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
 

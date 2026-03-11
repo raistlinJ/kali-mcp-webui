@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request, jsonify, abort, Response
 import requests
-import subprocess
 import os
 import json
-import shlex
 import threading
 import asyncio
 import queue
@@ -16,17 +14,39 @@ app = Flask(__name__)
 RUNS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs")
 
 # ---------------------------------------------------------------------------
-# Active session tracking
+# Active session tracking  (only one session at a time for now)
 # ---------------------------------------------------------------------------
-# run_id → {"thread", "cancel_event", "queue", "status"}
-_active_sessions: dict[str, dict] = {}
-_sessions_lock = threading.Lock()
+_session_state = {
+    "session": None,        # MCPSession instance (lives in the async loop)
+    "thread": None,         # Background thread running the event loop
+    "loop": None,           # asyncio loop inside that thread
+    "queue": None,          # thread-safe event queue for SSE
+    "status": "idle",       # idle | starting | running | stopping | stopped
+    "run_id": None,
+    "cancel_event": None,   # asyncio.Event for cancelling a chat turn
+}
+_session_lock = threading.Lock()
 
 
 def _make_run_id(server_type: str) -> str:
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     return f"{ts}_{server_type}"
 
+
+def _event_callback(event: dict):
+    """Push an event onto the SSE queue."""
+    event["timestamp"] = datetime.now().isoformat()
+    q = _session_state.get("queue")
+    if q:
+        try:
+            q.put_nowait(event)
+        except queue.Full:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
 
 @app.route('/')
 def index():
@@ -48,134 +68,224 @@ def get_models():
 
 
 # -----------------------------------------------------------------------
-# Agent Run API
+# Session Lifecycle
 # -----------------------------------------------------------------------
 
-@app.route('/api/run', methods=['POST'])
-def start_run():
-    """Launch the MCP agent loop in a background thread."""
+@app.route('/api/session/start', methods=['POST'])
+def session_start():
+    """Launch the MCP server, connect, and discover tools.  Keeps session alive."""
+    with _session_lock:
+        if _session_state["status"] in ("starting", "running"):
+            return jsonify({
+                'success': False,
+                'error': 'A session is already running. Stop it first.',
+            }), 409
+
     data = request.json
     ollama_url = data.get('url', 'http://localhost:11434')
     model = data.get('model')
     server_command = data.get('server_command')
     tools_config = data.get('tools_config')
-    prompt = data.get('prompt', '').strip()
     context_window = int(data.get('context_window', 8192))
 
     if not model:
         return jsonify({'success': False, 'error': 'No model selected'}), 400
     if not server_command:
         return jsonify({'success': False, 'error': 'No server command provided'}), 400
-    if not prompt:
-        return jsonify({'success': False, 'error': 'No prompt provided'}), 400
 
-    try:
-        # Write tools config if provided
-        if tools_config:
-            with open(os.path.abspath('kali_tools.json'), 'w') as f:
-                json.dump(tools_config, f, indent=2)
+    # Write tools config if provided
+    if tools_config:
+        with open(os.path.abspath('kali_tools.json'), 'w') as f:
+            json.dump(tools_config, f, indent=2)
 
-        is_apt = "/usr/share/mcp-kali-server/mcp_server.py" in server_command
-        server_type = "apt" if is_apt else "native"
-        run_id = _make_run_id(server_type)
+    is_apt = "/usr/share/mcp-kali-server/mcp_server.py" in server_command
+    server_type = "apt" if is_apt else "native"
+    run_id = _make_run_id(server_type)
 
-        # Thread-safe event queue for SSE
-        event_queue = queue.Queue(maxsize=500)
-        cancel_event_async = None  # Will be set inside the thread
+    event_queue = queue.Queue(maxsize=1000)
 
-        def event_callback(event: dict):
-            event["timestamp"] = datetime.now().isoformat()
+    # We'll wait for the start() to finish before returning to the caller
+    start_result = {"success": False, "error": None, "tools": []}
+    start_done = threading.Event()
+
+    def run_session_loop():
+        """Background thread: create event loop, start session, then idle."""
+        import mcp_client
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        with _session_lock:
+            _session_state["loop"] = loop
+            _session_state["queue"] = event_queue
+            _session_state["status"] = "starting"
+            _session_state["run_id"] = run_id
+
+        session = mcp_client.MCPSession(
+            ollama_url=ollama_url,
+            model=model,
+            server_command=server_command,
+            run_id=run_id,
+            event_callback=_event_callback,
+            context_window=context_window,
+        )
+
+        async def _start():
             try:
-                event_queue.put_nowait(event)
-            except queue.Full:
-                pass  # drop if consumer is too slow
-
-        def run_in_thread():
-            import mcp_client
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            cancel_evt = asyncio.Event()
-
-            with _sessions_lock:
-                _active_sessions[run_id]["cancel_event_async"] = cancel_evt
-                _active_sessions[run_id]["loop"] = loop
-
-            try:
-                loop.run_until_complete(mcp_client.run_agent(
-                    ollama_url=ollama_url,
-                    model=model,
-                    server_command=server_command,
-                    prompt=prompt,
-                    run_id=run_id,
-                    event_callback=event_callback,
-                    cancel_event=cancel_evt,
-                    context_window=context_window,
-                ))
+                tools = await session.start()
+                with _session_lock:
+                    _session_state["session"] = session
+                    _session_state["status"] = "running"
+                start_result["success"] = True
+                start_result["tools"] = tools
             except Exception as exc:
-                event_callback({"type": "error", "message": str(exc)})
+                start_result["error"] = str(exc)
+                with _session_lock:
+                    _session_state["status"] = "idle"
             finally:
-                event_callback({"type": "done", "message": "Session ended."})
-                with _sessions_lock:
-                    if run_id in _active_sessions:
-                        _active_sessions[run_id]["status"] = "finished"
-                loop.close()
+                start_done.set()
 
-        thread = threading.Thread(target=run_in_thread, daemon=True)
+        loop.run_until_complete(_start())
 
-        with _sessions_lock:
-            _active_sessions[run_id] = {
-                "thread": thread,
-                "queue": event_queue,
-                "status": "running",
-                "cancel_event_async": None,
-                "loop": None,
-            }
+        if not start_result["success"]:
+            loop.close()
+            return
 
-        thread.start()
+        # Keep the loop running so we can schedule chat() coroutines on it
+        try:
+            loop.run_forever()
+        finally:
+            # Clean up when loop stops
+            async def _cleanup():
+                try:
+                    await session.stop()
+                except Exception:
+                    pass
 
+            # If loop is still running at this point, it was just stopped
+            loop.run_until_complete(_cleanup())
+            loop.close()
+
+            with _session_lock:
+                _session_state["status"] = "stopped"
+                _session_state["session"] = None
+                _session_state["loop"] = None
+
+    thread = threading.Thread(target=run_session_loop, daemon=True)
+    with _session_lock:
+        _session_state["thread"] = thread
+    thread.start()
+
+    # Wait for start() to complete (with timeout)
+    start_done.wait(timeout=30)
+
+    if start_result["success"]:
         return jsonify({
             'success': True,
             'run_id': run_id,
-            'message': 'Agent session started.',
+            'tools': start_result["tools"],
+            'message': f'Service started with {len(start_result["tools"])} tool(s).',
         })
+    else:
+        return jsonify({
+            'success': False,
+            'error': start_result["error"] or "Timed out starting session.",
+        }), 500
 
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/session/chat', methods=['POST'])
+def session_chat():
+    """Send a prompt to the running session."""
+    with _session_lock:
+        if _session_state["status"] != "running":
+            return jsonify({
+                'success': False,
+                'error': 'No active session. Start the service first.',
+            }), 409
+        loop = _session_state["loop"]
+        session = _session_state["session"]
+
+    data = request.json
+    prompt = (data.get('prompt') or '').strip()
+    if not prompt:
+        return jsonify({'success': False, 'error': 'Empty prompt.'}), 400
+
+    # Create a cancel event for this chat turn
+    cancel_event = asyncio.Event()
+    with _session_lock:
+        _session_state["cancel_event"] = cancel_event
+
+    # Schedule the chat coroutine on the session's event loop
+    future = asyncio.run_coroutine_threadsafe(
+        session.chat(prompt, cancel_event=cancel_event),
+        loop,
+    )
+
+    # Return immediately — the client follows progress via SSE
+    return jsonify({
+        'success': True,
+        'message': 'Prompt submitted.',
+    })
 
 
-@app.route('/api/run/<run_id>/stop', methods=['POST'])
-def stop_run(run_id):
-    """Cancel a running agent session."""
-    _validate_run_id(run_id)
-    with _sessions_lock:
-        session = _active_sessions.get(run_id)
-    if not session:
-        return jsonify({'success': False, 'error': 'Session not found'}), 404
+@app.route('/api/session/stop', methods=['POST'])
+def session_stop():
+    """Stop the running session."""
+    with _session_lock:
+        if _session_state["status"] not in ("running", "starting"):
+            return jsonify({
+                'success': False,
+                'error': 'No active session to stop.',
+            }), 409
+        loop = _session_state["loop"]
+        session = _session_state["session"]
+        _session_state["status"] = "stopping"
 
-    cancel_evt = session.get("cancel_event_async")
-    loop = session.get("loop")
-    if cancel_evt and loop:
-        loop.call_soon_threadsafe(cancel_evt.set)
+    # Cancel any in-progress chat
+    cancel = _session_state.get("cancel_event")
+    if cancel and loop:
+        loop.call_soon_threadsafe(cancel.set)
+
+    # Schedule session.stop() and then stop the loop
+    if session and loop:
+        async def _stop_and_halt():
+            try:
+                await session.stop()
+            except Exception:
+                pass
+            loop.stop()
+
+        asyncio.run_coroutine_threadsafe(_stop_and_halt(), loop)
+
     return jsonify({'success': True, 'message': 'Stop signal sent.'})
 
 
-@app.route('/api/logs/<run_id>/stream')
-def stream_logs(run_id):
-    """SSE endpoint — streams real-time events for a run."""
-    _validate_run_id(run_id)
-    with _sessions_lock:
-        session = _active_sessions.get(run_id)
-    if not session:
-        return jsonify({'error': 'Session not found'}), 404
+@app.route('/api/session/status')
+def session_status():
+    """Return current session status."""
+    with _session_lock:
+        return jsonify({
+            'status': _session_state["status"],
+            'run_id': _session_state["run_id"],
+        })
 
-    event_queue = session["queue"]
+
+@app.route('/api/session/stream')
+def session_stream():
+    """SSE endpoint — streams real-time events for the active session."""
+    with _session_lock:
+        if _session_state["status"] not in ("starting", "running", "stopping"):
+            return jsonify({'error': 'No active session'}), 404
+        event_queue = _session_state["queue"]
+
+    if not event_queue:
+        return jsonify({'error': 'No event queue'}), 404
 
     def generate():
         while True:
             try:
                 event = event_queue.get(timeout=30)
             except queue.Empty:
-                # Send keep-alive comment
                 yield ": keepalive\n\n"
                 continue
 
@@ -196,7 +306,7 @@ def stream_logs(run_id):
 
 
 # -----------------------------------------------------------------------
-# Sessions API (unchanged)
+# Sessions History API
 # -----------------------------------------------------------------------
 
 @app.route('/api/sessions', methods=['GET'])

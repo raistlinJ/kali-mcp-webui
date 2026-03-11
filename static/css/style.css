@@ -1075,3 +1075,100 @@ option {
         opacity: 0.4;
     }
 }
+
+/* ============================================================
+   Chat Input Bar
+   ============================================================ */
+
+.chat-input-bar {
+    padding: 0.75rem 1rem;
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.chat-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chat-input-wrapper input[type="text"] {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    padding-left: 1rem;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    color: var(--text-primary);
+    font-size: 0.92rem;
+    outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.chat-input-wrapper input[type="text"]:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-secondary);
+}
+
+.chat-input-wrapper input[type="text"]::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.chat-input-wrapper input[type="text"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.chat-input-wrapper .btn-sm {
+    position: static;
+    padding: 0.65rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 10px;
+    width: auto;
+    flex-shrink: 0;
+}
+
+/* ============================================================
+   Tools Badge (shown in live-log header)
+   ============================================================ */
+
+.tools-badge {
+    font-size: 0.72rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+}
+
+.live-log-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* ============================================================
+   Config Panel Disabled State
+   ============================================================ */
+
+.config-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(0.3);
+    transition: opacity var(--transition-smooth), filter var(--transition-smooth);
+}
+
+/* Stop button inline-flex to match start button */
+#stop-service-btn {
+    width: 100%;
+}
+
+#start-service-btn {
+    display: inline-flex;
+}
