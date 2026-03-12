@@ -293,12 +293,11 @@
 
                 <!-- Live Session / Chat Tab -->
                 <div class="tab-pane" id="chat-pane">
-                    <div class="live-log-panel" id="live-log-panel" style="height: 100%; display: flex; flex-direction: column;">
-                        <div class="live-log-header">
-                            <h2><i class="ph ph-pulse"></i> Live Session</h2>
-                            <div class="live-log-header-actions">
-                                <span id="service-tools-badge" class="tools-badge" style="display:none;"></span>
-                            </div>
+                    <!-- Unified Chat Window -->
+                    <div class="chat-window-container" id="live-log-panel" style="display: flex; flex-direction: column; height: 100%;">
+                        <!-- Tools indicator (condensed) -->
+                        <div class="chat-header-actions" style="display: flex; justify-content: flex-end; padding: 0.5rem 0;">
+                            <span id="service-tools-badge" class="tools-badge" style="display:none; font-size: 0.75rem;"></span>
                         </div>
                         <div class="context-usage-bar" id="context-usage-bar" style="display:none;">
                             <div class="context-usage-labels">
@@ -310,22 +309,22 @@
                             </div>
                         </div>
                 <div class="live-log-viewer" id="live-log-viewer" style="flex: 1; min-height: 480px; max-height: none;">
-                    <div class="log-entry log-status">Waiting for events…</div>
+                    <div class="log-entry log-status">Waiting for service to start...</div>
                 </div>
 
-                <!-- Inline Chat Console -->
-                <div id="chat-console-bar" class="chat-console-bar hidden">
+                <!-- Docked Chat Console -->
+                <div id="chat-console-bar" class="chat-console-bar">
                     <div class="chat-console-wrapper">
-                        <textarea id="chat-prompt-input" placeholder="Type your prompt and press Enter to run..." rows="2" spellcheck="false"></textarea>
-                        <button type="button" id="chat-send-btn" class="btn btn-primary" title="Send">
+                        <textarea id="chat-prompt-input" placeholder="Start the service in the Configuration tab to begin..." rows="2" spellcheck="false" disabled></textarea>
+                        <button type="button" id="chat-send-btn" class="btn btn-primary" title="Send" disabled>
                             <i class="ph ph-paper-plane-tilt" style="font-size: 1.5rem;"></i>
                         </button>
                         <button type="button" id="chat-cancel-btn" class="btn btn-danger" title="Cancel/Abort" style="display: none;">
                             <i class="ph ph-stop-circle" style="font-size: 1.5rem;"></i>
                         </button>
                     </div>
-                    </div>
-                </div> <!-- End live-log-panel -->
+                </div> <!-- End Chat Console -->
+                </div> <!-- End chat-window-container -->
                 </div> <!-- End Chat Tab -->
             </div> <!-- End content-area -->
             

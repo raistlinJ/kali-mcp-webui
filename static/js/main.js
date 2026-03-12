@@ -246,8 +246,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 navChatBtn.disabled = false;
                 switchTab('chat-pane');
                 
-                // Show Console UI
-                chatConsoleBar.classList.remove('hidden');
+                // Enable Chat Console inputs
+                chatPromptInput.disabled = false;
+                chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
+                sendPromptBtn.disabled = false;
 
                 openSseStream();
                 showAlert('Service started! Use the Prompt console to chat.', 'success');
@@ -402,13 +404,13 @@ document.addEventListener('DOMContentLoaded', () => {
         resetStartBtn();
         setConfigEnabled(true);
         toolsBadge.style.display = 'none';
-        // Hide Console UI and Switch back to config
+        // Switch back to config and disable active chat inputs
         navChatBtn.disabled = true;
         switchTab('config-pane');
 
-        chatConsoleBar.classList.add('hidden');
-        chatPromptInput.disabled = false;
-        sendPromptBtn.disabled = false;
+        chatPromptInput.disabled = true;
+        chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
+        sendPromptBtn.disabled = true;
 
         loadSessions();
     }

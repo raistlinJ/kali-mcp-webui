@@ -974,37 +974,19 @@ option {
 }
 
 /* ============================================================
-   Live Log Panel
+   Unified Chat Window
    ============================================================ */
 
-.live-log-panel {
-    margin-top: 1.5rem;
-    border: 1px solid rgba(59, 130, 246, 0.25);
-    border-radius: 12px;
-    overflow: hidden;
-    animation: slideIn 0.3s ease-out forwards;
-}
-
-.live-log-panel.hidden {
-    display: none;
-}
-
-.live-log-header {
+.chat-window-container {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    background: rgba(59, 130, 246, 0.08);
-    border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+    flex-direction: column;
+    height: 100%;
 }
 
-.live-log-header h2 {
-    font-size: 0.95rem;
-    font-weight: 600;
+.chat-header-actions {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--accent-primary);
+    justify-content: flex-end;
+    padding: 0.5rem 0;
 }
 
 /* Context Usage Bar */
@@ -1056,10 +1038,11 @@ option {
 }
 
 .live-log-viewer {
-    max-height: 480px;
+    flex: 1;
     overflow-y: auto;
-    padding: 0.75rem;
-    background: rgba(0, 0, 0, 0.35);
+    padding: 1rem 0.5rem;
+    background: transparent;
+    border-radius: 8px;
     scrollbar-width: thin;
     display: flex;
     flex-direction: column;
@@ -1204,11 +1187,9 @@ option {
     margin-top: 1rem;
     display: flex;
     justify-content: center;
-}
-
-.chat-console-bar.hidden {
-    display: none;
-    pointer-events: none;
+    padding: 1rem 0;
+    border-top: 1px solid var(--panel-border);
+    background: transparent;
 }
 
 .chat-console-wrapper {
