@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatConsoleBar = document.getElementById('chat-console-bar');
     const chatPromptInput = document.getElementById('chat-prompt-input');
     const sendPromptBtn = document.getElementById('chat-send-btn');
+    const cancelPromptBtn = document.getElementById('chat-cancel-btn');
 
     let _eventSource = null;
     let _serviceRunning = false;
@@ -167,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let command = '';
         if (cmdType === 'python') {
-            command = '/usr/local/bin/uv run --with mcp mcp_kali.py';
+            command = 'uv run --with mcp mcp_kali.py';
         } else if (cmdType === 'apt') {
             command = 'python3 apt_logger_wrapper.py';
         }
@@ -290,7 +291,13 @@ document.addEventListener('DOMContentLoaded', () => {
         chatPromptInput.value = '';
         
         chatPromptInput.disabled = true;
+        
         sendPromptBtn.disabled = true;
+        const sendIcon = sendPromptBtn.querySelector('i');
+        if (sendIcon) sendIcon.className = 'ph ph-spinner-gap spin';
+        
+        cancelPromptBtn.style.display = 'flex';
+        cancelPromptBtn.disabled = false;
 
         appendLog(`<span class="log-label">👤 You</span> ${escapeHtml(prompt)}`, 'log-prompt');
 
@@ -312,12 +319,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setChatReady() {
         _chatBusy = false;
+        
+        const sendIcon = sendPromptBtn.querySelector('i');
+        if (sendIcon) sendIcon.className = 'ph ph-paper-plane-tilt';
+
+        cancelPromptBtn.style.display = 'none';
+
         if (_serviceRunning) {
             chatPromptInput.disabled = false;
             sendPromptBtn.disabled = false;
             chatPromptInput.focus();
         }
     }
+
+    cancelPromptBtn.addEventListener('click', async () => {
+        if (!_chatBusy || !_serviceRunning) return;
+        
+        cancelPromptBtn.disabled = true;
+        appendLog('<span class="log-label">⏹️</span> Cancelling prompt...', 'log-status');
+        
+        try {
+            await fetch('/api/session/cancel_prompt', { method: 'POST' });
+        } catch (error) {
+            appendLog(`<span class="log-label">❌ Error</span> ${escapeHtml('Failed to send cancel signal.')}`, 'log-error');
+            cancelPromptBtn.disabled = false;
+        }
+    });
 
     // ---------------------------------------------------------------
     // Stop Service

@@ -227,6 +227,24 @@ def session_chat():
         'message': 'Prompt submitted.',
     })
 
+@app.route('/api/session/cancel_prompt', methods=['POST'])
+def session_cancel_prompt():
+    """Cancel the currently running prompt processing."""
+    with _session_lock:
+        if _session_state["status"] != "running":
+            return jsonify({
+                'success': False,
+                'error': 'No active session to cancel.',
+            }), 409
+        loop = _session_state["loop"]
+        cancel_event = _session_state.get("cancel_event")
+
+    if cancel_event and loop:
+        loop.call_soon_threadsafe(cancel_event.set)
+        return jsonify({'success': True, 'message': 'Cancel signal sent.'})
+    else:
+        return jsonify({'success': False, 'error': 'No prompt currently running to cancel.'}), 400
+
 
 @app.route('/api/session/stop', methods=['POST'])
 def session_stop():
