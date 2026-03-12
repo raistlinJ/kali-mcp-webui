@@ -265,9 +265,16 @@ class MCPSession:
         self.server_command = server_command
         self.context_window = context_window
         self.event_callback = event_callback
-
         self.run_id = run_id or make_run_id("agent")
-        self.messages: list[dict] = []
+        
+        # Initialize with a strong system prompt to ensure tools aren't sent to the background
+        self.messages: list[dict] = [
+            {
+                "role": "system",
+                "content": "You are a network security assistant. You must wait for all tools to finish executing. NEVER attempt to run tools in the background (e.g., using `&` or `nohup`). You MUST allow the system to execute the tool synchronously so you can read and analyze the output before replying."
+            }
+        ]
+        
         self.tool_names: list[str] = []
         self._ollama_tools: list[dict] = []
         self._model_max_ctx: int = context_window
