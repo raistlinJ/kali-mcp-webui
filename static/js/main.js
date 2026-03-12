@@ -30,6 +30,39 @@ document.addEventListener('DOMContentLoaded', () => {
     let _serviceRunning = false;
     let _chatBusy = false;
 
+    // ---------------------------------------------------------------
+    // Vertical Tab Navigation
+    // ---------------------------------------------------------------
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    const navChatBtn = document.getElementById('nav-chat-btn');
+
+    function switchTab(targetPaneId) {
+        // Update nav buttons
+        navBtns.forEach(btn => {
+            if (btn.getAttribute('data-target') === targetPaneId) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        // Show target pane
+        tabPanes.forEach(pane => {
+            if (pane.id === targetPaneId) {
+                pane.classList.add('active');
+            } else {
+                pane.classList.remove('active');
+            }
+        });
+    }
+
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (btn.disabled) return;
+            switchTab(btn.getAttribute('data-target'));
+        });
+    });
+
     // Toggle tools config visibility
     kaliCommandType.addEventListener('change', (e) => {
         toolsConfigSection.style.display = e.target.value === 'apt' ? 'none' : 'block';
@@ -209,6 +242,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateStatus('running', 'Service Running');
                 startBtn.style.display = 'none';
                 stopBtn.style.display = 'inline-flex';
+                // Enable Chat Tab and switch to it
+                navChatBtn.disabled = false;
+                switchTab('chat-pane');
                 
                 // Show Console UI
                 chatConsoleBar.classList.remove('hidden');
@@ -366,8 +402,10 @@ document.addEventListener('DOMContentLoaded', () => {
         resetStartBtn();
         setConfigEnabled(true);
         toolsBadge.style.display = 'none';
-        
-        // Hide Console UI
+        // Hide Console UI and Switch back to config
+        navChatBtn.disabled = true;
+        switchTab('config-pane');
+
         chatConsoleBar.classList.add('hidden');
         chatPromptInput.disabled = false;
         sendPromptBtn.disabled = false;

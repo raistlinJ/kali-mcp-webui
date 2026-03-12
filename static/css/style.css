@@ -166,6 +166,112 @@ body {
     box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45);
 }
 
+/* 2-Tab Vertical Navbar Layout */
+.layout-wrapper {
+    display: flex;
+    flex-direction: row;
+    gap: 2rem;
+    padding: 2.5rem; /* overrides the inline styles earlier */
+}
+
+/* Vertical Tabs sidebar */
+.vertical-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 220px;
+    border-right: 1px solid var(--panel-border);
+    padding-right: 2rem;
+}
+
+.nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: transparent;
+    border: none;
+    padding: 0.85rem 1rem;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: left;
+}
+
+.nav-btn i {
+    font-size: 1.25rem;
+}
+
+.nav-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.nav-btn.active {
+    background: var(--accent-secondary);
+    color: var(--accent-primary);
+    border-right: 3px solid var(--accent-primary);
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Content Area */
+.content-area {
+    flex: 1;
+    min-width: 0; /* Fixes flexbox overflow in some cases */
+}
+
+/* Tab Panes */
+.tab-pane {
+    display: none;
+    animation: fadeIn var(--transition-smooth);
+}
+
+.tab-pane.active {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+    .layout-wrapper {
+        flex-direction: column;
+        padding: 1.5rem;
+    }
+    .vertical-tabs {
+        flex-direction: row;
+        border-right: none;
+        border-bottom: 1px solid var(--panel-border);
+        padding-right: 0;
+        padding-bottom: 1.5rem;
+        overflow-x: auto;
+    }
+    .nav-btn {
+        flex: 1;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+    }
+    .nav-btn.active {
+        border-right: none;
+        border-bottom: 3px solid var(--accent-primary);
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+}
+
 /* Form Styles */
 .mcp-form {
     display: flex;

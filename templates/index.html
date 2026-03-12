@@ -28,10 +28,28 @@
             <p class="subtitle">Run Kali tools with local LLMs via the Model Context Protocol</p>
         </header>
 
-        <div class="glass-panel" style="display: flex; flex-direction: column; gap: 2rem;">
+        <div class="glass-panel layout-wrapper">
+            
+            <!-- Vertical Navigation -->
+            <nav class="vertical-tabs" id="main-navigation">
+                <button class="nav-btn active" data-target="config-pane">
+                    <i class="ph ph-sliders"></i>
+                    <span>Configuration</span>
+                </button>
+                <button class="nav-btn" data-target="chat-pane" id="nav-chat-btn" disabled>
+                    <i class="ph ph-chat-centered-text"></i>
+                    <span>Live Chat</span>
+                </button>
+                <button class="nav-btn" data-target="sessions-pane">
+                    <i class="ph ph-clock-counter-clockwise"></i>
+                    <span>Past Sessions</span>
+                </button>
+            </nav>
 
-            <!-- Config Form — disabled while service is running -->
-            <div id="config-panel">
+            <div class="content-area">
+                <!-- Configuration Tab (Active by Default) -->
+                <div class="tab-pane active" id="config-pane">
+                    <div id="config-panel">
 
                         <!-- Connection Section -->
                         <div class="form-section">
@@ -242,8 +260,10 @@
                         </div>
 
                     </div>
+                </div> <!-- End Configuration Tab -->
 
-                    <!-- Sessions Panel (moved to left column) -->
+                <!-- Past Sessions Tab -->
+                <div class="tab-pane" id="sessions-pane">
                     <div class="sessions-panel" id="sessions-panel">
                         <div class="sessions-header">
                             <h2><i class="ph ph-clock-countdown"></i> Past Sessions</h2>
@@ -270,13 +290,14 @@
                         </div>
                     </div>
 
-            </div>
+                            </div>
+                        </div>
+                    </div>
+                </div> <!-- End Past Sessions Tab -->
 
-            <!-- Alerts Container -->
-            <div id="alerts-container" class="alerts-container"></div>
-
-                    <!-- Live Session Log container -->
-                    <div class="live-log-panel" id="live-log-panel" style="display:none; height: 100%; display: flex; flex-direction: column;">
+                <!-- Live Session / Chat Tab -->
+                <div class="tab-pane" id="chat-pane">
+                    <div class="live-log-panel" id="live-log-panel" style="height: 100%; display: flex; flex-direction: column;">
                         <div class="live-log-header">
                             <h2><i class="ph ph-pulse"></i> Live Session</h2>
                             <div class="live-log-header-actions">
@@ -308,7 +329,11 @@
                         </button>
                     </div>
                 </div>
-            </div>
+                </div> <!-- End Chat Tab -->
+            </div> <!-- End content-area -->
+            
+            <!-- Global Alerts Container -->
+            <div id="alerts-container" class="alerts-container"></div>
 
         </div>
     </main>
