@@ -1,4 +1,6 @@
 from flask import Flask, render_template, request, jsonify, abort, Response, send_file
+import io
+import zipfile
 import requests
 import os
 import json
@@ -360,18 +362,29 @@ def get_transcript(run_id):
 
 
 @app.route('/api/sessions/<run_id>/download', methods=['GET'])
-def download_transcript(run_id):
-    """Download the transcript.md content as an attachment."""
+def download_session_archive(run_id):
+    """Download the entire session folder (transcript, tool calls, artifacts) as a .zip."""
     _validate_run_id(run_id)
-    path = os.path.join(RUNS_DIR, run_id, "transcript.md")
-    if not os.path.isfile(path):
-        abort(404, description="Transcript not found for this session.")
+    session_dir = os.path.join(RUNS_DIR, run_id)
+    if not os.path.isdir(session_dir):
+        abort(404, description="Session not found.")
+    
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(session_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # Compute the relative path so the zip structure is clean (e.g., transcript.md, artifacts/...)
+                arcname = os.path.relpath(file_path, session_dir)
+                zf.write(file_path, arcname)
+                
+    memory_file.seek(0)
     
     return send_file(
-        path,
+        memory_file,
         as_attachment=True,
-        download_name=f"acosta_kali_mcp_run_{run_id}.md",
-        mimetype='text/markdown'
+        download_name=f"acosta_kali_mcp_run_{run_id}.zip",
+        mimetype='application/zip'
     )
 
 
