@@ -337,7 +337,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         sendPromptBtn.disabled = true;
         const sendIcon = sendPromptBtn.querySelector('i');
-        if (sendIcon) sendIcon.className = 'ph ph-spinner-gap spin';
+        if (sendIcon) {
+            sendIcon.classList.remove('ph-paper-plane-tilt');
+            sendIcon.classList.add('ph-spinner-gap', 'spin');
+        }
         
         cancelPromptBtn.style.display = 'flex';
         cancelPromptBtn.disabled = false;
@@ -364,7 +367,10 @@ document.addEventListener('DOMContentLoaded', () => {
         _chatBusy = false;
         
         const sendIcon = sendPromptBtn.querySelector('i');
-        if (sendIcon) sendIcon.className = 'ph ph-paper-plane-tilt';
+        if (sendIcon) {
+            sendIcon.classList.remove('ph-spinner-gap', 'spin');
+            sendIcon.classList.add('ph-paper-plane-tilt');
+        }
 
         cancelPromptBtn.style.display = 'none';
 
