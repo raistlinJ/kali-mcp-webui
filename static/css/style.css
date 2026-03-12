@@ -1196,7 +1196,7 @@ option {
     width: 100%;
     display: flex;
     gap: 1rem;
-    align-items: center;
+    align-items: flex-end;
 }
 
 #chat-prompt-input {
@@ -1208,6 +1208,9 @@ option {
     color: var(--text-primary);
     resize: none;
     outline: none;
+    min-height: 52px;
+    max-height: 250px;
+    overflow-y: auto;
     font-size: 1rem;
     line-height: 1.5;
     font-family: 'Inter', sans-serif;
@@ -1235,8 +1238,7 @@ option {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: auto;
-    align-self: stretch;
+    height: 52px;
     border-radius: 12px;
 }
 

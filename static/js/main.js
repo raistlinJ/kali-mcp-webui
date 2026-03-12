@@ -325,6 +325,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    chatPromptInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = this.scrollHeight + 'px';
+    });
+
     chatPromptInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -338,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         _chatBusy = true;
         chatPromptInput.value = '';
+        chatPromptInput.style.height = 'auto';
         chatPromptInput.disabled = true;
         
         // Morph the send button into a stop button
