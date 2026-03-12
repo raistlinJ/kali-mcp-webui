@@ -93,7 +93,6 @@ body {
 /* Main Container */
 .container {
     width: 100%;
-    max-width: 1120px;
     padding: 2rem;
     z-index: 10;
 }
@@ -1108,19 +1107,10 @@ option {
    ============================================================ */
 
 .chat-console-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
     width: 100%;
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(59, 130, 246, 0.25);
-    padding: 1rem;
-    z-index: 1000;
+    margin-top: 1rem;
     display: flex;
     justify-content: center;
-    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
 }
 
 .chat-console-bar.hidden {
@@ -1130,7 +1120,6 @@ option {
 
 .chat-console-wrapper {
     width: 100%;
-    max-width: 1120px;
     display: flex;
     gap: 1rem;
     align-items: center;

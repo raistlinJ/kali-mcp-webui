@@ -28,14 +28,10 @@
             <p class="subtitle">Run Kali tools with local LLMs via the Model Context Protocol</p>
         </header>
 
-        <div class="glass-panel">
-            <div class="panel-columns">
+        <div class="glass-panel" style="display: flex; flex-direction: column; gap: 2rem;">
 
-                <!-- LEFT COLUMN -->
-                <div class="panel-col">
-
-                    <!-- Config Form — disabled while service is running -->
-                    <div id="config-panel">
+            <!-- Config Form — disabled while service is running -->
+            <div id="config-panel">
 
                         <!-- Connection Section -->
                         <div class="form-section">
@@ -274,13 +270,10 @@
                         </div>
                     </div>
 
-                </div> <!-- END LEFT COLUMN -->
+            </div>
 
-                <!-- RIGHT COLUMN -->
-                <div class="panel-col">
-
-                    <!-- Alerts Container -->
-                    <div id="alerts-container" class="alerts-container"></div>
+            <!-- Alerts Container -->
+            <div id="alerts-container" class="alerts-container"></div>
 
                     <!-- Live Session Log container -->
                     <div class="live-log-panel" id="live-log-panel" style="display:none; height: 100%; display: flex; flex-direction: column;">
@@ -299,26 +292,23 @@
                                 <div class="context-usage-fill" id="context-usage-fill" style="width:0%"></div>
                             </div>
                         </div>
-                        <div class="live-log-viewer" id="live-log-viewer" style="flex: 1; min-height: 480px; max-height: none;">
-                            <div class="log-entry log-status">Waiting for events…</div>
-                        </div>
+                <div class="live-log-viewer" id="live-log-viewer" style="flex: 1; min-height: 480px; max-height: none;">
+                    <div class="log-entry log-status">Waiting for events…</div>
+                </div>
+
+                <!-- Inline Chat Console -->
+                <div id="chat-console-bar" class="chat-console-bar hidden">
+                    <div class="chat-console-wrapper">
+                        <textarea id="chat-prompt-input" placeholder="Type your prompt and press Enter to run..." rows="2" spellcheck="false"></textarea>
+                        <button type="button" id="chat-send-btn" class="btn btn-primary" title="Send">
+                            <i class="ph ph-paper-plane-tilt" style="font-size: 1.5rem;"></i>
+                        </button>
                     </div>
+                </div>
+            </div>
 
-                </div> <!-- END RIGHT COLUMN -->
-
-            </div> <!-- END PANEL COLUMNS -->
         </div>
     </main>
-
-    <!-- Full Width Chat Console -->
-    <div id="chat-console-bar" class="chat-console-bar hidden">
-        <div class="chat-console-wrapper">
-            <textarea id="chat-prompt-input" placeholder="Type your prompt and press Enter to run..." rows="2" spellcheck="false"></textarea>
-            <button type="button" id="chat-send-btn" class="btn btn-primary" title="Send">
-                <i class="ph ph-paper-plane-tilt" style="font-size: 1.5rem;"></i>
-            </button>
-        </div>
-    </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
