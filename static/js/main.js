@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatConsoleBar = document.getElementById('chat-console-bar');
     const chatPromptInput = document.getElementById('chat-prompt-input');
     const sendPromptBtn = document.getElementById('chat-send-btn');
-    const cancelPromptBtn = document.getElementById('chat-cancel-btn');
     const chatDownloadBtn = document.getElementById('chat-download-btn');
     const sessionDownloadBtn = document.getElementById('session-download-btn');
 
@@ -318,7 +317,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------------
     // Send Chat
     // ---------------------------------------------------------------
-    sendPromptBtn.addEventListener('click', sendChat);
+    sendPromptBtn.addEventListener('click', () => {
+        if (_chatBusy) {
+            cancelChat();
+        } else {
+            sendChat();
+        }
+    });
+
     chatPromptInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -332,18 +338,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         _chatBusy = true;
         chatPromptInput.value = '';
-        
         chatPromptInput.disabled = true;
         
-        sendPromptBtn.disabled = true;
+        // Morph the send button into a stop button
+        sendPromptBtn.classList.remove('btn-primary');
+        sendPromptBtn.classList.add('btn-danger');
+        sendPromptBtn.title = "Cancel/Abort";
+        
         const sendIcon = sendPromptBtn.querySelector('i');
         if (sendIcon) {
             sendIcon.classList.remove('ph-paper-plane-tilt');
-            sendIcon.classList.add('ph-spinner-gap', 'spin');
+            sendIcon.classList.add('ph-stop-circle');
         }
-        
-        cancelPromptBtn.style.display = 'flex';
-        cancelPromptBtn.disabled = false;
 
         appendLog(`<span class="log-label">👤 You</span> ${escapeHtml(prompt)}`, 'log-prompt');
 
@@ -366,34 +372,48 @@ document.addEventListener('DOMContentLoaded', () => {
     function setChatReady() {
         _chatBusy = false;
         
+        // Restore the send button
+        sendPromptBtn.classList.remove('btn-danger');
+        sendPromptBtn.classList.add('btn-primary');
+        sendPromptBtn.title = "Send";
+        sendPromptBtn.disabled = false;
+        
         const sendIcon = sendPromptBtn.querySelector('i');
         if (sendIcon) {
-            sendIcon.classList.remove('ph-spinner-gap', 'spin');
+            sendIcon.classList.remove('ph-stop-circle', 'ph-spinner-gap', 'spin');
             sendIcon.classList.add('ph-paper-plane-tilt');
         }
 
-        cancelPromptBtn.style.display = 'none';
-
         if (_serviceRunning) {
             chatPromptInput.disabled = false;
-            sendPromptBtn.disabled = false;
             chatPromptInput.focus();
         }
     }
 
-    cancelPromptBtn.addEventListener('click', async () => {
+    async function cancelChat() {
         if (!_chatBusy || !_serviceRunning) return;
         
-        cancelPromptBtn.disabled = true;
+        // Disable the stop button and turn into spinner so they can't spam it
+        sendPromptBtn.disabled = true;
+        const sendIcon = sendPromptBtn.querySelector('i');
+        if (sendIcon) {
+            sendIcon.classList.remove('ph-stop-circle');
+            sendIcon.classList.add('ph-spinner-gap', 'spin');
+        }
+
         appendLog('<span class="log-label">⏹️</span> Cancelling prompt...', 'log-status');
         
         try {
             await fetch('/api/session/cancel_prompt', { method: 'POST' });
         } catch (error) {
             appendLog(`<span class="log-label">❌ Error</span> ${escapeHtml('Failed to send cancel signal.')}`, 'log-error');
-            cancelPromptBtn.disabled = false;
+            sendPromptBtn.disabled = false;
+            if (sendIcon) {
+                sendIcon.classList.remove('ph-spinner-gap', 'spin');
+                sendIcon.classList.add('ph-stop-circle');
+            }
         }
-    });
+    }
 
     // ---------------------------------------------------------------
     // Stop Service
