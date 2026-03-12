@@ -166,38 +166,39 @@ body {
     box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45);
 }
 
-/* 2-Tab Vertical Navbar Layout */
+/* 2-Tab Horizontal Navbar Layout */
 .layout-wrapper {
     display: flex;
-    flex-direction: row;
-    gap: 2rem;
+    flex-direction: column;
+    gap: 1.5rem;
     padding: 2.5rem; /* overrides the inline styles earlier */
 }
 
-/* Vertical Tabs sidebar */
-.vertical-tabs {
+/* Horizontal Tabs header */
+.horizontal-tabs {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 0.5rem;
-    min-width: 220px;
-    border-right: 1px solid var(--panel-border);
-    padding-right: 2rem;
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 1.5rem;
+    overflow-x: auto;
 }
 
 .nav-btn {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.75rem;
     background: transparent;
     border: none;
-    padding: 0.85rem 1rem;
+    padding: 0.85rem 1.5rem;
     border-radius: 8px;
     color: var(--text-secondary);
     font-size: 0.95rem;
     font-weight: 500;
     cursor: pointer;
     transition: all var(--transition-fast);
-    text-align: left;
+    white-space: nowrap;
 }
 
 .nav-btn i {
@@ -212,8 +213,8 @@ body {
 .nav-btn.active {
     background: var(--accent-secondary);
     color: var(--accent-primary);
-    border-right: 3px solid var(--accent-primary);
-    border-top-right-radius: 0;
+    border-bottom: 3px solid var(--accent-primary);
+    border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
 }
 
@@ -225,7 +226,7 @@ body {
 /* Content Area */
 .content-area {
     flex: 1;
-    min-width: 0; /* Fixes flexbox overflow in some cases */
+    min-height: 500px;
 }
 
 /* Tab Panes */
@@ -247,28 +248,14 @@ body {
 
 @media (max-width: 768px) {
     .layout-wrapper {
-        flex-direction: column;
         padding: 1.5rem;
     }
-    .vertical-tabs {
-        flex-direction: row;
-        border-right: none;
-        border-bottom: 1px solid var(--panel-border);
-        padding-right: 0;
-        padding-bottom: 1.5rem;
-        overflow-x: auto;
+    .horizontal-tabs {
+        padding-bottom: 1rem;
     }
     .nav-btn {
         flex: 1;
-        justify-content: center;
-        text-align: center;
-        white-space: nowrap;
-    }
-    .nav-btn.active {
-        border-right: none;
-        border-bottom: 3px solid var(--accent-primary);
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
+        padding: 0.75rem 1rem;
     }
 }
 
