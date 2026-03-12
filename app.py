@@ -302,7 +302,10 @@ def session_stream():
     def generate():
         while True:
             try:
-                event = event_queue.get(timeout=30)
+                # Use a short timeout (e.g. 5s) to guarantee we yield keepalives
+                # frequently enough to prevent Nginx or load balancers from dropping
+                # the connection during long-running tool executions.
+                event = event_queue.get(timeout=5)
             except queue.Empty:
                 yield ": keepalive\n\n"
                 continue
