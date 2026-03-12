@@ -283,6 +283,9 @@
                                     Tools</button>
                                 <button class="detail-tab" data-tab="artifacts"><i class="ph ph-file-arrow-down"></i>
                                     Artifacts</button>
+                                <button type="button" id="session-download-btn" class="btn btn-secondary" style="margin-left: auto; padding: 0.3rem 0.6rem; font-size: 0.82rem; display: none;" title="Download Transcript">
+                                    <i class="ph ph-download-simple"></i> Download
+                                </button>
                             </div>
                             <div class="detail-content" id="detail-content">
                                 <div class="empty-state">Select a session above.</div>
@@ -296,8 +299,11 @@
                     <!-- Unified Chat Window -->
                     <div class="chat-window-container" id="live-log-panel" style="display: flex; flex-direction: column; height: 100%;">
                         <!-- Tools indicator (condensed) -->
-                        <div class="chat-header-actions" style="display: flex; justify-content: flex-end; padding: 0.5rem 0;">
+                        <div class="chat-header-actions" style="display: flex; justify-content: flex-end; padding: 0.5rem 0; gap: 0.5rem;">
                             <span id="service-tools-badge" class="tools-badge" style="display:none; font-size: 0.75rem;"></span>
+                            <button type="button" id="chat-download-btn" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.82rem; display: none;" title="Download Transcript">
+                                <i class="ph ph-download-simple"></i> Download Log
+                            </button>
                         </div>
                         <div class="context-usage-bar" id="context-usage-bar" style="display:none;">
                             <div class="context-usage-labels">

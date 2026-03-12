@@ -25,10 +25,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatPromptInput = document.getElementById('chat-prompt-input');
     const sendPromptBtn = document.getElementById('chat-send-btn');
     const cancelPromptBtn = document.getElementById('chat-cancel-btn');
+    const chatDownloadBtn = document.getElementById('chat-download-btn');
+    const sessionDownloadBtn = document.getElementById('session-download-btn');
 
     let _eventSource = null;
     let _serviceRunning = false;
     let _chatBusy = false;
+    let _currentRunId = null;
 
     // ---------------------------------------------------------------
     // Vertical Tab Navigation
@@ -235,11 +238,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.success) {
                 _serviceRunning = true;
+                _currentRunId = data.run_id;
                 if (data.tools && data.tools.length) {
                     toolsBadge.textContent = `${data.tools.length} tool(s): ${data.tools.join(', ')}`;
                     toolsBadge.style.display = 'inline-block';
                 }
-                updateStatus('running', 'Service Running');
+                updateStatus('running', 'Service Running - Chat Active');
                 startBtn.style.display = 'none';
                 stopBtn.style.display = 'inline-flex';
                 // Enable Chat Tab and switch to it
@@ -250,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatPromptInput.disabled = false;
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;
+                chatDownloadBtn.style.display = 'inline-block';
 
                 openSseStream();
                 showAlert('Service started! Use the Prompt console to chat.', 'success');
@@ -397,6 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleServiceStopped() {
         _serviceRunning = false;
         _chatBusy = false;
+        _currentRunId = null;
         updateStatus('success', 'Service Stopped');
         
         stopBtn.style.display = 'none';
@@ -411,6 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatPromptInput.disabled = true;
         chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
         sendPromptBtn.disabled = true;
+        chatDownloadBtn.style.display = 'none';
 
         loadSessions();
     }
@@ -494,6 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function openSession(runId) {
         _browseRunId = runId; sessionDetail.style.display = 'block';
         sessionsList.querySelectorAll('.session-card').forEach(c => c.classList.toggle('active', c.dataset.run === runId));
+        sessionDownloadBtn.style.display = 'inline-block';
         await renderTab(_currentTab);
     }
 
@@ -524,6 +532,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('detail-tabs').addEventListener('click', e => { const tab = e.target.closest('.detail-tab'); if (tab && _browseRunId) renderTab(tab.dataset.tab); });
     document.getElementById('refresh-sessions-btn').addEventListener('click', loadSessions);
+
+    chatDownloadBtn.addEventListener('click', () => {
+        if (_currentRunId) window.location.href = `/api/sessions/${_currentRunId}/download`;
+    });
+    
+    sessionDownloadBtn.addEventListener('click', () => {
+        if (_browseRunId) window.location.href = `/api/sessions/${_browseRunId}/download`;
+    });
 
     function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     loadSessions();

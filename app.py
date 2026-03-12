@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, abort, Response
+from flask import Flask, render_template, request, jsonify, abort, Response, send_file
 import requests
 import os
 import json
@@ -357,6 +357,22 @@ def get_transcript(run_id):
         return jsonify({'content': ''}), 404
     with open(path) as f:
         return jsonify({'content': f.read()})
+
+
+@app.route('/api/sessions/<run_id>/download', methods=['GET'])
+def download_transcript(run_id):
+    """Download the transcript.md content as an attachment."""
+    _validate_run_id(run_id)
+    path = os.path.join(RUNS_DIR, run_id, "transcript.md")
+    if not os.path.isfile(path):
+        abort(404, description="Transcript not found for this session.")
+    
+    return send_file(
+        path,
+        as_attachment=True,
+        download_name=f"acosta_kali_mcp_run_{run_id}.md",
+        mimetype='text/markdown'
+    )
 
 
 @app.route('/api/sessions/<run_id>/tool_calls', methods=['GET'])
