@@ -426,6 +426,67 @@ def download_session_archive(run_id):
     )
 
 
+@app.route('/api/sessions/<run_id>/analyze', methods=['POST'])
+def analyze_session(run_id):
+    """Run a one-shot LLM analysis on a past session to identify improvements."""
+    _validate_run_id(run_id)
+    session_dir = os.path.join(RUNS_DIR, run_id)
+    if not os.path.isdir(session_dir):
+        abort(404, description="Session not found.")
+        
+    # Read Transcript
+    transcript_path = os.path.join(session_dir, "transcript.md")
+    transcript = ""
+    if os.path.isfile(transcript_path):
+        with open(transcript_path, 'r') as f:
+            transcript = f.read()
+            
+    # Read Annotations
+    annotations_path = os.path.join(session_dir, "annotations.jsonl")
+    annotations = ""
+    if os.path.isfile(annotations_path):
+        with open(annotations_path, 'r') as f:
+            annotations = f.read()
+
+    if not transcript:
+        return jsonify({"success": False, "error": "No transcript available for analysis."}), 400
+
+    try:
+        import ollama
+        
+        # Build prompt
+        system_prompt = (
+            "You are a Senior Penetration Testing Analyst reviewing a recent engagement. "
+            "Your job is to read the attached transcript and user annotations, and provide a Post-Mortem Analysis in Markdown. "
+            "Focus specifically on areas of improvement:\n"
+            "1. Did the agent miss opportunities to use an existing tool that would have resulted in more efficient success?\n"
+            "2. Could a new MCP tool be built or scripted to automate a tedious manual process seen in the logs?\n"
+            "3. How efficiently did the agent leverage the user's annotations?\n"
+            "Keep the response professional, actionable, and formatted nicely in Markdown."
+        )
+        
+        user_prompt = f"### Transcript ###\n{transcript}\n\n### Annotations (JSON Lines) ###\n{'No annotations.' if not annotations else annotations}"
+        
+        # Truncate slightly if it's too huge, but Ollama standard windows might handle it
+        client = ollama.Client(host=app.config.get('OLLAMA_URL', 'http://localhost:11434'))
+        model = app.config.get('MCP_MODEL', 'llama3')
+        
+        resp = client.chat(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        )
+        
+        analysis = resp.get("message", {}).get("content", "No analysis returned.")
+        return jsonify({"success": True, "analysis": analysis})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/api/sessions/<run_id>/tool_calls', methods=['GET'])
 def get_tool_calls(run_id):
     """Return a list of tool call records for a run."""

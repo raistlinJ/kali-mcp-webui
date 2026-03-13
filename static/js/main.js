@@ -33,6 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const chatDownloadBtn = document.getElementById('chat-download-btn');
     const sessionDownloadBtn = document.getElementById('session-download-btn');
+    const sessionAnalyzeBtn = document.getElementById('session-analyze-btn');
+    const tabAnalysis = document.getElementById('tab-analysis');
+    let _analysisCache = {};
 
     let _eventSource = null;
     let _serviceRunning = false;
@@ -588,7 +591,9 @@ document.addEventListener('DOMContentLoaded', () => {
         _browseRunId = runId; sessionDetail.style.display = 'block';
         sessionsList.querySelectorAll('.session-card').forEach(c => c.classList.toggle('active', c.dataset.run === runId));
         sessionDownloadBtn.style.display = 'inline-block';
-        await renderTab(_currentTab);
+        sessionAnalyzeBtn.style.display = 'inline-block';
+        if (_analysisCache[runId]) tabAnalysis.style.display = 'inline-block';
+        await renderTab(_currentTab === 'analysis' && !_analysisCache[runId] ? 'transcript' : _currentTab);
     }
 
     async function renderTab(tab) {
@@ -609,6 +614,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 detailContent.innerHTML = `<ul class="artifact-list">${arts.map(a => `<li class="artifact-item" data-artifact="${escapeHtml(a)}"><i class="ph ph-file-text"></i> ${escapeHtml(a)}</li>`).join('')}</ul>`;
                 detailContent.querySelectorAll('.artifact-item').forEach(el => el.addEventListener('click', () => openArtifact(el.dataset.artifact)));
             } catch { detailContent.innerHTML = '<div class="empty-state">Could not load artifacts.</div>'; }
+        } else if (tab === 'analysis') {
+            if (_analysisCache[_browseRunId]) {
+                detailContent.innerHTML = `<div class="analysis-result" style="padding: 1rem;"><pre style="white-space: pre-wrap; font-family: 'Inter', sans-serif; line-height: 1.5; font-size: 0.95rem;">${escapeHtml(_analysisCache[_browseRunId])}</pre></div>`;
+            } else {
+                detailContent.innerHTML = '<div class="empty-state">No analysis generated yet. Click "Analyze Session" to run inference.</div>';
+            }
         }
     }
 
@@ -625,6 +636,37 @@ document.addEventListener('DOMContentLoaded', () => {
     
     sessionDownloadBtn.addEventListener('click', () => {
         if (_browseRunId) window.location.href = `/api/sessions/${_browseRunId}/download`;
+    });
+    
+    sessionAnalyzeBtn.addEventListener('click', async () => {
+        if (!_browseRunId) return;
+        if (!_serviceRunning) {
+            showAlert("You must Start the backend Service (in Config tab) to use Ollama for Analysis.", "warning");
+            return;
+        }
+
+        const originalText = sessionAnalyzeBtn.innerHTML;
+        sessionAnalyzeBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Analyzing...';
+        sessionAnalyzeBtn.disabled = true;
+
+        try {
+            const res = await fetch(`/api/sessions/${_browseRunId}/analyze`, { method: 'POST' });
+            const data = await res.json();
+            
+            if (data.success && data.analysis) {
+                _analysisCache[_browseRunId] = data.analysis;
+                tabAnalysis.style.display = 'inline-flex';
+                renderTab('analysis');
+                showAlert("Post-Mortem Analysis Complete!", "success");
+            } else {
+                showAlert('Analysis failed: ' + (data.error || 'Unknown error'), 'error');
+            }
+        } catch (err) {
+            showAlert('Failed to analyze session: ' + err.message, 'error');
+        } finally {
+            sessionAnalyzeBtn.innerHTML = originalText;
+            sessionAnalyzeBtn.disabled = false;
+        }
     });
 
     function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
