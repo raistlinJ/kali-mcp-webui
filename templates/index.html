@@ -328,8 +328,11 @@
                     <div class="chat-console-wrapper">
                         <!-- Annotation Popup (Hidden by default) -->
                         <div id="annotation-popup" class="annotation-popup" style="display: none;">
-                            <div class="annotation-header">
-                                <strong>📝 Add Annotation</strong>
+                            <div class="annotation-header" style="justify-content: flex-start; gap: 0.5rem; width: 100%;">
+                                <select id="annotation-action" class="form-select config-input" style="flex: 1; font-weight: bold; background-color: var(--panel-border);">
+                                    <option value="annotate">📝 Add Annotation</option>
+                                    <option value="analyze">🪄 Analyze Logs</option>
+                                </select>
                                 <button type="button" id="close-annotation-btn" class="icon-btn"><i class="ph ph-x"></i></button>
                             </div>
                             <textarea id="annotation-text" placeholder="Write your observation here..." rows="3"></textarea>

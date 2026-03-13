@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const annotationPopup = document.getElementById('annotation-popup');
     const closeAnnotationBtn = document.getElementById('close-annotation-btn');
     const saveAnnotationBtn = document.getElementById('save-annotation-btn');
+    const annotationAction = document.getElementById('annotation-action');
     const annotationText = document.getElementById('annotation-text');
     const annotationSpan = document.getElementById('annotation-span');
     
@@ -433,48 +434,84 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ---------------------------------------------------------------
-    // Annotations
+    // Annotations & Live Analysis
     // ---------------------------------------------------------------
     annotateBtn.addEventListener('click', () => {
         if (!_serviceRunning) return;
         annotationPopup.style.display = 'flex';
+        annotationAction.value = 'annotate';
+        annotationText.style.display = 'block';
+        saveAnnotationBtn.textContent = 'Save Note';
         annotationText.focus();
+    });
+
+    annotationAction.addEventListener('change', (e) => {
+        if (e.target.value === 'analyze') {
+            annotationText.style.display = 'none';
+            saveAnnotationBtn.textContent = 'Run Analysis';
+        } else {
+            annotationText.style.display = 'block';
+            saveAnnotationBtn.textContent = 'Save Note';
+            annotationText.focus();
+        }
     });
 
     closeAnnotationBtn.addEventListener('click', () => {
         annotationPopup.style.display = 'none';
         annotationText.value = '';
         annotationSpan.value = 'Event Point';
+        annotationAction.value = 'annotate';
+        annotationText.style.display = 'block';
+        saveAnnotationBtn.textContent = 'Save Note';
     });
 
     saveAnnotationBtn.addEventListener('click', async () => {
+        const action = annotationAction.value;
         const text = annotationText.value.trim();
         const span = annotationSpan.value;
-        if (!text || !_currentRunId) return;
+        if (!_currentRunId) return;
+        if (action === 'annotate' && !text) return;
 
         saveAnnotationBtn.disabled = true;
-        saveAnnotationBtn.textContent = 'Saving...';
+        saveAnnotationBtn.textContent = action === 'analyze' ? 'Running...' : 'Saving...';
 
         try {
-            const response = await fetch(`/api/sessions/${_currentRunId}/annotate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text, span })
-            });
-            const data = await response.json();
-            
-            if (data.success) {
-                // Manually inject a visual entry into the UI so the user sees it immediately
-                appendLog(`<span class="log-label">📝 Annotation saved</span> <em>Scope: ${span}</em><br/>${escapeHtml(text)}`, 'log-prompt');
-                closeAnnotationBtn.click();
+            if (action === 'analyze') {
+                const response = await fetch(`/api/sessions/${_currentRunId}/analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ span })
+                });
+                const data = await response.json();
+                
+                if (data.success && data.analysis) {
+                    appendLog(`<span class="log-label">💡 Live Analysis</span> <em>Scope: ${span}</em><br/>${marked.parse(data.analysis)}`, 'log-system');
+                    closeAnnotationBtn.click();
+                    // Scroll to bottom
+                    liveLogViewer.scrollTop = liveLogViewer.scrollHeight;
+                } else {
+                    showAlert('Live Analysis failed: ' + (data.error || 'Unknown error'), 'error');
+                }
             } else {
-                showAlert('Failed to save annotation: ' + (data.error || 'Unknown error'), 'error');
+                const response = await fetch(`/api/sessions/${_currentRunId}/annotate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, span })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    appendLog(`<span class="log-label">📝 Annotation saved</span> <em>Scope: ${span}</em><br/>${escapeHtml(text)}`, 'log-prompt');
+                    closeAnnotationBtn.click();
+                } else {
+                    showAlert('Failed to save annotation: ' + (data.error || 'Unknown error'), 'error');
+                }
             }
         } catch (err) {
-            showAlert('Failed to save annotation: ' + err.message, 'error');
+            showAlert(`Failed to ${action}: ` + err.message, 'error');
         } finally {
             saveAnnotationBtn.disabled = false;
-            saveAnnotationBtn.textContent = 'Save Note';
+            saveAnnotationBtn.textContent = action === 'analyze' ? 'Run Analysis' : 'Save Note';
         }
     });
 

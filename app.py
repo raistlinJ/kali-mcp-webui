@@ -434,6 +434,10 @@ def analyze_session(run_id):
     if not os.path.isdir(session_dir):
         abort(404, description="Session not found.")
         
+    # Check for span request
+    data = request.json or {}
+    span_req = data.get("span", "Entire Session")
+
     # Read Transcript
     transcript_path = os.path.join(session_dir, "transcript.md")
     transcript = ""
@@ -451,21 +455,78 @@ def analyze_session(run_id):
     if not transcript:
         return jsonify({"success": False, "error": "No transcript available for analysis."}), 400
 
+    # Filter logs by span if requested
+    if span_req not in ("Entire Session", "Event Point", ""):
+        try:
+            minutes = int(span_req.split()[1])
+            cutoff_time = datetime.now() - timedelta(minutes=minutes)
+            
+            # Simple heuristic filter:
+            # We look for lines containing [HH:MM:SS] markers that session_logger inserts. 
+            filtered_lines = []
+            include_line = False
+            import re
+            time_pattern = re.compile(r'\[(\d{2}:\d{2}:\d{2})\]')
+            
+            for line in transcript.split('\n'):
+                match = time_pattern.search(line)
+                if match:
+                    # Parse marker time, assuming current date. 
+                    # Note: this might wrap strangely at midnight but suffices for active sessions.
+                    time_str = match.group(1)
+                    now = datetime.now()
+                    try:
+                        marker_time = datetime.strptime(time_str, "%H:%M:%S").replace(
+                            year=now.year, month=now.month, day=now.day
+                        )
+                        include_line = marker_time >= cutoff_time
+                    except ValueError:
+                        pass # Ignore malformed
+                        
+                if include_line:
+                    filtered_lines.append(line)
+                    
+            if filtered_lines:
+                transcript = "(Filtered down to " + span_req + ")\n" + "\n".join(filtered_lines)
+        except Exception as e:
+            # If parsing the span fails, we'll just fall back to the full transcript
+            app.logger.error(f"Failed to slice log for span {span_req}: {e}")
+    annotations_path = os.path.join(session_dir, "annotations.jsonl")
+    annotations = ""
+    if os.path.isfile(annotations_path):
+        with open(annotations_path, 'r') as f:
+            annotations = f.read()
+
+    if not transcript:
+        return jsonify({"success": False, "error": "No transcript available for analysis."}), 400
+
     try:
         import ollama
         
         # Build prompt
-        system_prompt = (
-            "You are a Senior Penetration Testing Analyst reviewing a recent engagement. "
-            "Your job is to read the attached transcript and user annotations, and provide a Post-Mortem Analysis in Markdown. "
-            "Focus specifically on areas of improvement:\n"
-            "1. Did the agent miss opportunities to use an existing tool that would have resulted in more efficient success?\n"
-            "2. Could a new MCP tool be built or scripted to automate a tedious manual process seen in the logs?\n"
-            "3. How efficiently did the agent leverage the user's annotations?\n"
-            "Keep the response professional, actionable, and formatted nicely in Markdown."
-        )
+        if span_req in ("Entire Session", "Event Point", ""):
+            system_prompt = (
+                "You are a Senior Penetration Testing Analyst reviewing a recent engagement. "
+                "Your job is to read the attached transcript and user annotations, and provide a Post-Mortem Analysis in Markdown. "
+                "Focus specifically on areas of improvement:\n"
+                "1. Did the agent miss opportunities to use an existing tool that would have resulted in more efficient success?\n"
+                "2. Could a new MCP tool be built or scripted to automate a tedious manual process seen in the logs?\n"
+                "3. How efficiently did the agent leverage the user's annotations?\n"
+                "Keep the response professional, actionable, and formatted nicely in Markdown."
+            )
+        else:
+            system_prompt = (
+                f"You are a Senior Penetration Testing Analyst monitoring a LIVE engagement. "
+                f"You are reviewing the logs from the {span_req.upper()}. "
+                "Your job is to read the attached slice of the transcript and provide a rapid, real-time Analysis in Markdown. "
+                "Focus specifically on areas of immediate tactical improvement:\n"
+                "1. Is the agent stuck in a loop, and could an existing tool be used to bypass the blocker?\n"
+                "2. Could a new MCP tool be built quickly right now to automate what the agent is struggling with?\n"
+                "3. What tactical pivot do you suggest based on the recent annotations?\n"
+                "Keep the response punchy, actionable, and formatted nicely in Markdown."
+            )
         
-        user_prompt = f"### Transcript ###\n{transcript}\n\n### Annotations (JSON Lines) ###\n{'No annotations.' if not annotations else annotations}"
+        user_prompt = f"### Transcript ({span_req}) ###\n{transcript}\n\n### Annotations (JSON Lines) ###\n{'No annotations.' if not annotations else annotations}"
         
         # Truncate slightly if it's too huge, but Ollama standard windows might handle it
         client = ollama.Client(host=app.config.get('OLLAMA_URL', 'http://localhost:11434'))
