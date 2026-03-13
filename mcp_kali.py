@@ -47,7 +47,7 @@ async def list_tools() -> list[Tool]:
     for t in config.get("tools", []):
         tools.append(Tool(
             name=t["name"],
-            description=f"Run {t['name']}",
+            description=t.get("description", f"Run {t['name']}"),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -70,9 +70,22 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         return [TextContent(type="text", text=f"Error: Tool {name} not found in config")]
         
     cmd = [tool_config["command"]]
-    if tool_config.get("allow_args", False) and "args" in arguments:
+    base_args = tool_config.get("base_args", [])
+    user_args = arguments.get("args", "")
+
+    if base_args:
+        # If we have base_args, check for {args} placeholder or just extend
+        has_placeholder = any("{args}" in a for a in base_args)
+        if has_placeholder:
+            cmd.extend([a.replace("{args}", user_args) for a in base_args])
+        else:
+            cmd.extend(base_args)
+            if tool_config.get("allow_args", False) and user_args:
+                import shlex
+                cmd.extend(shlex.split(user_args))
+    elif tool_config.get("allow_args", False) and user_args:
         import shlex
-        cmd.extend(shlex.split(arguments["args"]))
+        cmd.extend(shlex.split(user_args))
         
     try:
         t0 = time.time()
