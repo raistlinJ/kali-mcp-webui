@@ -224,9 +224,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ---------------------------------------------------------------
-    // Start Service
+    // Start / Stop Service
     // ---------------------------------------------------------------
+    async function stopService() {
+        if (!_serviceRunning) return;
+        
+        startBtn.disabled = true;
+        startBtn.querySelector('i').className = 'ph ph-spinner-gap spin';
+        updateStatus('running', 'Stopping service…');
+
+        try {
+            const response = await fetch('/api/session/stop', { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                _serviceRunning = false;
+                closeSse();
+                setConfigEnabled(true);
+                
+                // Revert button to Start state
+                startBtn.className = 'btn btn-primary';
+                startBtn.querySelector('i').className = 'ph ph-power';
+                startBtn.querySelector('span').textContent = 'Start Service';
+                startBtn.disabled = false;
+                
+                updateStatus('idle');
+                appendLog('Service stopped.', 'log-status');
+                
+                // Reset session specific UI
+                toolsBadge.style.display = 'none';
+                chatPromptInput.disabled = true;
+                chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
+                sendPromptBtn.disabled = true;
+                annotateBtn.disabled = true;
+            } else {
+                throw new Error(data.error || 'Failed to stop service');
+            }
+        } catch (error) {
+            showAlert(error.message);
+            startBtn.disabled = false;
+        }
+    }
+
     startBtn.addEventListener('click', async () => {
+        if (_serviceRunning) {
+            await stopService();
+            return;
+        }
+
         const url = ollamaUrlInput.value.trim();
         const model = modelSelect.value;
         const cmdType = kaliCommandType.value;
@@ -250,8 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!model || !command) return;
 
         setConfigEnabled(false);
-        startBtn.querySelector('i').classList.remove('ph-power');
-        startBtn.querySelector('i').classList.add('ph-spinner-gap', 'spin');
+        startBtn.querySelector('i').className = 'ph ph-spinner-gap spin';
         startBtn.disabled = true;
         updateStatus('running', 'Starting service…');
 
@@ -269,16 +312,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.success) {
                 _serviceRunning = true;
-                _currentRunId = data.run_id;
+                
+                // Switch button to Stop state
+                startBtn.className = 'btn btn-danger';
+                startBtn.querySelector('i').className = 'ph ph-stop';
+                startBtn.querySelector('span').textContent = 'Stop Service';
+                startBtn.disabled = false;
+
                 if (data.tools && data.tools.length) {
                     toolsBadge.textContent = `${data.tools.length} tool(s): ${data.tools.join(', ')}`;
                     toolsBadge.style.display = 'inline-block';
                 }
+                
                 updateStatus('running', 'Service Running - Chat Active');
-                startBtn.style.display = 'none';
-                stopBtn.style.display = 'inline-flex';
-                // Enable Chat Tab and switch to it
-                navChatBtn.disabled = false;
+                
+                // Switch to Chat tab
                 switchTab('chat-pane');
                 
                 // Enable Chat Console inputs
@@ -291,13 +339,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 openSseStream();
                 showAlert('Service started! Use the Prompt console to chat.', 'success');
                 setTimeout(() => chatPromptInput.focus(), 500);
-            } else { throw new Error(data.error || 'Failed to start service'); }
+            } else {
+                throw new Error(data.error || 'Failed to start session');
+            }
         } catch (error) {
-            console.error('Start error:', error);
-            updateStatus('error', 'Start Failed');
             showAlert(error.message);
             setConfigEnabled(true);
-            resetStartBtn();
+            startBtn.className = 'btn btn-primary';
+            startBtn.querySelector('i').className = 'ph ph-power';
+            startBtn.disabled = false;
+            updateStatus('idle');
         }
     });
 
