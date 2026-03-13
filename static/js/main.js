@@ -124,7 +124,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedTools = [];
         toolCheckboxes.forEach(cb => {
             if (cb.checked) {
-                selectedTools.push({ name: cb.value, command: cb.dataset.cmd, args: ["{args}"], allow_args: true });
+                const name = cb.value;
+                const cmd = cb.dataset.cmd;
+
+                if (name === 'msf_search') {
+                    selectedTools.push({
+                        name: "msf_search",
+                        description: "Search for Metasploit modules by keyword (e.g., 'jboss').",
+                        command: "msfconsole",
+                        base_args: ["-q", "-x", "search {args}; exit"],
+                        allow_args: true
+                    });
+                } else if (name === 'msf_run') {
+                    selectedTools.push({
+                        name: "msf_run",
+                        description: "Execute a Metasploit module. Format: '<module_path>; set RHOSTS <target>; run'.",
+                        command: "msfconsole",
+                        base_args: ["-q", "-x", "use {args}; exit"],
+                        allow_args: true
+                    });
+                } else {
+                    selectedTools.push({ name: name, command: cmd, args: ["{args}"], allow_args: true });
+                }
             }
         });
         try {
