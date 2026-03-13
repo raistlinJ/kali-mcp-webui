@@ -24,6 +24,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatConsoleBar = document.getElementById('chat-console-bar');
     const chatPromptInput = document.getElementById('chat-prompt-input');
     const sendPromptBtn = document.getElementById('chat-send-btn');
+    const annotateBtn = document.getElementById('chat-annotate-btn');
+    const annotationPopup = document.getElementById('annotation-popup');
+    const closeAnnotationBtn = document.getElementById('close-annotation-btn');
+    const saveAnnotationBtn = document.getElementById('save-annotation-btn');
+    const annotationText = document.getElementById('annotation-text');
+    const annotationSpan = document.getElementById('annotation-span');
+    
     const chatDownloadBtn = document.getElementById('chat-download-btn');
     const sessionDownloadBtn = document.getElementById('session-download-btn');
 
@@ -253,6 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatPromptInput.disabled = false;
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;
+                annotateBtn.disabled = false;
                 chatDownloadBtn.style.display = 'inline-block';
 
                 openSseStream();
@@ -420,6 +428,52 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
+
+    // ---------------------------------------------------------------
+    // Annotations
+    // ---------------------------------------------------------------
+    annotateBtn.addEventListener('click', () => {
+        if (!_serviceRunning) return;
+        annotationPopup.style.display = 'flex';
+        annotationText.focus();
+    });
+
+    closeAnnotationBtn.addEventListener('click', () => {
+        annotationPopup.style.display = 'none';
+        annotationText.value = '';
+        annotationSpan.value = 'Event Point';
+    });
+
+    saveAnnotationBtn.addEventListener('click', async () => {
+        const text = annotationText.value.trim();
+        const span = annotationSpan.value;
+        if (!text || !_currentRunId) return;
+
+        saveAnnotationBtn.disabled = true;
+        saveAnnotationBtn.textContent = 'Saving...';
+
+        try {
+            const response = await fetch(`/api/sessions/${_currentRunId}/annotate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, span })
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                // Manually inject a visual entry into the UI so the user sees it immediately
+                appendLog(`<span class="log-label">📝 Annotation saved</span> <em>Scope: ${span}</em><br/>${escapeHtml(text)}`, 'log-prompt');
+                closeAnnotationBtn.click();
+            } else {
+                showAlert('Failed to save annotation: ' + (data.error || 'Unknown error'), 'error');
+            }
+        } catch (err) {
+            showAlert('Failed to save annotation: ' + err.message, 'error');
+        } finally {
+            saveAnnotationBtn.disabled = false;
+            saveAnnotationBtn.textContent = 'Save Note';
+        }
+    });
 
     // ---------------------------------------------------------------
     // Stop Service

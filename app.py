@@ -247,8 +247,46 @@ def session_cancel_prompt():
     else:
         return jsonify({'success': False, 'error': 'No prompt currently running to cancel.'}), 400
 
+@app.route('/api/sessions/<run_id>/annotate', methods=['POST'])
+def session_annotate(run_id):
+    """Add a human-in-the-loop annotation to the run log."""
+    _validate_run_id(run_id)
+    
+    data = request.json or {}
+    text = data.get('text', '').strip()
+    span = data.get('span', 'Entire Session')
+    
+    if not text:
+        return jsonify({'success': False, 'error': 'Annotation text is required.'}), 400
+        
+    # We must ensure we log to the correct run. 
+    # If it's the active run, we use the active logger to emit events and stay in sync.
+    with _session_lock:
+        is_active = (_session_state["status"] == "running" and 
+                     _session_state.get("run_id") == run_id and 
+                     _session_state.get("logger"))
+        active_logger = _session_state.get("logger") if is_active else None
 
-@app.route('/api/session/stop', methods=['POST'])
+    try:
+        if active_logger:
+            active_logger.log_annotation(text, span)
+        else:
+            # For past sessions, we instantiate a temporary logger to append the file
+            from session_logger import SessionLogger
+            # Try to load existing metadata to preserve fields
+            meta_path = os.path.join(RUNS_DIR, run_id, "metadata.json")
+            metadata = {}
+            if os.path.exists(meta_path):
+                with open(meta_path, 'r') as f:
+                    metadata = json.load(f)
+            # Create a temporary logger (don't overwrite end_time/status)
+            temp_logger = SessionLogger(run_id, metadata)
+            temp_logger.log_annotation(text, span)
+            
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 def session_stop():
     """Stop the running session."""
     with _session_lock:

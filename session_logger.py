@@ -58,6 +58,7 @@ class SessionLogger:
 
         self._transcript_path = os.path.join(self.run_dir, "transcript.md")
         self._metadata_path = os.path.join(self.run_dir, "metadata.json")
+        self._annotations_path = os.path.join(self.run_dir, "annotations.jsonl")
 
         # Write initial metadata
         self._metadata = {
@@ -176,6 +177,23 @@ class SessionLogger:
         with open(path, "w") as f:
             f.write(content)
         return safe_name
+
+    def log_annotation(self, text: str, span: str):
+        """Append a user annotation (observation) to annotations.jsonl."""
+        record = {
+            "timestamp": _now_iso(),
+            "span_relevance": span,
+            "note": text
+        }
+        with open(self._annotations_path, "a") as f:
+            f.write(json.dumps(record) + "\n")
+            
+        # Also put a visual marker into the transcript
+        ts = datetime.now().strftime("%H:%M:%S")
+        with open(self._transcript_path, "a") as f:
+            f.write(f"### 📝 Human Annotation [{ts}] (Relevance: {span})\n\n> {text}\n\n")
+        
+        self._emit_event("annotation", {"text": text, "span": span})
 
     def finalize(self, status: str = "completed"):
         """Mark the session as finished and write end time to metadata."""
