@@ -1200,7 +1200,7 @@ option {
 }
 
 #chat-prompt-input {
-    flex: 0 0 calc(90% - 0.5rem);
+    flex: 1;
     border-radius: 12px;
     padding: 0.85rem 1.25rem;
     background: rgba(255, 255, 255, 0.05);
@@ -1232,8 +1232,8 @@ option {
     cursor: not-allowed;
 }
 
-#chat-send-btn {
-    flex: 0 0 calc(10% - 0.5rem);
+#chat-send-btn, #chat-annotate-btn {
+    flex: 0 0 52px;
     padding: 0;
     display: flex;
     justify-content: center;
