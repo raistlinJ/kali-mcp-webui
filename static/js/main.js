@@ -231,7 +231,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start / Stop Service
     // ---------------------------------------------------------------
     async function stopService() {
-        if (!_serviceRunning) return;
+        if (!_serviceRunning) {
+            console.warn("stopService called but _serviceRunning is false. Checking backend status...");
+            const statusRes = await fetch('/api/session/status');
+            const statusData = await statusRes.json();
+            if (statusData.status === 'idle') return;
+            // Otherwise, we might be out of sync, proceed with stop signal
+        }
         
         startBtn.disabled = true;
         startBtn.querySelector('i').className = 'ph ph-spinner-gap spin';
@@ -242,6 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (data.success) {
                 _serviceRunning = false;
+                _currentRunId = null;
                 closeSse();
                 setConfigEnabled(true);
                 
@@ -804,6 +811,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    async function checkServiceStatus() {
+        try {
+            const response = await fetch('/api/session/status');
+            const data = await response.json();
+            
+            if (data.status === 'running' || data.status === 'starting') {
+                console.log("Service is already active, restoring UI state...", data);
+                _serviceRunning = true;
+                _currentRunId = data.run_id;
+
+                // Sync UI elements
+                setConfigEnabled(false);
+                startBtn.className = 'btn btn-danger';
+                startBtn.querySelector('i').className = 'ph ph-stop';
+                startBtn.querySelector('span').textContent = 'Stop Service';
+                startBtn.disabled = false;
+
+                updateStatus('running', 'Service Running - Chat Active');
+                
+                // Enable Chat Console inputs
+                chatPromptInput.disabled = false;
+                chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
+                sendPromptBtn.disabled = false;
+                annotateBtn.disabled = false;
+                chatDownloadBtn.style.display = 'inline-block';
+
+                // Re-open log stream
+                openSseStream();
+                
+                // Optional: switch to chat tab if running
+                switchTab('chat-pane');
+            }
+        } catch (err) {
+            console.error("Failed to check initial service status:", err);
+        }
+    }
+
     function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    
+    // Initialize
     loadSessions();
+    checkServiceStatus();
 });
