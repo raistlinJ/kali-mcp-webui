@@ -179,9 +179,9 @@ def session_start():
     thread.start()
 
     # Wait for start() to complete (with timeout)
-    start_done.wait(timeout=30)
+    success = start_done.wait(timeout=30)
 
-    if start_result["success"]:
+    if success and start_result["success"]:
         return jsonify({
             'success': True,
             'run_id': run_id,
@@ -189,9 +189,23 @@ def session_start():
             'message': f'Service started with {len(start_result["tools"])} tool(s).',
         })
     else:
+        # TIMEOUT or ERROR: Force cleanup so we're not stuck in "starting"
+        with _session_lock:
+            _session_state["status"] = "idle"
+            loop = _session_state["loop"]
+            _session_state["session"] = None
+            _session_state["loop"] = None
+
+        if loop:
+            try:
+                loop.call_soon_threadsafe(loop.stop)
+            except Exception:
+                pass
+
+        error_msg = start_result["error"] or "Timed out starting session."
         return jsonify({
             'success': False,
-            'error': start_result["error"] or "Timed out starting session.",
+            'error': error_msg,
         }), 500
 
 
@@ -287,35 +301,50 @@ def session_annotate(run_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/session/stop', methods=['POST'])
 def session_stop():
     """Stop the running session."""
     with _session_lock:
-        if _session_state["status"] not in ("running", "starting"):
-            return jsonify({
-                'success': False,
-                'error': 'No active session to stop.',
-            }), 409
+        status = _session_state["status"]
         loop = _session_state["loop"]
         session = _session_state["session"]
-        _session_state["status"] = "stopping"
+
+        if status == "idle":
+            return jsonify({'success': True, 'message': 'No session running.'})
+
+        # Transitioning to stopping
+        _session_state["status"] = "idle" # Proactive reset to prevent lockout
+        _session_state["session"] = None
+        _session_state["loop"] = None
 
     # Cancel any in-progress chat
     cancel = _session_state.get("cancel_event")
     if cancel and loop:
-        loop.call_soon_threadsafe(cancel.set)
+        try:
+            loop.call_soon_threadsafe(cancel.set)
+        except Exception:
+            pass
 
     # Schedule session.stop() and then stop the loop
-    if session and loop:
+    if loop:
         async def _stop_and_halt():
+            if session:
+                try:
+                    await session.stop()
+                except Exception:
+                    pass
             try:
-                await session.stop()
+                loop.stop()
             except Exception:
                 pass
-            loop.stop()
 
-        asyncio.run_coroutine_threadsafe(_stop_and_halt(), loop)
+        try:
+            asyncio.run_coroutine_threadsafe(_stop_and_halt(), loop)
+        except Exception:
+            # If the loop is already closed or failing
+            pass
 
-    return jsonify({'success': True, 'message': 'Stop signal sent.'})
+    return jsonify({'success': True, 'message': 'Stop signal sent and state reset.'})
 
 
 @app.route('/api/session/status')
