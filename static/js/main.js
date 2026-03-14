@@ -573,8 +573,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const action = annotationAction.value;
         const text = annotationText.value.trim();
         const span = annotationSpan.value;
-        if (!_currentRunId) return;
-        if (action === 'annotate' && !text) return;
+        if (!_currentRunId) {
+            showAlert('Cannot save: No active session ID found.', 'error');
+            return;
+        }
+        if (action === 'annotate' && !text) {
+            showAlert('Please enter an observation note.', 'warning');
+            return;
+        }
 
         saveAnnotationBtn.disabled = true;
         saveAnnotationBtn.textContent = action === 'analyze' ? 'Running...' : 'Saving...';
