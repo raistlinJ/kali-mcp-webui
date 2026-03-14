@@ -45,7 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionDownloadBtn = document.getElementById('session-download-btn');
     const sessionAnalyzeBtn = document.getElementById('session-analyze-btn');
     const tabAnalysis = document.getElementById('tab-analysis');
+    const analysisJobsList = document.getElementById('analysis-jobs-list');
+    const clearJobsBtn = document.getElementById('clear-jobs-btn');
+    
     let _analysisCache = {};
+    let _analysisJobsInterval = null;
 
     let _eventSource = null;
     let _serviceRunning = false;
@@ -81,7 +85,16 @@ document.addEventListener('DOMContentLoaded', () => {
     navBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             if (btn.disabled) return;
-            switchTab(btn.getAttribute('data-target'));
+            const targetId = btn.getAttribute('data-target');
+            switchTab(targetId);
+            
+            // Handle analysis polling
+            if (targetId === 'analysis-pane') {
+                loadAnalysisJobs();
+                startAnalysisJobsPolling();
+            } else {
+                stopAnalysisJobsPolling();
+            }
         });
     });
 
@@ -622,9 +635,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const data = await response.json();
                 
-                if (data.success && data.analysis) {
-                    appendLog(`<span class="log-label">💡 Live Analysis</span> <em>Scope: ${span}</em><br/>${marked.parse(data.analysis)}`, 'log-system');
+                if (data.success) {
+                    showAlert('Background analysis job started. Check the Analysis Jobs tab.', 'success');
                     closeAndResetModal();
+                    // Switch to analysis tab automatically to show progress? 
+                    // Let's do it to guide the user.
+                    switchTab('analysis-pane');
+                    loadAnalysisJobs();
+                    startAnalysisJobsPolling();
                 } else {
                     showAlert('Live Analysis failed: ' + (data.error || 'Unknown error'), 'error');
                 }
@@ -825,14 +843,18 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionAnalyzeBtn.disabled = true;
 
         try {
-            const res = await fetch(`/api/sessions/${_browseRunId}/analyze`, { method: 'POST' });
+            const res = await fetch(`/api/sessions/${_browseRunId}/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ span: 'Entire Session' })
+            });
             const data = await res.json();
             
-            if (data.success && data.analysis) {
-                _analysisCache[_browseRunId] = data.analysis;
-                tabAnalysis.style.display = 'inline-flex';
-                renderTab('analysis');
-                showAlert("Post-Mortem Analysis Complete!", "success");
+            if (data.success) {
+                showAlert('Background analysis job started.', 'success');
+                switchTab('analysis-pane');
+                loadAnalysisJobs();
+                startAnalysisJobsPolling();
             } else {
                 showAlert('Analysis failed: ' + (data.error || 'Unknown error'), 'error');
             }
@@ -887,4 +909,123 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize
     loadSessions();
     checkServiceStatus();
+    
+    // ---------------------------------------------------------------
+    // Analysis Job Management
+    // ---------------------------------------------------------------
+    async function loadAnalysisJobs() {
+        try {
+            const res = await fetch('/api/analysis/jobs');
+            const data = await res.json();
+            renderAnalysisJobs(data.jobs || []);
+        } catch (err) {
+            console.error('Failed to load analysis jobs:', err);
+        }
+    }
+
+    function renderAnalysisJobs(jobs) {
+        if (!jobs.length) {
+            analysisJobsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="ph ph-tray" style="font-size: 2.5rem; opacity: 0.3; margin-bottom: 1rem;"></i>
+                    <p>No analysis jobs found. Run an analysis from Chat or Past Sessions.</p>
+                </div>`;
+            return;
+        }
+
+        analysisJobsList.innerHTML = jobs.map(job => {
+            const date = new Date(job.start_time).toLocaleString();
+            const statusClass = `status-${job.status}`;
+            const statusIcon = job.status === 'running' ? 'ph-spinner spinning' : (job.status === 'success' ? 'ph-check-circle' : 'ph-x-circle');
+            
+            return `
+                <div class="job-card">
+                    <div class="job-header">
+                        <div class="job-info">
+                            <div class="job-id">${job.job_id}</div>
+                            <div class="job-title">Analysis: ${job.run_id}</div>
+                        </div>
+                        <div class="job-status-badge ${statusClass}">
+                            <i class="ph ${statusIcon}"></i>
+                            <span>${job.status}</span>
+                        </div>
+                    </div>
+                    <div class="job-footer">
+                        <div class="job-meta">
+                            <span><i class="ph ph-calendar"></i> ${date}</span>
+                            <span><i class="ph ph-clock"></i> ${job.span}</span>
+                        </div>
+                        ${job.status === 'success' ? `
+                            <button class="btn btn-primary btn-sm" onclick="viewAnalysisResult('${job.job_id}')" style="width: auto; padding: 0.3rem 0.8rem;">
+                                <i class="ph ph-eye"></i> View Result
+                            </button>
+                        ` : ''}
+                        ${job.status === 'failed' ? `
+                            <div class="status-error" style="font-size: 0.8rem;">Error: ${escapeHtml(job.error)}</div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    window.viewAnalysisResult = async function(jobId) {
+        try {
+            const res = await fetch('/api/analysis/jobs');
+            const data = await res.json();
+            const job = data.jobs.find(j => j.job_id === jobId);
+            
+            if (job && job.result) {
+                // Show in a modal
+                const modal = document.createElement('div');
+                modal.className = 'modal-overlay';
+                modal.style.display = 'flex';
+                modal.innerHTML = `
+                    <div class="annotation-modal" style="max-width: 800px; width: 90%;">
+                        <div class="modal-header">
+                            <h3><i class="ph ph-brain"></i> Analysis Result: ${job.run_id}</h3>
+                            <button type="button" class="icon-btn" onclick="this.closest('.modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                        </div>
+                        <div class="modal-body" style="max-height: 60vh; overflow-y: auto; padding: 1.5rem; background: rgba(0,0,0,0.2); border-radius: 12px; margin: 1rem;">
+                            <div class="markdown-body" style="font-size: 0.95rem; line-height: 1.6; color: var(--text-primary);">
+                                ${marked.parse(job.result)}
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Close</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                // Close on overlay click
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            }
+        } catch (err) {
+            showAlert('Failed to load analysis result: ' + err.message, 'error');
+        }
+    };
+
+    function startAnalysisJobsPolling() {
+        if (_analysisJobsInterval) return;
+        _analysisJobsInterval = setInterval(loadAnalysisJobs, 3000);
+    }
+
+    function stopAnalysisJobsPolling() {
+        if (_analysisJobsInterval) {
+            clearInterval(_analysisJobsInterval);
+            _analysisJobsInterval = null;
+        }
+    }
+
+    clearJobsBtn.addEventListener('click', async () => {
+        if (!confirm('Clear all analysis job history?')) return;
+        try {
+            await fetch('/api/analysis/jobs/clear', { method: 'POST' });
+            loadAnalysisJobs();
+        } catch (err) {
+            showAlert('Failed to clear jobs: ' + err.message, 'error');
+        }
+    });
 });

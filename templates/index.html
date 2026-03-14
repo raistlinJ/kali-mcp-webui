@@ -44,6 +44,10 @@
                     <i class="ph ph-clock-counter-clockwise"></i>
                     <span>Past Sessions</span>
                 </button>
+                <button class="nav-btn" data-target="analysis-pane">
+                    <i class="ph ph-magnifying-glass-plus"></i>
+                    <span>Analysis Jobs</span>
+                </button>
             </nav>
 
             <div class="content-area">
@@ -308,6 +312,28 @@
                         </div>
                     </div>
                 </div> <!-- End Past Sessions Tab -->
+
+                <!-- Analysis Jobs Pane -->
+                <div class="tab-pane" id="analysis-pane">
+                    <div class="pane-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding: 0.5rem 0;">
+                        <div class="pane-title" style="display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="ph ph-magnifying-glass-plus" style="font-size: 1.5rem; color: var(--accent-primary);"></i>
+                            <h2 style="margin: 0; font-size: 1.25rem;">Background Analysis Jobs</h2>
+                        </div>
+                        <button id="clear-jobs-btn" class="btn btn-secondary btn-sm" style="width: auto; padding: 0.4rem 0.85rem; font-size: 0.82rem;">
+                            <i class="ph ph-trash"></i>
+                            <span>Clear Jobs</span>
+                        </button>
+                    </div>
+
+                    <div id="analysis-jobs-list" class="sessions-list">
+                        <!-- Job cards will be injected here -->
+                        <div class="empty-state">
+                            <i class="ph ph-tray" style="font-size: 2.5rem; opacity: 0.3; margin-bottom: 1rem;"></i>
+                            <p>No analysis jobs found. Run an analysis from Chat or Past Sessions.</p>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Live Session / Chat Tab -->
                 <div class="tab-pane" id="chat-pane">
