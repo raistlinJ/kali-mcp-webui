@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------------
     const fetchBtn = document.getElementById('fetch-models-btn');
     const startBtn = document.getElementById('start-service-btn');
-    const stopBtn = document.getElementById('stop-service-btn');
     const modelSelect = document.getElementById('model-select');
     const ollamaUrlInput = document.getElementById('ollama-url');
 
@@ -261,6 +260,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
                 sendPromptBtn.disabled = true;
                 annotateBtn.disabled = true;
+                
+                // Refresh history so the just-ended session appears
+                loadSessions();
             } else {
                 throw new Error(data.error || 'Failed to stop service');
             }
@@ -614,24 +616,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Stop Service (Handled by startBtn toggle)
     // ---------------------------------------------------------------
-    // Stop Service
-    // ---------------------------------------------------------------
-    stopBtn.addEventListener('click', async () => {
-        stopBtn.disabled = true;
-        appendLog('<span class="log-label">⏹️</span> Stopping service…', 'log-status');
-        try { await fetch('/api/session/stop', { method: 'POST' }); } 
-        catch (err) { showAlert('Failed to send stop signal.'); }
-    });
-
     function handleServiceStopped() {
         _serviceRunning = false;
         _chatBusy = false;
         _currentRunId = null;
         updateStatus('success', 'Service Stopped');
         
-        stopBtn.style.display = 'none';
-        stopBtn.disabled = false;
         resetStartBtn();
         setConfigEnabled(true);
         toolsBadge.style.display = 'none';
@@ -644,7 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sendPromptBtn.disabled = true;
         chatDownloadBtn.style.display = 'none';
 
-        loadSessions();
+        loadSessions(); // Refresh history
     }
 
     // ---------------------------------------------------------------
