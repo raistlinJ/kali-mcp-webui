@@ -1195,6 +1195,47 @@ option {
     }
 }
 
+/* Chat Console Stop Button */
+#chat-stop-btn {
+    color: var(--status-error);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+#chat-stop-btn:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--status-error);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+}
+
+/* Stop Button in Session Cards */
+.btn-stop-session {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--status-error);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 0.5rem;
+}
+.btn-stop-session:hover {
+    background: var(--status-error);
+    color: white;
+    transform: scale(1.1);
+}
+
+/* Confirmation Modal specialized styles */
+#confirm-modal-overlay .annotation-modal {
+    max-width: 400px;
+}
+#confirm-modal-overlay .modal-body p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
 /* ============================================================
    Full-Width Chat Console Bar
    ============================================================ */

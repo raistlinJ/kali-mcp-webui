@@ -343,9 +343,12 @@
                             </button>
                             <ul class="dropdown-menu" id="annotation-menu">
                                 <li data-action="annotate"><i class="ph ph-note-pencil"></i> Add Observation</li>
-                                <li data-action="analyze"><i class="ph ph-magic-wand"></i> Analyze Logs</li>
+                                <li data-action="analyze"><i class="ph ph-magnifying-glass"></i> Analyze Logs</li>
                             </ul>
                         </div>
+                        <button type="button" id="chat-stop-btn" class="btn btn-secondary" title="Stop Current Session" disabled>
+                            <i class="ph ph-stop-circle" style="font-size: 1.5rem;"></i>
+                        </button>
 
                         <!-- Annotation Modal / Popup -->
                         <div id="annotation-modal-overlay" class="modal-overlay" style="display: none;">
@@ -381,6 +384,24 @@
                                 <input type="hidden" id="annotation-action" value="annotate">
                             </div>
                         </div>
+
+                        <!-- Confirmation Modal -->
+                        <div id="confirm-modal-overlay" class="modal-overlay" style="display: none;">
+                            <div class="annotation-modal">
+                                <div class="modal-header">
+                                    <h3><i class="ph ph-warning-circle" style="color: var(--status-error);"></i> Stop Session?</h3>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Are you sure you want to stop the current session?</p>
+                                    <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">This will finalize the chat transcript and move it to your history.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" id="confirm-cancel-btn" class="btn btn-secondary">Go Back</button>
+                                    <button type="button" id="confirm-stop-btn" class="btn btn-danger">Yes, Stop Session</button>
+                                </div>
+                            </div>
+                        </div>
+
                         <textarea id="chat-prompt-input" placeholder="Start the service in the Configuration tab to begin..." rows="1" spellcheck="false" disabled></textarea>
                         <button type="button" id="chat-send-btn" class="btn btn-primary" title="Send" disabled>
                             <i class="ph ph-paper-plane-tilt" style="font-size: 1.5rem;"></i>

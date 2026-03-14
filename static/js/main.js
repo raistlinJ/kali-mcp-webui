@@ -30,6 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeAnnotationBtn = document.getElementById('close-annotation-btn');
     const cancelAnnotationBtn = document.getElementById('cancel-annotation-btn');
     const saveAnnotationBtn = document.getElementById('save-annotation-btn');
+    const chatStopBtn = document.getElementById('chat-stop-btn');
+    const confirmModalOverlay = document.getElementById('confirm-modal-overlay');
+    const confirmStopBtn = document.getElementById('confirm-stop-btn');
+    const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+    
     const annotationAction = document.getElementById('annotation-action');
     const annotationText = document.getElementById('annotation-text');
     const annotationTextGroup = document.getElementById('annotation-text-group');
@@ -230,6 +235,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------------
     // Start / Stop Service
     // ---------------------------------------------------------------
+    function askToStopSession() {
+        confirmModalOverlay.style.display = 'flex';
+    }
+
+    confirmCancelBtn.addEventListener('click', () => {
+        confirmModalOverlay.style.display = 'none';
+    });
+
+    confirmStopBtn.addEventListener('click', () => {
+        confirmModalOverlay.style.display = 'none';
+        stopService();
+    });
+
+    chatStopBtn.addEventListener('click', askToStopSession);
+
     async function stopService() {
         if (!_serviceRunning) {
             console.warn("stopService called but _serviceRunning is false. Checking backend status...");
@@ -267,6 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
                 sendPromptBtn.disabled = true;
                 annotateBtn.disabled = true;
+                chatStopBtn.disabled = true;
                 
                 // Refresh history so the just-ended session appears
                 loadSessions();
@@ -281,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     startBtn.addEventListener('click', async () => {
         if (_serviceRunning) {
-            await stopService();
+            askToStopSession();
             return;
         }
 
@@ -723,10 +744,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="session-run-id">${s.run_id}</span>
                     <span class="session-meta">${s.start_time ? new Date(s.start_time).toLocaleString() : '—'}</span>
                 </div>
-                <span class="session-status ${s.status || 'unknown'}">${s.status || 'unknown'}</span>
+                <div style="display: flex; align-items: center;">
+                    <span class="session-status ${s.status || 'unknown'}">${s.status || 'unknown'}</span>
+                    ${s.status === 'running' ? `<button class="btn-stop-session" title="Stop Running Session" data-stop-run="${s.run_id}"><i class="ph ph-stop"></i></button>` : ''}
+                </div>
             </div>`;
         }).join('');
-        sessionsList.querySelectorAll('.session-card').forEach(card => card.addEventListener('click', () => openSession(card.dataset.run)));
+        
+        sessionsList.querySelectorAll('.session-card').forEach(card => card.addEventListener('click', (e) => {
+            if (e.target.closest('.btn-stop-session')) return; // Ignore card click if stop button pressed
+            openSession(card.dataset.run)
+        }));
+
+        sessionsList.querySelectorAll('.btn-stop-session').forEach(btn => btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            askToStopSession();
+        }));
     }
 
     async function openSession(runId) {
@@ -835,6 +868,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;
                 annotateBtn.disabled = false;
+                chatStopBtn.disabled = false;
                 chatDownloadBtn.style.display = 'inline-block';
 
                 // Re-open log stream
