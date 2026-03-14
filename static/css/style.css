@@ -1335,6 +1335,10 @@ option {
     transition: opacity var(--transition-smooth), filter var(--transition-smooth);
 }
 
+.config-disabled #start-service-btn {
+    pointer-events: auto;
+}
+
 /* Stop button inline-flex to match start button */
 #stop-service-btn {
     width: 100%;

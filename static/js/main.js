@@ -280,30 +280,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/stop', { method: 'POST' });
             const data = await response.json();
             if (data.success) {
-                _serviceRunning = false;
-                _currentRunId = null;
-                closeSse();
-                setConfigEnabled(true);
-                
-                // Revert button to Start state
-                startBtn.className = 'btn btn-primary';
-                startBtn.querySelector('i').className = 'ph ph-power';
-                startBtn.querySelector('span').textContent = 'Start Service';
-                startBtn.disabled = false;
-                
-                updateStatus('idle');
-                appendLog('Service stopped.', 'log-status');
-                
-                // Reset session specific UI
-                toolsBadge.style.display = 'none';
-                chatPromptInput.disabled = true;
-                chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
-                sendPromptBtn.disabled = true;
-                annotateBtn.disabled = true;
-                chatStopBtn.disabled = true;
-                
-                // Refresh history so the just-ended session appears
-                loadSessions();
+                handleServiceStopped();
+                appendLog('Service stopped manually.', 'log-status');
             } else {
                 throw new Error(data.error || 'Failed to stop service');
             }
@@ -376,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateStatus('running', 'Service Running - Chat Active');
                 
                 // Switch to Chat tab
+                navChatBtn.disabled = false;
                 switchTab('chat-pane');
                 
                 // Enable Chat Console inputs
@@ -383,6 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;
                 annotateBtn.disabled = false;
+                chatStopBtn.disabled = false;
                 chatDownloadBtn.style.display = 'inline-block';
 
                 openSseStream();
@@ -886,6 +866,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateStatus('running', 'Service Running - Chat Active');
                 
                 // Enable Chat Console inputs
+                navChatBtn.disabled = false;
                 chatPromptInput.disabled = false;
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;
