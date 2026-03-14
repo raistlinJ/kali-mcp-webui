@@ -319,6 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.success) {
                 _serviceRunning = true;
+                _currentRunId = data.run_id;
                 
                 // Switch button to Stop state
                 startBtn.className = 'btn btn-danger';
