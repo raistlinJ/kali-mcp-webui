@@ -1358,4 +1358,3 @@ option {
 .job-meta { font-size: 0.8rem; color: var(--text-secondary); display: flex; gap: 1rem; }
 .spinning { animation: spin 2s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-}
