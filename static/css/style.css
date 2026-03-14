@@ -576,7 +576,7 @@ option {
 .dropdown-menu {
     position: absolute;
     bottom: 100%;
-    right: 0;
+    left: 0;
     margin-bottom: 0.75rem;
     min-width: 180px;
     background: rgba(30, 41, 59, 0.95);
@@ -590,7 +590,7 @@ option {
     display: none;
     flex-direction: column;
     animation: slideUp 0.2s ease-out forwards;
-    transform-origin: bottom right;
+    transform-origin: bottom left;
 }
 
 .dropdown-menu.show {
