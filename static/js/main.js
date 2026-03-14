@@ -280,8 +280,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/stop', { method: 'POST' });
             const data = await response.json();
             if (data.success) {
+                // handleServiceStopped will be called via SSE 'done' or 'service_stopped'
+                // But we call it here too for immediate UI feedback
                 handleServiceStopped();
-                appendLog('Service stopped manually.', 'log-status');
+                appendLog('Service stop signal sent.', 'log-status');
             } else {
                 throw new Error(data.error || 'Failed to stop service');
             }
@@ -382,8 +384,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function resetStartBtn() {
-        startBtn.querySelector('i').classList.remove('ph-spinner-gap', 'spin');
-        startBtn.querySelector('i').classList.add('ph-power');
+        startBtn.className = 'btn btn-primary';
+        const icon = startBtn.querySelector('i');
+        icon.className = 'ph ph-power';
+        icon.classList.remove('ph-spinner-gap', 'spin');
+        startBtn.querySelector('span').textContent = 'Start Service';
         startBtn.disabled = false;
         startBtn.style.display = 'inline-flex';
     }
@@ -652,6 +657,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Stop Service (Handled by startBtn toggle)
     // ---------------------------------------------------------------
     function handleServiceStopped() {
+        if (!_serviceRunning && statusText.textContent === 'Idle') return; // Already cleaned up
+
         _serviceRunning = false;
         _chatBusy = false;
         _currentRunId = null;
@@ -660,14 +667,19 @@ document.addEventListener('DOMContentLoaded', () => {
         resetStartBtn();
         setConfigEnabled(true);
         toolsBadge.style.display = 'none';
-        // Switch back to config and disable active chat inputs
-        navChatBtn.disabled = true;
-        switchTab('config-pane');
-
+        
+        // Disable active chat inputs
         chatPromptInput.disabled = true;
         chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
         sendPromptBtn.disabled = true;
+        annotateBtn.disabled = true;
+        chatStopBtn.disabled = true;
         chatDownloadBtn.style.display = 'none';
+
+        // We DON'T force a tab switch to config here anymore to prevent jarring jumps.
+        // The user can switch back when they are ready to reconfigure.
+        // Just disable the Live Chat tab if we're not on it, or let them see logs.
+        navChatBtn.disabled = true; 
 
         loadSessions(); // Refresh history
     }
