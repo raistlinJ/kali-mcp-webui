@@ -25,12 +25,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatPromptInput = document.getElementById('chat-prompt-input');
     const sendPromptBtn = document.getElementById('chat-send-btn');
     const annotateBtn = document.getElementById('chat-annotate-btn');
-    const annotationPopup = document.getElementById('annotation-popup');
+    const annotationMenu = document.getElementById('annotation-menu');
+    const annotationModalOverlay = document.getElementById('annotation-modal-overlay');
+    const annotationPopup = document.getElementById('annotation-popup'); // modal container
     const closeAnnotationBtn = document.getElementById('close-annotation-btn');
+    const cancelAnnotationBtn = document.getElementById('cancel-annotation-btn');
     const saveAnnotationBtn = document.getElementById('save-annotation-btn');
     const annotationAction = document.getElementById('annotation-action');
     const annotationText = document.getElementById('annotation-text');
+    const annotationTextGroup = document.getElementById('annotation-text-group');
     const annotationSpan = document.getElementById('annotation-span');
+    const modalTitle = document.getElementById('modal-title');
     
     const chatDownloadBtn = document.getElementById('chat-download-btn');
     const sessionDownloadBtn = document.getElementById('session-download-btn');
@@ -508,33 +513,57 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------------
     // Annotations & Live Analysis
     // ---------------------------------------------------------------
-    annotateBtn.addEventListener('click', () => {
+    annotateBtn.addEventListener('click', (e) => {
         if (!_serviceRunning) return;
-        annotationPopup.style.display = 'flex';
-        annotationAction.value = 'annotate';
-        annotationText.style.display = 'block';
-        saveAnnotationBtn.textContent = 'Save Note';
-        annotationText.focus();
+        e.stopPropagation();
+        annotationMenu.classList.toggle('show');
     });
 
-    annotationAction.addEventListener('change', (e) => {
-        if (e.target.value === 'analyze') {
-            annotationText.style.display = 'none';
+    // Close dropdown on click-away
+    window.addEventListener('click', () => {
+        annotationMenu.classList.remove('show');
+    });
+
+    annotationMenu.querySelectorAll('li').forEach(item => {
+        item.addEventListener('click', () => {
+            const action = item.getAttribute('data-action');
+            openAnnotationModal(action);
+        });
+    });
+
+    function openAnnotationModal(action) {
+        if (!_serviceRunning) return;
+        annotationModalOverlay.style.display = 'flex';
+        annotationAction.value = action;
+        
+        if (action === 'analyze') {
+            modalTitle.innerHTML = '<i class="ph ph-magic-wand"></i> Analyze Logs';
+            annotationTextGroup.style.display = 'none';
             saveAnnotationBtn.textContent = 'Run Analysis';
         } else {
-            annotationText.style.display = 'block';
+            modalTitle.innerHTML = '<i class="ph ph-note-pencil"></i> Add Observation';
+            annotationTextGroup.style.display = 'flex';
             saveAnnotationBtn.textContent = 'Save Note';
-            annotationText.focus();
+            setTimeout(() => annotationText.focus(), 100);
         }
-    });
+        annotationMenu.classList.remove('show');
+    }
 
-    closeAnnotationBtn.addEventListener('click', () => {
-        annotationPopup.style.display = 'none';
+    const closeAndResetModal = () => {
+        annotationModalOverlay.style.display = 'none';
         annotationText.value = '';
         annotationSpan.value = 'Event Point';
         annotationAction.value = 'annotate';
-        annotationText.style.display = 'block';
+        annotationTextGroup.style.display = 'flex';
         saveAnnotationBtn.textContent = 'Save Note';
+    };
+
+    closeAnnotationBtn.addEventListener('click', closeAndResetModal);
+    cancelAnnotationBtn.addEventListener('click', closeAndResetModal);
+
+    // Also close on overlay click
+    annotationModalOverlay.addEventListener('click', (e) => {
+        if (e.target === annotationModalOverlay) closeAndResetModal();
     });
 
     saveAnnotationBtn.addEventListener('click', async () => {
@@ -558,9 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (data.success && data.analysis) {
                     appendLog(`<span class="log-label">💡 Live Analysis</span> <em>Scope: ${span}</em><br/>${marked.parse(data.analysis)}`, 'log-system');
-                    closeAnnotationBtn.click();
-                    // Scroll to bottom
-                    liveLogViewer.scrollTop = liveLogViewer.scrollHeight;
+                    closeAndResetModal();
                 } else {
                     showAlert('Live Analysis failed: ' + (data.error || 'Unknown error'), 'error');
                 }
@@ -574,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (data.success) {
                     appendLog(`<span class="log-label">📝 Annotation saved</span> <em>Scope: ${span}</em><br/>${escapeHtml(text)}`, 'log-prompt');
-                    closeAnnotationBtn.click();
+                    closeAndResetModal();
                 } else {
                     showAlert('Failed to save annotation: ' + (data.error || 'Unknown error'), 'error');
                 }
