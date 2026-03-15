@@ -377,56 +377,6 @@
                             <i class="ph ph-stop-circle" style="font-size: 1.5rem;"></i>
                         </button>
 
-                        <!-- Annotation Modal / Popup -->
-                        <div id="annotation-modal-overlay" class="modal-overlay" style="display: none;">
-                            <div id="annotation-popup" class="annotation-modal">
-                                <div class="modal-header">
-                                    <h3 id="modal-title"><i class="ph ph-note-pencil"></i> Add Observation</h3>
-                                    <button type="button" id="close-annotation-btn" class="icon-btn"><i class="ph ph-x"></i></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div id="annotation-text-group" class="input-group">
-                                        <label for="annotation-text">Observation Note</label>
-                                        <textarea id="annotation-text" placeholder="Describe what you observed..." rows="4" spellcheck="false"></textarea>
-                                    </div>
-                                    <div class="input-group">
-                                        <label for="annotation-span">Analysis Scope / Time Span</label>
-                                        <div class="select-wrapper">
-                                            <i class="ph ph-clock-counter-clockwise icon-left"></i>
-                                            <select id="annotation-span" class="form-select config-input">
-                                                <option value="Event Point">Event Point (Right Now)</option>
-                                                <option value="Last 1 Minute">Last 1 Minute</option>
-                                                <option value="Last 5 Minutes">Last 5 Minutes</option>
-                                                <option value="Last 15 Minutes">Last 15 Minutes</option>
-                                                <option value="Entire Session">Entire Session</option>
-                                            </select>
-                                            <i class="ph ph-caret-down icon-right"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" id="cancel-annotation-btn" class="btn btn-secondary">Cancel</button>
-                                    <button type="button" id="save-annotation-btn" class="btn btn-primary">Save Note</button>
-                                </div>
-                                <input type="hidden" id="annotation-action" value="annotate">
-                            </div>
-                        </div>
-
-                        <!-- Confirmation Modal -->
-                        <div id="confirm-modal-overlay" class="modal-overlay" style="display: none;">
-                            <div class="annotation-modal">
-                                <div class="modal-header">
-                                    <h3><i class="ph ph-warning-circle" style="color: var(--status-error);"></i> Stop Session?</h3>
-                                </div>
-                                <div class="modal-body">
-                                    <p>Are you sure you want to stop the current session?</p>
-                                    <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">This will finalize the chat transcript and move it to your history.</p>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" id="confirm-cancel-btn" class="btn btn-secondary">Go Back</button>
-                                    <button type="button" id="confirm-stop-btn" class="btn btn-danger">Yes, Stop Session</button>
-                                </div>
-                            </div>
                         </div>
 
                         <textarea id="chat-prompt-input" placeholder="Start the service in the Configuration tab to begin..." rows="1" spellcheck="false" disabled></textarea>
@@ -439,6 +389,59 @@
                 </div> <!-- End Chat Tab -->
             </div> <!-- End content-area -->
             
+            <!-- Shared Modals -->
+            <!-- Annotation Modal / Popup -->
+            <div id="annotation-modal-overlay" class="modal-overlay" style="display: none;">
+                <div id="annotation-popup" class="annotation-modal">
+                    <div class="modal-header">
+                        <h3 id="modal-title"><i class="ph ph-note-pencil"></i> Add Observation</h3>
+                        <button type="button" id="close-annotation-btn" class="icon-btn"><i class="ph ph-x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="annotation-text-group" class="input-group">
+                            <label for="annotation-text">Observation Note</label>
+                            <textarea id="annotation-text" placeholder="Describe what you observed..." rows="4" spellcheck="false"></textarea>
+                        </div>
+                        <div class="input-group">
+                            <label for="annotation-span">Analysis Scope / Time Span</label>
+                            <div class="select-wrapper">
+                                <i class="ph ph-clock-counter-clockwise icon-left"></i>
+                                <select id="annotation-span" class="form-select config-input">
+                                    <option value="Event Point">Event Point (Right Now)</option>
+                                    <option value="Last 1 Minute">Last 1 Minute</option>
+                                    <option value="Last 5 Minutes">Last 5 Minutes</option>
+                                    <option value="Last 15 Minutes">Last 15 Minutes</option>
+                                    <option value="Entire Session">Entire Session</option>
+                                </select>
+                                <i class="ph ph-caret-down icon-right"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="cancel-annotation-btn" class="btn btn-secondary">Cancel</button>
+                        <button type="button" id="save-annotation-btn" class="btn btn-primary">Save Note</button>
+                    </div>
+                    <input type="hidden" id="annotation-action" value="annotate">
+                </div>
+            </div>
+
+            <!-- Confirmation Modal -->
+            <div id="confirm-modal-overlay" class="modal-overlay" style="display: none;">
+                <div class="annotation-modal">
+                    <div class="modal-header">
+                        <h3><i class="ph ph-warning-circle" style="color: var(--status-error);"></i> Stop Session?</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to stop the current session?</p>
+                        <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">This will finalize the chat transcript and move it to your history.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="confirm-cancel-btn" class="btn btn-secondary">Go Back</button>
+                        <button type="button" id="confirm-stop-btn" class="btn btn-danger">Yes, Stop Session</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Global Alerts Container -->
             <div id="alerts-container" class="alerts-container"></div>
 
