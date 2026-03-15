@@ -840,7 +840,6 @@ class MCPSession:
                         if recovered_content:
                             self.messages.append({"role": "assistant", "content": recovered_content})
                             self._logger.log_response(recovered_content)
-                            _emit(self.event_callback, "response", {"text": recovered_content})
                             _emit(self.event_callback, "chat_done", {
                                 "message": "Recovered final answer after user-approved retry."
                             })

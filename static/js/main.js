@@ -1218,7 +1218,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendLog(`<span class="log-label">📋 Result</span> <strong>${escapeHtml(event.tool)}</strong> ${exitBadge} (${event.duration_ms}ms)\n<pre class="log-pre">${escapeHtml(event.result || '(no output)')}</pre>`, 'log-tool-result');
                 break;
             }
-            case 'status': appendLog(`<span class="log-label">ℹ️ Status</span> ${escapeHtml(event.message)}`, 'log-status'); break;
+            case 'status': {
+                const transientRecoveryStatuses = [
+                    'Model failed to produce a final reply after tools. Waiting for user decision: retry or cancel and restore.',
+                    'Model returned an empty post-tool reply; retrying once without tools for a final answer …',
+                ];
+                if (!transientRecoveryStatuses.includes(event.message || '')) {
+                    appendLog(`<span class="log-label">ℹ️ Status</span> ${escapeHtml(event.message)}`, 'log-status');
+                }
+                break;
+            }
             case 'context_usage': updateContextBar(event); break;
             case 'service_started': appendLog(`<span class="log-label">🟢 Service Started</span>`, 'log-done'); break;
             case 'service_stopped': appendLog(`<span class="log-label">🔴 Service Stopped</span>`, 'log-status'); break;
@@ -1226,7 +1235,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 _awaitingPostToolReplyDecision = true;
                 postToolReplyMessage.textContent = event.message || 'The model completed the tool calls but returned an empty final reply.';
                 postToolReplyModalOverlay.style.display = 'flex';
-                appendLog(`<span class="log-label">⚠️ Decision Needed</span> ${escapeHtml(event.message || 'Choose whether to retry the final answer or cancel and restore.')}`, 'log-status');
                 break;
             case 'chat_done':
                 appendLog(`<span class="log-label">✅ Turn Complete</span> ${escapeHtml(event.message || 'Ready for next prompt.')}`, 'log-done');
