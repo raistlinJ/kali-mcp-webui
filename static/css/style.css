@@ -1242,23 +1242,24 @@ option {
 
 .chat-console-bar {
     width: 100%;
-    margin-top: 1rem;
-    display: flex;
-    justify-content: center;
-    padding: 1rem 0;
+    margin-top: 1.5rem;
+    padding: 1.25rem 0;
     border-top: 1px solid var(--panel-border);
     background: transparent;
 }
 
 .chat-console-wrapper {
-    width: 100%;
+    width: 95%;
+    max-width: 1200px;
+    margin: 0 auto;
     display: flex;
     gap: 1rem;
     align-items: flex-end;
 }
 
 #chat-prompt-input {
-    flex: 1;
+    flex-grow: 1;
+    min-width: 100px;
     border-radius: 12px;
     padding: 0.85rem 1.25rem;
     background: rgba(255, 255, 255, 0.05);
