@@ -23,30 +23,55 @@
     <main class="container">
         <header class="header">
             <div class="logo">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="var(--accent-primary)" viewBox="0 0 256 256"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,128a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,128Z"></path></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="var(--accent-primary)"
+                    viewBox="0 0 256 256">
+                    <path
+                        d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,128a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,128Z">
+                    </path>
+                </svg>
                 <h1>Acosta Kali MCP Frontend</h1>
             </div>
             <p class="subtitle">Run Kali tools with local LLMs via the Model Context Protocol</p>
         </header>
 
         <div class="glass-panel layout-wrapper">
-            
+
             <!-- Horizontal Navigation -->
             <nav class="horizontal-tabs" id="main-navigation">
                 <button class="nav-btn active" data-target="config-pane">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M124,56a36,36,0,0,0-68.82,0H32a4,4,0,0,0,0,8H55.18a36,36,0,0,0,68.82,0H224a4,4,0,0,0,0-8ZM88,88a28,28,0,1,1,28-28A28,28,0,0,1,88,88Zm136,32H200.82a36,36,0,0,0-68.82,0H32a4,4,0,0,0,0,8H132a36,36,0,0,0,68.82,0H224a4,4,0,0,0,0-8ZM168,152a28,28,0,1,1,28-28A28,28,0,0,1,168,152Zm56,32H124.82a36,36,0,0,0-68.82,0H32a4,4,0,0,0,0,8H56a36,36,0,0,0,68.82,0H224a4,4,0,0,0,0-8ZM88,216a28,28,0,1,1,28-28A28,28,0,0,1,88,216Z"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                        viewBox="0 0 256 256">
+                        <path
+                            d="M124,56a36,36,0,0,0-68.82,0H32a4,4,0,0,0,0,8H55.18a36,36,0,0,0,68.82,0H224a4,4,0,0,0,0-8ZM88,88a28,28,0,1,1,28-28A28,28,0,0,1,88,88Zm136,32H200.82a36,36,0,0,0-68.82,0H32a4,4,0,0,0,0,8H132a36,36,0,0,0,68.82,0H224a4,4,0,0,0,0-8ZM168,152a28,28,0,1,1,28-28A28,28,0,0,1,168,152Zm56,32H124.82a36,36,0,0,0-68.82,0H32a4,4,0,0,0,0,8H56a36,36,0,0,0,68.82,0H224a4,4,0,0,0,0-8ZM88,216a28,28,0,1,1,28-28A28,28,0,0,1,88,216Z">
+                        </path>
+                    </svg>
                     <span>Configuration</span>
                 </button>
                 <button class="nav-btn" data-target="chat-pane" id="nav-chat-btn" disabled>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M216,48H40A16,16,0,0,0,24,64V224a15.84,15.84,0,0,0,9.25,14.5,16,16,0,0,0,16.27-1.39l44-31.42H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48ZM128,144H80a8,8,0,0,1,0-16h48a8,8,0,0,1,0,16Zm48-32H80a8,8,0,0,1,0-16h96a8,8,0,0,1,0,16Z"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                        viewBox="0 0 256 256">
+                        <path
+                            d="M216,48H40A16,16,0,0,0,24,64V224a15.84,15.84,0,0,0,9.25,14.5,16,16,0,0,0,16.27-1.39l44-31.42H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48ZM128,144H80a8,8,0,0,1,0-16h48a8,8,0,0,1,0,16Zm48-32H80a8,8,0,0,1,0-16h96a8,8,0,0,1,0,16Z">
+                        </path>
+                    </svg>
                     <span>Live Chat</span>
                 </button>
                 <button class="nav-btn" data-target="sessions-pane">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                        viewBox="0 0 256 256">
+                        <path
+                            d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z">
+                        </path>
+                    </svg>
                     <span>Past Sessions</span>
                 </button>
                 <button class="nav-btn" data-target="analysis-pane">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M229.66,218.34,179.6,168.28a88.21,88.21,0,1,0-11.32,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                        viewBox="0 0 256 256">
+                        <path
+                            d="M229.66,218.34,179.6,168.28a88.21,88.21,0,1,0-11.32,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z">
+                        </path>
+                    </svg>
                     <span>Analysis Jobs</span>
                 </button>
             </nav>
@@ -66,17 +91,30 @@
                             <div class="input-group">
                                 <label for="ollama-url">Instance URL</label>
                                 <div class="input-with-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="var(--text-muted)" viewBox="0 0 256 256" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); z-index: 10;"><path d="M160,128a32,32,0,1,1-32-32A32,32,0,0,1,160,128Zm64-64V192a40,40,0,0,1-40,40H72a40,40,0,0,1-40-40V64A40,40,0,0,1,72,24H184A40,40,0,0,1,224,64Zm-16,0a24,24,0,0,0-24-24H72A24,24,0,0,0,48,64V192a24,24,0,0,0,24,24H184a24,24,0,0,0,24-24V64Z"></path></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                        fill="var(--text-muted)" viewBox="0 0 256 256"
+                                        style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); z-index: 10;">
+                                        <path
+                                            d="M160,128a32,32,0,1,1-32-32A32,32,0,0,1,160,128Zm64-64V192a40,40,0,0,1-40,40H72a40,40,0,0,1-40-40V64A40,40,0,0,1,72,24H184A40,40,0,0,1,224,64Zm-16,0a24,24,0,0,0-24-24H72A24,24,0,0,0,48,64V192a24,24,0,0,0,24,24H184a24,24,0,0,0,24-24V64Z">
+                                        </path>
+                                    </svg>
                                     <input type="url" id="ollama-url" value="http://localhost:11434" required
                                         placeholder="http://localhost:11434">
                                 </div>
                             </div>
 
                             <button type="button" id="fetch-models-btn" class="btn btn-secondary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256" class="reload-icon"><path d="M224,128a96,96,0,0,1-144.07,83.11l-3.37-2.31a8,8,0,0,1,9.15-13.15l3.38,2.32A80,80,0,1,0,52.56,92H80a8,8,0,0,1,0,16H32a8,8,0,0,1-8-8V52a8,8,0,0,1,16,0V79.43A95.78,95.78,0,0,1,224,128Z"></path></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
+                                    viewBox="0 0 256 256" class="reload-icon">
+                                    <path
+                                        d="M224,128a96,96,0,0,1-144.07,83.11l-3.37-2.31a8,8,0,0,1,9.15-13.15l3.38,2.32A80,80,0,1,0,52.56,92H80a8,8,0,0,1,0,16H32a8,8,0,0,1-8-8V52a8,8,0,0,1,16,0V79.43A95.78,95.78,0,0,1,224,128Z">
+                                    </path>
+                                </svg>
                                 <span>Fetch Available LLMs</span>
                             </button>
-                            <div id="ollama-fetch-error" class="error-label" style="display: none; color: var(--status-error); font-size: 0.82rem; margin-top: 0.6rem; padding: 0.4rem 0.6rem; border-radius: 4px; background: rgba(var(--status-error-rgb, 255, 68, 68), 0.1);"></div>
+                            <div id="ollama-fetch-error" class="error-label"
+                                style="display: none; color: var(--status-error); font-size: 0.82rem; margin-top: 0.6rem; padding: 0.4rem 0.6rem; border-radius: 4px; background: rgba(var(--status-error-rgb, 255, 68, 68), 0.1);">
+                            </div>
                         </div>
 
                         <div class="divider"></div>
@@ -124,24 +162,28 @@
                                 <div class="tools-grid">
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/nmap"
                                             value="nmap" class="tool-checkbox"> nmap</label>
-                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/rustscan"
-                                            value="rustscan" class="tool-checkbox"> rustscan</label>
+                                    <label class="checkbox-container"><input type="checkbox"
+                                            data-cmd="/usr/bin/rustscan" value="rustscan" class="tool-checkbox">
+                                        rustscan</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/masscan"
                                             value="masscan" class="tool-checkbox"> masscan</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/amass"
                                             value="amass" class="tool-checkbox"> amass</label>
-                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/subfinder"
-                                            value="subfinder" class="tool-checkbox"> subfinder</label>
-                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/recon-ng"
-                                            value="recon-ng" class="tool-checkbox"> recon-ng</label>
+                                    <label class="checkbox-container"><input type="checkbox"
+                                            data-cmd="/usr/bin/subfinder" value="subfinder" class="tool-checkbox">
+                                        subfinder</label>
+                                    <label class="checkbox-container"><input type="checkbox"
+                                            data-cmd="/usr/bin/recon-ng" value="recon-ng" class="tool-checkbox">
+                                        recon-ng</label>
                                 </div>
                             </div>
 
                             <div class="input-group">
                                 <label>Web Application Analysis</label>
                                 <div class="tools-grid">
-                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/gobuster"
-                                            value="gobuster" class="tool-checkbox"> gobuster</label>
+                                    <label class="checkbox-container"><input type="checkbox"
+                                            data-cmd="/usr/bin/gobuster" value="gobuster" class="tool-checkbox">
+                                        gobuster</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/dirb"
                                             value="dirb" class="tool-checkbox"> dirb</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/ffuf"
@@ -178,16 +220,18 @@
                             <div class="input-group">
                                 <label>Vulnerability &amp; Network</label>
                                 <div class="tools-grid">
-                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/searchsploit"
-                                            value="searchsploit" class="tool-checkbox"> searchsploit</label>
+                                    <label class="checkbox-container"><input type="checkbox"
+                                            data-cmd="/usr/bin/searchsploit" value="searchsploit" class="tool-checkbox">
+                                        searchsploit</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/netcat"
                                             value="netcat" class="tool-checkbox"> netcat (nc)</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/ncat"
                                             value="ncat" class="tool-checkbox"> ncat</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/tcpdump"
                                             value="tcpdump" class="tool-checkbox"> tcpdump</label>
-                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/sbin/aircrack-ng"
-                                            value="aircrack-ng" class="tool-checkbox"> aircrack-ng</label>
+                                    <label class="checkbox-container"><input type="checkbox"
+                                            data-cmd="/usr/sbin/aircrack-ng" value="aircrack-ng" class="tool-checkbox">
+                                        aircrack-ng</label>
                                 </div>
                             </div>
 
@@ -198,8 +242,9 @@
                                             value="msf_search" class="tool-checkbox"> msf_search</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="msf_run"
                                             value="msf_run" class="tool-checkbox"> msf_run</label>
-                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/msfconsole"
-                                            value="msfconsole" class="tool-checkbox"> msfconsole</label>
+                                    <label class="checkbox-container"><input type="checkbox"
+                                            data-cmd="/usr/bin/msfconsole" value="msfconsole" class="tool-checkbox">
+                                        msfconsole</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/commix"
                                             value="commix" class="tool-checkbox"> commix</label>
                                 </div>
@@ -210,13 +255,15 @@
                                     <summary>
                                         <div
                                             style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                            <span><i class="ph ph-file-code"></i> Advanced: kali_tools.json Editor</span>
+                                            <span><i class="ph ph-file-code"></i> Advanced: kali_tools.json
+                                                Editor</span>
                                             <span
                                                 style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(Auto-saves
                                                 on Start) <i class="ph ph-caret-down"></i></span>
                                         </div>
                                     </summary>
-                                    <textarea id="kali-tools-json" rows="8" spellcheck="false" style="margin-top: 1rem;">{
+                                    <textarea id="kali-tools-json" rows="8" spellcheck="false"
+                                        style="margin-top: 1rem;">{
   "tools": []
 }</textarea>
                                 </details>
@@ -258,14 +305,20 @@
                                     </select>
                                     <i class="ph ph-caret-down icon-right"></i>
                                 </div>
-                                <span class="input-hint">Older messages are auto-summarised when approaching limit</span>
+                                <span class="input-hint">Older messages are auto-summarised when approaching
+                                    limit</span>
                             </div>
                         </div>
 
                         <!-- Service Action Buttons -->
                         <div class="action-footer">
                             <button type="button" id="start-service-btn" class="btn btn-primary" disabled>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24a8,8,0,0,1,8,8v80a8,8,0,0,1-16,0V32A8,8,0,0,1,128,24ZM198.63,62.63a8,8,0,0,0-11.26,11.4c26.46,26.11,26.46,68.63,0,94.74a67,67,0,0,1-94.74,0c-26.46-26.11-26.46-68.63,0-94.74a8,8,0,0,0-11.26-11.4c-32.73,32.31-32.73,84.89,0,117.2a83,83,0,0,0,117.26,0C231.36,147.52,231.36,94.94,198.63,62.63Z"></path></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                                    viewBox="0 0 256 256">
+                                    <path
+                                        d="M128,24a8,8,0,0,1,8,8v80a8,8,0,0,1-16,0V32A8,8,0,0,1,128,24ZM198.63,62.63a8,8,0,0,0-11.26,11.4c26.46,26.11,26.46,68.63,0,94.74a67,67,0,0,1-94.74,0c-26.46-26.11-26.46-68.63,0-94.74a8,8,0,0,0-11.26-11.4c-32.73,32.31-32.73,84.89,0,117.2a83,83,0,0,0,117.26,0C231.36,147.52,231.36,94.94,198.63,62.63Z">
+                                    </path>
+                                </svg>
                                 <span>Start Service</span>
                             </button>
 
@@ -285,7 +338,12 @@
                             <h2><i class="ph ph-clock-countdown"></i> Past Sessions</h2>
                             <button type="button" id="refresh-sessions-btn" class="btn btn-secondary"
                                 style="width:auto;padding:0.4rem 0.85rem;font-size:0.82rem;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256" style="margin-right: 4px;"><path d="M224,128a96,96,0,0,1-144.07,83.11l-3.37-2.31a8,8,0,0,1,9.15-13.15l3.38,2.32A80,80,0,1,0,52.56,92H80a8,8,0,0,1,0,16H32a8,8,0,0,1-8-8V52a8,8,0,0,1,16,0V79.43A95.78,95.78,0,0,1,224,128Z"></path></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                                    viewBox="0 0 256 256" style="margin-right: 4px;">
+                                    <path
+                                        d="M224,128a96,96,0,0,1-144.07,83.11l-3.37-2.31a8,8,0,0,1,9.15-13.15l3.38,2.32A80,80,0,1,0,52.56,92H80a8,8,0,0,1,0,16H32a8,8,0,0,1-8-8V52a8,8,0,0,1,16,0V79.43A95.78,95.78,0,0,1,224,128Z">
+                                    </path>
+                                </svg>
                                 Refresh
                             </button>
                         </div>
@@ -300,13 +358,23 @@
                                     Tools</button>
                                 <button class="detail-tab" data-tab="artifacts"><i class="ph ph-file-arrow-down"></i>
                                     Artifacts</button>
-                                <button class="detail-tab" data-tab="analysis" id="tab-analysis" style="display: none;"><i class="ph ph-brain"></i>
+                                <button class="detail-tab" data-tab="analysis" id="tab-analysis"
+                                    style="display: none;"><i class="ph ph-brain"></i>
                                     Analysis</button>
-                                <button type="button" id="session-analyze-btn" class="btn btn-primary" style="margin-left: auto; padding: 0.3rem 0.6rem; font-size: 0.82rem; display: none;" title="Run API Analysis on this session">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256" style="margin-right: 4px;"><path d="M152,108a12,12,0,1,1-12-12A12,12,0,0,1,152,108ZM188,32a12,12,0,1,0,12,12A12,12,0,0,0,188,32ZM136,188.69a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,0-11.32l120-120a8,8,0,0,1,11.32,0l72,72a8,8,0,0,1,0,11.32l-120,120Z"></path></svg>
+                                <button type="button" id="session-analyze-btn" class="btn btn-primary"
+                                    style="margin-left: auto; padding: 0.3rem 0.6rem; font-size: 0.82rem; display: none;"
+                                    title="Run API Analysis on this session">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                                        viewBox="0 0 256 256" style="margin-right: 4px;">
+                                        <path
+                                            d="M152,108a12,12,0,1,1-12-12A12,12,0,0,1,152,108ZM188,32a12,12,0,1,0,12,12A12,12,0,0,0,188,32ZM136,188.69a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,0-11.32l120-120a8,8,0,0,1,11.32,0l72,72a8,8,0,0,1,0,11.32l-120,120Z">
+                                        </path>
+                                    </svg>
                                     Analyze Session
                                 </button>
-                                <button type="button" id="session-download-btn" class="btn btn-secondary" style="margin-left: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.82rem; display: none;" title="Download Full Session Archive (.zip)">
+                                <button type="button" id="session-download-btn" class="btn btn-secondary"
+                                    style="margin-left: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.82rem; display: none;"
+                                    title="Download Full Session Archive (.zip)">
                                     <i class="ph ph-file-zip"></i> Download Archive
                                 </button>
                             </div>
@@ -319,13 +387,21 @@
 
                 <!-- Analysis Jobs Pane -->
                 <div class="tab-pane" id="analysis-pane">
-                    <div class="pane-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding: 0.5rem 0;">
+                    <div class="pane-header"
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding: 0.5rem 0;">
                         <div class="pane-title" style="display: flex; align-items: center; gap: 0.75rem;">
-                            <i class="ph ph-magnifying-glass-plus" style="font-size: 1.5rem; color: var(--accent-primary);"></i>
+                            <i class="ph ph-magnifying-glass-plus"
+                                style="font-size: 1.5rem; color: var(--accent-primary);"></i>
                             <h2 style="margin: 0; font-size: 1.25rem;">Background Analysis Jobs</h2>
                         </div>
-                        <button id="clear-jobs-btn" class="btn btn-secondary btn-sm" style="width: auto; padding: 0.4rem 0.85rem; font-size: 0.82rem;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256" style="margin-right: 4px;"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96ZM192,208H64V64H192Z"></path></svg>
+                        <button id="clear-jobs-btn" class="btn btn-secondary btn-sm"
+                            style="width: auto; padding: 0.4rem 0.85rem; font-size: 0.82rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                                viewBox="0 0 256 256" style="margin-right: 4px;">
+                                <path
+                                    d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96ZM192,208H64V64H192Z">
+                                </path>
+                            </svg>
                             <span>Clear Jobs</span>
                         </button>
                     </div>
@@ -342,11 +418,16 @@
                 <!-- Live Session / Chat Tab -->
                 <div class="tab-pane" id="chat-pane">
                     <!-- Unified Chat Window -->
-                    <div class="chat-window-container" id="live-log-panel" style="display: flex; flex-direction: column; height: 100%;">
+                    <div class="chat-window-container" id="live-log-panel"
+                        style="display: flex; flex-direction: column; height: 100%;">
                         <!-- Tools indicator (condensed) -->
-                        <div class="chat-header-actions" style="display: flex; justify-content: flex-end; padding: 0.5rem 0; gap: 0.5rem;">
-                            <span id="service-tools-badge" class="tools-badge" style="display:none; font-size: 0.75rem;"></span>
-                            <button type="button" id="chat-download-btn" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.82rem; display: none;" title="Download Full Session Archive (.zip)">
+                        <div class="chat-header-actions"
+                            style="display: flex; justify-content: flex-end; padding: 0.5rem 0; gap: 0.5rem;">
+                            <span id="service-tools-badge" class="tools-badge"
+                                style="display:none; font-size: 0.75rem;"></span>
+                            <button type="button" id="chat-download-btn" class="btn btn-secondary"
+                                style="padding: 0.3rem 0.6rem; font-size: 0.82rem; display: none;"
+                                title="Download Full Session Archive (.zip)">
                                 <i class="ph ph-file-zip"></i> Download Archive
                             </button>
                         </div>
@@ -359,56 +440,88 @@
                                 <div class="context-usage-fill" id="context-usage-fill" style="width:0%"></div>
                             </div>
                         </div>
-                <div class="live-log-viewer" id="live-log-viewer">
-                    <div class="log-entry log-status">Waiting for service to start...</div>
-                </div>
-
-                <!-- Docked Chat Console -->
-                <div id="chat-console-bar" class="chat-console-bar" style="position: relative;">
-                    <div class="chat-console-wrapper">
-                        <!-- Annotation Dropdown -->
-                        <div class="dropdown" id="annotation-dropdown">
-                            <button type="button" id="chat-annotate-btn" class="btn btn-secondary dropdown-toggle" title="Add Observation or Analysis" disabled>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M227.31,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM192,108,148,64l24-24,44,44ZM48,168l88-88,44,44L92,212H48Z"></path></svg>
-                            </button>
-                            <ul class="dropdown-menu" id="annotation-menu">
-                                <li data-action="annotate">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256" style="margin-right: 8px;"><path d="M227.31,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM192,108,148,64l24-24,44,44ZM48,168l88-88,44,44L92,212H48Z"></path></svg>
-                                    Add Observation
-                                </li>
-                                <li data-action="analyze">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256" style="margin-right: 8px;"><path d="M229.66,218.34,179.6,168.28a88.21,88.21,0,1,0-11.32,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"></path></svg>
-                                    Analyze Logs
-                                </li>
-                            </ul>
+                        <div class="live-log-viewer" id="live-log-viewer">
+                            <div class="log-entry log-status">Waiting for service to start...</div>
                         </div>
-                        <button type="button" id="chat-stop-btn" class="btn btn-secondary" title="Stop Current Session" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM160,104v48a8,8,0,0,1-8,8H104a8,8,0,0,1-8-8V104a8,8,0,0,1,8-8h48A8,8,0,0,1,160,104Z"></path></svg>
-                        </button>
+
+                        <!-- Docked Chat Console -->
+                        <div id="chat-console-bar" class="chat-console-bar" style="position: relative;">
+                            <div class="chat-console-wrapper">
+                                <!-- Annotation Dropdown -->
+                                <div class="dropdown" id="annotation-dropdown">
+                                    <button type="button" id="chat-annotate-btn"
+                                        class="btn btn-secondary dropdown-toggle" title="Add Observation or Analysis"
+                                        disabled>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                            fill="currentColor" viewBox="0 0 256 256">
+                                            <path
+                                                d="M227.31,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM192,108,148,64l24-24,44,44ZM48,168l88-88,44,44L92,212H48Z">
+                                            </path>
+                                        </svg>
+                                    </button>
+                                    <ul class="dropdown-menu" id="annotation-menu">
+                                        <li data-action="annotate">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                                fill="currentColor" viewBox="0 0 256 256" style="margin-right: 8px;">
+                                                <path
+                                                    d="M227.31,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM192,108,148,64l24-24,44,44ZM48,168l88-88,44,44L92,212H48Z">
+                                                </path>
+                                            </svg>
+                                            Add Observation
+                                        </li>
+                                        <li data-action="analyze">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                                fill="currentColor" viewBox="0 0 256 256" style="margin-right: 8px;">
+                                                <path
+                                                    d="M229.66,218.34,179.6,168.28a88.21,88.21,0,1,0-11.32,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z">
+                                                </path>
+                                            </svg>
+                                            Analyze Logs
+                                        </li>
+                                    </ul>
+                                </div>
+                                <button type="button" id="chat-stop-btn" class="btn btn-secondary"
+                                    title="Stop Current Session" disabled>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                                        viewBox="0 0 256 256">
+                                        <path
+                                            d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM160,104v48a8,8,0,0,1-8,8H104a8,8,0,0,1-8-8V104a8,8,0,0,1,8-8h48A8,8,0,0,1,160,104Z">
+                                        </path>
+                                    </svg>
+                                </button>
 
 
-                        <textarea id="chat-prompt-input" placeholder="Start the service in the Configuration tab to begin..." rows="1" spellcheck="false" disabled></textarea>
-                        <button type="button" id="chat-send-btn" class="btn btn-primary" title="Send" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M231.87,114l-168-104A16,16,0,0,0,40.92,37.32L71.55,112H136a8,8,0,0,1,0,16H71.55L40.92,202.68A16,16,0,0,0,63.87,222a15.88,15.88,0,0,0,10-3.51l168-104a16,16,0,0,0,0-27.18Z"></path></svg>
-                        </button>
-                    </div>
-                </div> <!-- End Chat Console -->
-                </div> <!-- End chat-window-container -->
+                                <textarea id="chat-prompt-input"
+                                    placeholder="Start the service in the Configuration tab to begin..." rows="1"
+                                    spellcheck="false" disabled></textarea>
+                                <button type="button" id="chat-send-btn" class="btn btn-primary" title="Send" disabled>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                                        viewBox="0 0 256 256">
+                                        <path
+                                            d="M231.87,114l-168-104A16,16,0,0,0,40.92,37.32L71.55,112H136a8,8,0,0,1,0,16H71.55L40.92,202.68A16,16,0,0,0,63.87,222a15.88,15.88,0,0,0,10-3.51l168-104a16,16,0,0,0,0-27.18Z">
+                                        </path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div> <!-- End Chat Console -->
+                    </div> <!-- End chat-window-container -->
                 </div> <!-- End Chat Tab -->
             </div> <!-- End content-area -->
-            
+
             <!-- Shared Modals -->
             <!-- Annotation Modal / Popup -->
             <div id="annotation-modal-overlay" class="modal-overlay" style="display: none;">
                 <div id="annotation-popup" class="annotation-modal">
                     <div class="modal-header">
                         <h3 id="modal-title"><i class="ph ph-note-pencil"></i> Add Observation</h3>
-                        <button type="button" id="close-annotation-btn" class="icon-btn"><i class="ph ph-x"></i></button>
+                        <button type="button" id="close-annotation-btn" class="icon-btn"><i
+                                class="ph ph-x"></i></button>
                     </div>
                     <div class="modal-body">
                         <div id="annotation-text-group" class="input-group">
                             <label for="annotation-text">Observation Note</label>
-                            <textarea id="annotation-text" placeholder="Describe what you observed..." rows="4" spellcheck="false"></textarea>
+                            <textarea id="annotation-text" placeholder="Describe what you observed..." rows="4"
+                                spellcheck="false"></textarea>
                         </div>
                         <div class="input-group">
                             <label for="annotation-span">Analysis Scope / Time Span</label>
@@ -441,7 +554,8 @@
                     </div>
                     <div class="modal-body">
                         <p>Are you sure you want to stop the current session?</p>
-                        <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">This will finalize the chat transcript and move it to your history.</p>
+                        <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">This will finalize the chat
+                            transcript and move it to your history.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" id="confirm-cancel-btn" class="btn btn-secondary">Go Back</button>
@@ -454,12 +568,16 @@
             <div id="progress-modal-overlay" class="modal-overlay" style="display: none; z-index: 9999;">
                 <div class="annotation-modal" style="max-width: 400px; text-align: center; padding: 2.5rem;">
                     <div class="loading-spinner-large" id="progress-spinner">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="var(--accent-primary)" viewBox="0 0 256 256" class="spinning">
-                            <path d="M136,32V72a8,8,0,0,1-16,0V32a8,8,0,0,1,16,0Zm88,88H184a8,8,0,0,0,0,16h40a8,8,0,0,0,0-16ZM72,128a8,8,0,0,0-8-8H24a8,8,0,0,0,0,16H64A8,8,0,0,0,72,128Zm118.07,56.07a8,8,0,0,0-11.31,11.31l28.28,28.29a8,8,0,0,0,11.32-11.32ZM77.24,65.93,48.97,37.66A8,8,0,1,0,37.66,49l28.28,28.28a8,8,0,1,0,11.3-11.31Zm112.83,0a8,8,0,0,1,0,11.31L161.79,105.52a8,8,0,1,1-11.31-11.31l28.28-28.28A8,8,0,0,1,190.07,65.93Zm-112.83,112.8a8,8,0,0,1-11.32,0L37.66,207a8,8,0,1,1,11.31-11.31l28.27,28.28A8,8,0,0,1,77.24,178.73Z"></path>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="var(--accent-primary)"
+                            viewBox="0 0 256 256" class="spinning">
+                            <path
+                                d="M136,32V72a8,8,0,0,1-16,0V32a8,8,0,0,1,16,0Zm88,88H184a8,8,0,0,0,0,16h40a8,8,0,0,0,0-16ZM72,128a8,8,0,0,0-8-8H24a8,8,0,0,0,0,16H64A8,8,0,0,0,72,128Zm118.07,56.07a8,8,0,0,0-11.31,11.31l28.28,28.29a8,8,0,0,0,11.32-11.32ZM77.24,65.93,48.97,37.66A8,8,0,1,0,37.66,49l28.28,28.28a8,8,0,1,0,11.3-11.31Zm112.83,0a8,8,0,0,1,0,11.31L161.79,105.52a8,8,0,1,1-11.31-11.31l28.28-28.28A8,8,0,0,1,190.07,65.93Zm-112.83,112.8a8,8,0,0,1-11.32,0L37.66,207a8,8,0,1,1,11.31-11.31l28.27,28.28A8,8,0,0,1,77.24,178.73Z">
+                            </path>
                         </svg>
                     </div>
                     <h3 id="progress-title" style="margin-top: 1.5rem; font-size: 1.25rem;">Working...</h3>
-                    <p id="progress-message" style="margin-top: 0.5rem; opacity: 0.8; font-size: 0.95rem;">Please wait a moment.</p>
+                    <p id="progress-message" style="margin-top: 0.5rem; opacity: 0.8; font-size: 0.95rem;">Please wait a
+                        moment.</p>
                 </div>
             </div>
 
@@ -471,4 +589,5 @@
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
+
 </html>
