@@ -1255,10 +1255,12 @@ option {
     display: flex;
     gap: 1rem;
     align-items: flex-end;
+    flex-wrap: nowrap;
 }
 
 #chat-prompt-input {
     flex-grow: 1;
+    flex-shrink: 1;
     min-width: 100px;
     border-radius: 12px;
     padding: 0.85rem 1.25rem;
@@ -1291,13 +1293,14 @@ option {
     cursor: not-allowed;
 }
 
-#chat-send-btn, #chat-annotate-btn {
+#chat-send-btn, #chat-annotate-btn, #chat-stop-btn {
     flex: 0 0 52px;
-    padding: 0;
+    width: 52px !important;
+    height: 52px;
+    padding: 0 !important;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 52px;
     border-radius: 12px;
 }
 
