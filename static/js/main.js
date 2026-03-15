@@ -7,6 +7,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressTitle = document.getElementById('progress-title');
     const progressMsg = document.getElementById('progress-message');
     const ollamaFetchError = document.getElementById('ollama-fetch-error');
+    const analysisConfigModalOverlay = document.getElementById('analysis-config-modal-overlay');
+    const analysisConfigTitle = document.getElementById('analysis-config-title');
+    const analysisConfigDescription = document.getElementById('analysis-config-description');
+    const analysisOllamaUrlInput = document.getElementById('analysis-ollama-url');
+    const analysisModelSelect = document.getElementById('analysis-model-select');
+    const analysisSpanGroup = document.getElementById('analysis-span-group');
+    const analysisSpanSelect = document.getElementById('analysis-span-select');
+    const analysisFetchBtn = document.getElementById('analysis-fetch-models-btn');
+    const analysisFetchError = document.getElementById('analysis-fetch-error');
+    const confirmAnalysisConfigBtn = document.getElementById('confirm-analysis-config-btn');
+    const cancelAnalysisConfigBtn = document.getElementById('cancel-analysis-config-btn');
+    const closeAnalysisConfigBtn = document.getElementById('close-analysis-config-btn');
     const startBtn = document.getElementById('start-service-btn');
     const modelSelect = document.getElementById('model-select');
     const ollamaUrlInput = document.getElementById('ollama-url');
@@ -64,6 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let _currentRunId = null;
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
+    let _analysisConfigResolver = null;
+    let _analysisConfigOptions = null;
     
     // SVG Templates
     const ICON_SVG = {
@@ -258,17 +272,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------------
     // Fetch Models
     // ---------------------------------------------------------------
-    fetchBtn.addEventListener('click', async () => {
-        const url = ollamaUrlInput.value.trim();
-        if (!url) { showAlert('Please enter an Ollama Instance URL'); return; }
+    async function fetchModelsIntoSelect({ url, button, errorLabel, selectElement, progressTitleText, successMessage, onSuccess, onFailure }) {
+        if (!url) {
+            showAlert('Please enter an Ollama Instance URL');
+            return false;
+        }
 
-        // Start progress
-        fetchBtn.disabled = true;
-        ollamaFetchError.style.display = 'none';
-        ollamaFetchError.innerText = '';
-        
-        // Show progress modal
-        progressTitle.innerText = "Fetching Models";
+        button.disabled = true;
+        if (errorLabel) {
+            errorLabel.style.display = 'none';
+            errorLabel.innerText = '';
+        }
+
+        progressTitle.innerText = progressTitleText || 'Fetching Models';
         progressMsg.innerText = `Connecting to ${url}...`;
         progressModal.style.display = 'flex';
 
@@ -280,36 +296,145 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await response.json();
 
-            if (data.success) {
-                modelSelect.innerHTML = '';
-                if (data.models.length === 0) {
-                    modelSelect.innerHTML = '<option value="" disabled selected>No models found</option>';
-                    modelSelect.disabled = true;
-                    startBtn.disabled = true;
-                    showAlert('No models found in the specified Ollama instance.', 'error');
-                } else {
-                    data.models.forEach(model => {
-                        const option = document.createElement('option');
-                        option.value = model;
-                        option.textContent = model;
-                        modelSelect.appendChild(option);
-                    });
-                    modelSelect.disabled = false;
-                    startBtn.disabled = false;
-                    showAlert(`Successfully fetched ${data.models.length} models.`, 'success');
-                }
-            } else { throw new Error(data.error || 'Failed to fetch models'); }
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to fetch models');
+            }
+
+            selectElement.innerHTML = '';
+            if (!data.models.length) {
+                selectElement.innerHTML = '<option value="" disabled selected>No models found</option>';
+                selectElement.disabled = true;
+                if (onFailure) onFailure();
+                showAlert('No models found in the specified Ollama instance.', 'error');
+                return false;
+            }
+
+            data.models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                selectElement.appendChild(option);
+            });
+
+            selectElement.disabled = false;
+            if (onSuccess) onSuccess(data.models);
+            showAlert(successMessage || `Successfully fetched ${data.models.length} models.`, 'success');
+            return true;
         } catch (error) {
             showAlert(error.message, 'error');
-            ollamaFetchError.innerText = `❌ ${error.message}`;
-            ollamaFetchError.style.display = 'block';
-            
-            modelSelect.innerHTML = '<option value="" disabled selected>Failed to load models</option>';
-            modelSelect.disabled = true;
-            startBtn.disabled = true;
+            if (errorLabel) {
+                errorLabel.innerText = `❌ ${error.message}`;
+                errorLabel.style.display = 'block';
+            }
+            selectElement.innerHTML = '<option value="" disabled selected>Failed to load models</option>';
+            selectElement.disabled = true;
+            if (onFailure) onFailure(error);
+            return false;
         } finally {
-            fetchBtn.disabled = false;
+            button.disabled = false;
             progressModal.style.display = 'none';
+        }
+    }
+
+    fetchBtn.addEventListener('click', async () => {
+        const url = ollamaUrlInput.value.trim();
+        await fetchModelsIntoSelect({
+            url,
+            button: fetchBtn,
+            errorLabel: ollamaFetchError,
+            selectElement: modelSelect,
+            progressTitleText: 'Fetching Models',
+            onSuccess: () => { startBtn.disabled = false; },
+            onFailure: () => { startBtn.disabled = true; },
+        });
+    });
+
+    function closeAnalysisConfigModal(result = null) {
+        analysisConfigModalOverlay.style.display = 'none';
+        _analysisConfigOptions = null;
+        if (_analysisConfigResolver) {
+            _analysisConfigResolver(result);
+            _analysisConfigResolver = null;
+        }
+    }
+
+    async function openAnalysisConfigModal({
+        suggestedUrl = '',
+        suggestedModel = '',
+        title = 'Analysis Configuration',
+        description = 'Choose which Ollama instance and model should be used for this analysis job.',
+        confirmLabel = 'Run Analysis',
+        includeSpan = false,
+        defaultSpan = 'Entire Session',
+        fixedSpan = null,
+    } = {}) {
+        if (_analysisConfigResolver) {
+            closeAnalysisConfigModal(null);
+        }
+
+        _analysisConfigOptions = { includeSpan, fixedSpan };
+        analysisConfigTitle.innerHTML = `<i class="ph ph-brain"></i> ${escapeHtml(title)}`;
+        analysisConfigDescription.textContent = description;
+        confirmAnalysisConfigBtn.textContent = confirmLabel;
+        analysisOllamaUrlInput.value = suggestedUrl || ollamaUrlInput.value.trim() || 'http://localhost:11434';
+        analysisFetchError.style.display = 'none';
+        analysisFetchError.innerText = '';
+        analysisSpanGroup.style.display = includeSpan ? 'flex' : 'none';
+        analysisSpanSelect.value = defaultSpan;
+        analysisModelSelect.innerHTML = suggestedModel
+            ? `<option value="${escapeHtml(suggestedModel)}" selected>${escapeHtml(suggestedModel)}</option>`
+            : '<option value="" disabled selected>Fetch models to load options</option>';
+        analysisModelSelect.disabled = !suggestedModel;
+        analysisConfigModalOverlay.style.display = 'flex';
+
+        return new Promise(resolve => {
+            _analysisConfigResolver = resolve;
+        });
+    }
+
+    analysisFetchBtn.addEventListener('click', async () => {
+        const url = analysisOllamaUrlInput.value.trim();
+        const currentSelectedModel = analysisModelSelect.value;
+
+        await fetchModelsIntoSelect({
+            url,
+            button: analysisFetchBtn,
+            errorLabel: analysisFetchError,
+            selectElement: analysisModelSelect,
+            progressTitleText: 'Fetching Analysis Models',
+            successMessage: 'Analysis models fetched successfully.',
+            onSuccess: models => {
+                if (currentSelectedModel && models.includes(currentSelectedModel)) {
+                    analysisModelSelect.value = currentSelectedModel;
+                }
+            },
+        });
+    });
+
+    confirmAnalysisConfigBtn.addEventListener('click', () => {
+        const ollamaUrl = analysisOllamaUrlInput.value.trim();
+        const model = analysisModelSelect.value;
+        const span = _analysisConfigOptions?.includeSpan
+            ? analysisSpanSelect.value
+            : (_analysisConfigOptions?.fixedSpan || 'Entire Session');
+
+        if (!ollamaUrl) {
+            showAlert('Please enter an Ollama Instance URL', 'error');
+            return;
+        }
+        if (!model) {
+            showAlert('Fetch models and select one before running analysis.', 'error');
+            return;
+        }
+
+        closeAnalysisConfigModal({ ollama_url: ollamaUrl, model, span });
+    });
+
+    cancelAnalysisConfigBtn.addEventListener('click', () => closeAnalysisConfigModal(null));
+    closeAnalysisConfigBtn.addEventListener('click', () => closeAnalysisConfigModal(null));
+    analysisConfigModalOverlay.addEventListener('click', (e) => {
+        if (e.target === analysisConfigModalOverlay) {
+            closeAnalysisConfigModal(null);
         }
     });
 
@@ -716,18 +841,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openAnnotationModal(action) {
         if (!_serviceRunning) return;
+        if (action === 'analyze') {
+            annotationMenu.classList.remove('show');
+            openAnalysisConfigModal({
+                suggestedUrl: ollamaUrlInput.value.trim(),
+                suggestedModel: modelSelect.value,
+                title: 'Analyze Live Logs',
+                description: 'Choose a log window plus the Ollama instance and model for this background analysis job.',
+                includeSpan: true,
+                defaultSpan: 'Event Point',
+                confirmLabel: 'Run Analysis',
+            }).then(async analysisConfig => {
+                if (!analysisConfig || !_currentRunId) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/sessions/${_currentRunId}/analyze`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(analysisConfig)
+                    });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        showAlert('Background analysis job started. Check the Analysis Jobs tab.', 'success');
+                        switchTab('analysis-pane');
+                        loadAnalysisJobs();
+                        startAnalysisJobsPolling();
+                    } else {
+                        showAlert('Live Analysis failed: ' + (data.error || 'Unknown error'), 'error');
+                    }
+                } catch (err) {
+                    showAlert('Failed to analyze logs: ' + err.message, 'error');
+                }
+            });
+            return;
+        }
+
         annotationModalOverlay.style.display = 'flex';
         annotationAction.value = action;
-        
-        if (action === 'analyze') {
-            modalTitle.innerHTML = '<i class="ph ph-magic-wand"></i> Analyze Logs';
-            annotationTextGroup.style.display = 'none';
-            saveAnnotationBtn.textContent = 'Run Analysis';
-        } else {
+
+        if (action === 'annotate') {
             modalTitle.innerHTML = '<i class="ph ph-note-pencil"></i> Add Observation';
             annotationTextGroup.style.display = 'flex';
             saveAnnotationBtn.textContent = 'Save Note';
             setTimeout(() => annotationText.focus(), 100);
+        } else {
+            modalTitle.innerHTML = '<i class="ph ph-note-pencil"></i> Add Observation';
+            annotationTextGroup.style.display = 'flex';
+            saveAnnotationBtn.textContent = 'Save Note';
         }
         annotationMenu.classList.remove('show');
     }
@@ -766,26 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveAnnotationBtn.textContent = action === 'analyze' ? 'Running...' : 'Saving...';
 
         try {
-            if (action === 'analyze') {
-                const response = await fetch(`/api/sessions/${_currentRunId}/analyze`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ span })
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    showAlert('Background analysis job started. Check the Analysis Jobs tab.', 'success');
-                    closeAndResetModal();
-                    // Switch to analysis tab automatically to show progress? 
-                    // Let's do it to guide the user.
-                    switchTab('analysis-pane');
-                    loadAnalysisJobs();
-                    startAnalysisJobsPolling();
-                } else {
-                    showAlert('Live Analysis failed: ' + (data.error || 'Unknown error'), 'error');
-                }
-            } else {
+            if (action === 'annotate') {
                 const response = await fetch(`/api/sessions/${_currentRunId}/annotate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -799,12 +943,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     showAlert('Failed to save annotation: ' + (data.error || 'Unknown error'), 'error');
                 }
+            } else {
+                showAlert('Unsupported annotation action.', 'error');
             }
         } catch (err) {
             showAlert(`Failed to ${action}: ` + err.message, 'error');
         } finally {
             saveAnnotationBtn.disabled = false;
-            saveAnnotationBtn.textContent = action === 'analyze' ? 'Run Analysis' : 'Save Note';
+            saveAnnotationBtn.textContent = 'Save Note';
         }
     });
 
@@ -985,8 +1131,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     sessionAnalyzeBtn.addEventListener('click', async () => {
         if (!_browseRunId) return;
-        if (!_serviceRunning) {
-            showAlert("You must Start the backend Service (in Config tab) to use Ollama for Analysis.", "warning");
+
+        const analysisConfig = await openAnalysisConfigModal({
+            suggestedUrl: ollamaUrlInput.value.trim(),
+            suggestedModel: modelSelect.value,
+            title: 'Analyze Session',
+            description: 'Choose which Ollama instance and model should be used for this session analysis job.',
+            fixedSpan: 'Entire Session',
+        });
+        if (!analysisConfig) {
             return;
         }
 
@@ -998,7 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(`/api/sessions/${_browseRunId}/analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ span: 'Entire Session' })
+                body: JSON.stringify(analysisConfig)
             });
             const data = await res.json();
             
@@ -1106,9 +1259,20 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="job-id">${job.job_id}</div>
                             <div class="job-title">Analysis: ${job.run_id}</div>
                         </div>
-                        <div class="job-status-badge ${statusClass}">
-                            <i class="ph ${statusIcon}"></i>
-                            <span>${job.status}</span>
+                        <div class="job-card-controls">
+                            <div class="job-status-badge ${statusClass}">
+                                <i class="ph ${statusIcon}"></i>
+                                <span>${job.status}</span>
+                            </div>
+                            <div class="dropdown job-actions-dropdown">
+                                <button class="btn btn-secondary btn-sm job-actions-toggle" type="button" data-job-id="${job.job_id}" style="width: auto; padding: 0.35rem 0.6rem;">
+                                    <i class="ph ph-dots-three-outline-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu job-actions-menu" data-job-id="${job.job_id}">
+                                    <li data-action="view" data-job-id="${job.job_id}"><i class="ph ph-eye"></i> View</li>
+                                    <li data-action="download" data-job-id="${job.job_id}"><i class="ph ph-download-simple"></i> Download</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                     <div class="job-footer">
@@ -1116,11 +1280,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span><i class="ph ph-calendar"></i> ${date}</span>
                             <span><i class="ph ph-clock"></i> ${job.span}</span>
                         </div>
-                        ${job.status === 'success' ? `
-                            <button class="btn btn-primary btn-sm" onclick="viewAnalysisResult('${job.job_id}')" style="width: auto; padding: 0.3rem 0.8rem;">
-                                <i class="ph ph-eye"></i> View Result
-                            </button>
-                        ` : ''}
                         ${job.status === 'failed' ? `
                             <div class="status-error" style="font-size: 0.8rem;">Error: ${escapeHtml(job.error)}</div>
                         ` : ''}
@@ -1128,28 +1287,82 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         }).join('');
+
+        analysisJobsList.querySelectorAll('.job-actions-toggle').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const jobId = btn.dataset.jobId;
+                const menu = analysisJobsList.querySelector(`.job-actions-menu[data-job-id="${jobId}"]`);
+                const isOpen = menu.classList.contains('show');
+                closeAnalysisJobMenus();
+                if (!isOpen) {
+                    menu.classList.add('show');
+                }
+            });
+        });
+
+        analysisJobsList.querySelectorAll('.job-actions-menu li').forEach(item => {
+            item.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const { action, jobId } = item.dataset;
+                closeAnalysisJobMenus();
+                if (action === 'view') {
+                    window.viewAnalysisResult(jobId);
+                } else if (action === 'download') {
+                    window.downloadAnalysisJob(jobId);
+                }
+            });
+        });
+    }
+
+    function closeAnalysisJobMenus() {
+        analysisJobsList.querySelectorAll('.job-actions-menu.show').forEach(menu => {
+            menu.classList.remove('show');
+        });
     }
 
     window.viewAnalysisResult = async function(jobId) {
         try {
-            const res = await fetch('/api/analysis/jobs');
-            const data = await res.json();
-            const job = data.jobs.find(j => j.job_id === jobId);
+            const res = await fetch(`/api/analysis/jobs/${jobId}`);
+            const job = await res.json();
             
-            if (job && job.result) {
-                // Show in a modal
+            if (job) {
                 const modal = document.createElement('div');
                 modal.className = 'modal-overlay';
                 modal.style.display = 'flex';
+                const renderedResponse = job.response ? marked.parse(job.response) : '<p>No response captured yet.</p>';
+                const renderedSystemPrompt = escapeHtml(job.system_prompt || 'Not captured.');
+                const renderedUserPrompt = escapeHtml(job.user_prompt || 'Not captured.');
+                const renderedError = job.error ? `<div class="status-error" style="margin-bottom: 1rem;">${escapeHtml(job.error)}</div>` : '';
                 modal.innerHTML = `
                     <div class="annotation-modal" style="max-width: 800px; width: 90%;">
                         <div class="modal-header">
-                            <h3><i class="ph ph-brain"></i> Analysis Result: ${job.run_id}</h3>
+                            <h3><i class="ph ph-brain"></i> Analysis Job: ${job.run_id}</h3>
                             <button type="button" class="icon-btn" onclick="this.closest('.modal-overlay').remove()"><i class="ph ph-x"></i></button>
                         </div>
                         <div class="modal-body" style="max-height: 60vh; overflow-y: auto; padding: 1.5rem; background: rgba(0,0,0,0.2); border-radius: 12px; margin: 1rem;">
-                            <div class="markdown-body" style="font-size: 0.95rem; line-height: 1.6; color: var(--text-primary);">
-                                ${marked.parse(job.result)}
+                            <div style="display: grid; gap: 1rem; font-size: 0.95rem; line-height: 1.6; color: var(--text-primary);">
+                                <div>
+                                    <strong>Status:</strong> ${escapeHtml(job.status || 'unknown')}<br>
+                                    <strong>Span:</strong> ${escapeHtml(job.span || 'unknown')}<br>
+                                    <strong>Ollama URL:</strong> ${escapeHtml(job.ollama_url || 'unknown')}<br>
+                                    <strong>Model:</strong> ${escapeHtml(job.model || 'unknown')}
+                                </div>
+                                ${renderedError}
+                                <div>
+                                    <h4 style="margin-bottom: 0.5rem;">System Prompt</h4>
+                                    <pre class="log-pre" style="white-space: pre-wrap;">${renderedSystemPrompt}</pre>
+                                </div>
+                                <div>
+                                    <h4 style="margin-bottom: 0.5rem;">User Prompt</h4>
+                                    <pre class="log-pre" style="white-space: pre-wrap;">${renderedUserPrompt}</pre>
+                                </div>
+                                <div>
+                                    <h4 style="margin-bottom: 0.5rem;">Response</h4>
+                                    <div class="markdown-body" style="font-size: 0.95rem; line-height: 1.6; color: var(--text-primary);">
+                                        ${renderedResponse}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div class="modal-footer">
@@ -1167,6 +1380,16 @@ document.addEventListener('DOMContentLoaded', () => {
             showAlert('Failed to load analysis result: ' + err.message, 'error');
         }
     };
+
+    window.downloadAnalysisJob = function(jobId) {
+        window.location.href = `/api/analysis/jobs/${jobId}/download`;
+    };
+
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.job-actions-dropdown')) {
+            closeAnalysisJobMenus();
+        }
+    });
 
     function startAnalysisJobsPolling() {
         if (_analysisJobsInterval) return;

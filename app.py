@@ -30,6 +30,7 @@ _session_state = {
 _session_lock = threading.Lock()
 _analysis_jobs = {} # job_id -> {status, result, error, run_id, start_time}
 _analysis_lock = threading.Lock()
+ANALYSIS_JOBS_DIRNAME = "analysis_jobs"
 
 
 def _make_run_id(server_type: str) -> str:
@@ -46,6 +47,164 @@ def _event_callback(event: dict):
             q.put_nowait(event)
         except queue.Full:
             pass
+
+
+def _analysis_jobs_dir(run_id: str) -> str:
+    return os.path.join(RUNS_DIR, run_id, ANALYSIS_JOBS_DIRNAME)
+
+
+def _analysis_job_json_path(run_id: str, job_id: str) -> str:
+    return os.path.join(_analysis_jobs_dir(run_id), f"{job_id}.json")
+
+
+def _analysis_job_markdown_path(run_id: str, job_id: str) -> str:
+    return os.path.join(_analysis_jobs_dir(run_id), f"{job_id}.md")
+
+
+def _write_analysis_job_record(run_id: str, job_id: str, record: dict):
+    os.makedirs(_analysis_jobs_dir(run_id), exist_ok=True)
+
+    json_path = _analysis_job_json_path(run_id, job_id)
+    with open(json_path, 'w') as f:
+        json.dump(record, f, indent=2)
+
+    markdown_path = _analysis_job_markdown_path(run_id, job_id)
+    with open(markdown_path, 'w') as f:
+        f.write(f"# Analysis Job {job_id}\n\n")
+        f.write(f"- Run ID: {record.get('run_id', 'unknown')}\n")
+        f.write(f"- Status: {record.get('status', 'unknown')}\n")
+        f.write(f"- Span: {record.get('span', 'unknown')}\n")
+        f.write(f"- Started: {record.get('start_time', 'unknown')}\n")
+        f.write(f"- Completed: {record.get('end_time') or 'in-progress'}\n")
+        f.write(f"- Ollama URL: {record.get('ollama_url') or 'unknown'}\n")
+        f.write(f"- Model: {record.get('model') or 'unknown'}\n\n")
+
+        if record.get('error'):
+            f.write("## Error\n\n")
+            f.write(f"```text\n{record['error']}\n```\n\n")
+
+        if record.get('system_prompt'):
+            f.write("## System Prompt\n\n")
+            f.write(f"```text\n{record['system_prompt']}\n```\n\n")
+
+        if record.get('user_prompt'):
+            f.write("## User Prompt\n\n")
+            f.write(f"```text\n{record['user_prompt']}\n```\n\n")
+
+        if record.get('response'):
+            f.write("## Response\n\n")
+            f.write(record['response'])
+            f.write("\n")
+
+
+def _find_analysis_job_path(job_id: str) -> str | None:
+    for run_id in os.listdir(RUNS_DIR) if os.path.isdir(RUNS_DIR) else []:
+        candidate = _analysis_job_json_path(run_id, job_id)
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def _load_analysis_job_record(job_id: str):
+    record_path = _find_analysis_job_path(job_id)
+    if not record_path:
+        return None
+    with open(record_path, 'r') as f:
+        return json.load(f)
+
+
+def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None):
+    session_dir = os.path.join(RUNS_DIR, run_id)
+    transcript_path = os.path.join(session_dir, "transcript.md")
+    if not os.path.isfile(transcript_path):
+        raise ValueError("No transcript available.")
+
+    with open(transcript_path, 'r') as f:
+        transcript = f.read()
+
+    from datetime import timedelta
+    if span_req not in ("Entire Session", "Event Point", ""):
+        try:
+            parts = span_req.split()
+            if len(parts) >= 2 and parts[1].isdigit():
+                minutes = int(parts[1])
+                cutoff_time = datetime.now() - timedelta(minutes=minutes)
+                filtered_lines = []
+                include_line = False
+                import re
+                time_pattern = re.compile(r'\[(\d{2}:\d{2}:\d{2})\]')
+                for line in transcript.split('\n'):
+                    match = time_pattern.search(line)
+                    if match:
+                        time_str = match.group(1)
+                        now = datetime.now()
+                        marker_time = datetime.strptime(time_str, "%H:%M:%S").replace(
+                            year=now.year, month=now.month, day=now.day
+                        )
+                        include_line = marker_time >= cutoff_time
+                    if include_line:
+                        filtered_lines.append(line)
+                if filtered_lines:
+                    transcript = "(Filtered down to " + span_req + ")\n" + "\n".join(filtered_lines)
+        except Exception:
+            pass
+
+    annotations_path = os.path.join(session_dir, "annotations.jsonl")
+    annotations = ""
+    if os.path.isfile(annotations_path):
+        with open(annotations_path, 'r') as f:
+            annotations = f.read()
+
+    ollama_url = 'http://localhost:11434'
+    model = 'llama3'
+
+    meta_path = os.path.join(session_dir, "metadata.json")
+    if os.path.isfile(meta_path):
+        try:
+            with open(meta_path, 'r') as f:
+                meta = json.load(f)
+                ollama_url = meta.get('ollama_url', ollama_url)
+                model = meta.get('model', model)
+        except Exception:
+            pass
+
+    if ollama_url_override:
+        ollama_url = ollama_url_override
+    if model_override:
+        model = model_override
+
+    if span_req in ("Entire Session", "Event Point", ""):
+        system_prompt = (
+            "You are a Senior Penetration Testing Analyst reviewing a recent engagement. "
+            "Your job is to read the attached transcript and user annotations, and provide a Post-Mortem Analysis in Markdown. "
+            "Focus specifically on areas of improvement:\n"
+            "1. Did the agent miss opportunities to use an existing tool that would have resulted in more efficient success?\n"
+            "2. Could a new MCP tool be built or scripted to automate a tedious manual process seen in the logs?\n"
+            "3. How efficiently did the agent leverage the user's annotations?\n"
+            "Keep the response professional, actionable, and formatted nicely in Markdown."
+        )
+    else:
+        system_prompt = (
+            f"You are a Senior Penetration Testing Analyst monitoring a LIVE engagement. "
+            f"You are reviewing the logs from the {span_req.upper()}. "
+            "Your job is to read the attached slice of the transcript and provide a rapid, real-time Analysis in Markdown. "
+            "Focus specifically on areas of immediate tactical improvement:\n"
+            "1. Is the agent stuck in a loop, and could an existing tool be used to bypass the blocker?\n"
+            "2. Could a new MCP tool be built quickly right now to automate what the agent is struggling with?\n"
+            "3. What tactical pivot do you suggest based on the recent annotations?\n"
+            "Keep the response punchy, actionable, and formatted nicely in Markdown."
+        )
+
+    user_prompt = f"### Transcript ({span_req}) ###\n{transcript}\n\n### Annotations (JSON Lines) ###\n{'No annotations.' if not annotations else annotations}"
+
+    return {
+        "run_id": run_id,
+        "span": span_req,
+        "ollama_url": ollama_url,
+        "model": model,
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -513,127 +672,88 @@ def analyze_session(run_id):
         
     data = request.json or {}
     span_req = data.get("span", "Entire Session")
+    ollama_url_override = (data.get("ollama_url") or "").strip() or None
+    model_override = (data.get("model") or "").strip() or None
     job_id = f"job_{int(time.time())}_{run_id}"
 
+    start_time = datetime.now().isoformat()
+    initial_record = {
+        "job_id": job_id,
+        "status": "running",
+        "run_id": run_id,
+        "span": span_req,
+        "ollama_url": ollama_url_override,
+        "model": model_override,
+        "start_time": start_time,
+        "end_time": None,
+        "result": None,
+        "response": None,
+        "error": None,
+        "system_prompt": None,
+        "user_prompt": None,
+    }
+
     with _analysis_lock:
-        _analysis_jobs[job_id] = {
-            "status": "running",
-            "run_id": run_id,
-            "span": span_req,
-            "start_time": datetime.now().isoformat(),
-            "result": None,
-            "error": None
-        }
+        _analysis_jobs[job_id] = dict(initial_record)
+
+    _write_analysis_job_record(run_id, job_id, initial_record)
 
     def _job_wrapper():
         try:
-            result = _perform_llm_analysis(run_id, span_req)
+            details = _perform_llm_analysis(
+                run_id,
+                span_req,
+                ollama_url_override=ollama_url_override,
+                model_override=model_override,
+            )
+            completed_record = {
+                **_analysis_jobs.get(job_id, {}),
+                **details,
+                "job_id": job_id,
+                "status": "success",
+                "end_time": datetime.now().isoformat(),
+                "result": details.get("response"),
+                "response": details.get("response"),
+                "error": None,
+            }
             with _analysis_lock:
-                _analysis_jobs[job_id]["status"] = "success"
-                _analysis_jobs[job_id]["result"] = result
+                _analysis_jobs[job_id] = completed_record
+            _write_analysis_job_record(run_id, job_id, completed_record)
         except Exception as e:
             app.logger.error(f"Analysis job {job_id} failed: {e}")
+            failed_record = {
+                **_analysis_jobs.get(job_id, {}),
+                "job_id": job_id,
+                "status": "failed",
+                "end_time": datetime.now().isoformat(),
+                "error": str(e),
+            }
             with _analysis_lock:
-                _analysis_jobs[job_id]["status"] = "failed"
-                _analysis_jobs[job_id]["error"] = str(e)
+                _analysis_jobs[job_id] = failed_record
+            _write_analysis_job_record(run_id, job_id, failed_record)
 
     threading.Thread(target=_job_wrapper, daemon=True).start()
     return jsonify({"success": True, "job_id": job_id})
 
-def _perform_llm_analysis(run_id, span_req):
+def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None):
     """Internal helper to do the actual Ollama work."""
-    session_dir = os.path.join(RUNS_DIR, run_id)
-    transcript_path = os.path.join(session_dir, "transcript.md")
-    if not os.path.isfile(transcript_path):
-        raise ValueError("No transcript available.")
-        
-    with open(transcript_path, 'r') as f:
-        transcript = f.read()
-
-    # Filter logs by span if requested
-    from datetime import timedelta
-    if span_req not in ("Entire Session", "Event Point", ""):
-        try:
-            parts = span_req.split()
-            if len(parts) >= 2 and parts[1].isdigit():
-                minutes = int(parts[1])
-                cutoff_time = datetime.now() - timedelta(minutes=minutes)
-                filtered_lines = []
-                include_line = False
-                import re
-                time_pattern = re.compile(r'\[(\d{2}:\d{2}:\d{2})\]')
-                for line in transcript.split('\n'):
-                    match = time_pattern.search(line)
-                    if match:
-                        time_str = match.group(1)
-                        now = datetime.now()
-                        marker_time = datetime.strptime(time_str, "%H:%M:%S").replace(
-                            year=now.year, month=now.month, day=now.day
-                        )
-                        include_line = marker_time >= cutoff_time
-                    if include_line:
-                        filtered_lines.append(line)
-                if filtered_lines:
-                    transcript = "(Filtered down to " + span_req + ")\n" + "\n".join(filtered_lines)
-        except Exception: pass
-
-    annotations_path = os.path.join(session_dir, "annotations.jsonl")
-    annotations = ""
-    if os.path.isfile(annotations_path):
-        with open(annotations_path, 'r') as f:
-            annotations = f.read()
-
     import ollama
-    
-    # Defaults
-    ollama_url = 'http://localhost:11434'
-    model = 'llama3'
-    
-    # Try to load from metadata.json for this specific run
-    meta_path = os.path.join(session_dir, "metadata.json")
-    if os.path.isfile(meta_path):
-        try:
-            with open(meta_path, 'r') as f:
-                meta = json.load(f)
-                ollama_url = meta.get('ollama_url', ollama_url)
-                model = meta.get('model', model)
-        except Exception:
-            pass
+    request_data = _prepare_llm_analysis(run_id, span_req, ollama_url_override, model_override)
+    client = ollama.Client(host=request_data["ollama_url"])
 
-    if span_req in ("Entire Session", "Event Point", ""):
-        system_prompt = (
-            "You are a Senior Penetration Testing Analyst reviewing a recent engagement. "
-            "Your job is to read the attached transcript and user annotations, and provide a Post-Mortem Analysis in Markdown. "
-            "Focus specifically on areas of improvement:\n"
-            "1. Did the agent miss opportunities to use an existing tool that would have resulted in more efficient success?\n"
-            "2. Could a new MCP tool be built or scripted to automate a tedious manual process seen in the logs?\n"
-            "3. How efficiently did the agent leverage the user's annotations?\n"
-            "Keep the response professional, actionable, and formatted nicely in Markdown."
-        )
-    else:
-        system_prompt = (
-            f"You are a Senior Penetration Testing Analyst monitoring a LIVE engagement. "
-            f"You are reviewing the logs from the {span_req.upper()}. "
-            "Your job is to read the attached slice of the transcript and provide a rapid, real-time Analysis in Markdown. "
-            "Focus specifically on areas of immediate tactical improvement:\n"
-            "1. Is the agent stuck in a loop, and could an existing tool be used to bypass the blocker?\n"
-            "2. Could a new MCP tool be built quickly right now to automate what the agent is struggling with?\n"
-            "3. What tactical pivot do you suggest based on the recent annotations?\n"
-            "Keep the response punchy, actionable, and formatted nicely in Markdown."
-        )
-    
-    user_prompt = f"### Transcript ({span_req}) ###\n{transcript}\n\n### Annotations (JSON Lines) ###\n{'No annotations.' if not annotations else annotations}"
-    
-    client = ollama.Client(host=ollama_url)
-    
     resp = client.chat(
-        model=model,
+        model=request_data["model"],
         messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "system", "content": request_data["system_prompt"]},
+            {"role": "user", "content": request_data["user_prompt"]}
         ]
     )
-    return resp.get("message", {}).get("content", "No analysis returned.")
+    response_text = resp.get("message", {}).get("content", "No analysis returned.")
+    return {
+        **request_data,
+        "response": response_text,
+        "raw_response": resp,
+    }
 
 @app.route('/api/analysis/jobs', methods=['GET'])
 def list_analysis_jobs():
@@ -645,6 +765,40 @@ def list_analysis_jobs():
             reverse=True
         )
         return jsonify({"jobs": sorted_jobs})
+
+
+@app.route('/api/analysis/jobs/<job_id>', methods=['GET'])
+def get_analysis_job(job_id):
+    """Return the full persisted analysis job record."""
+    _validate_filename(job_id)
+
+    with _analysis_lock:
+        live_job = _analysis_jobs.get(job_id)
+
+    record = _load_analysis_job_record(job_id)
+    if not record and live_job:
+        record = dict(live_job)
+
+    if not record:
+        abort(404, description="Analysis job not found.")
+
+    return jsonify(record)
+
+
+@app.route('/api/analysis/jobs/<job_id>/download', methods=['GET'])
+def download_analysis_job(job_id):
+    """Download the full persisted analysis job record as JSON."""
+    _validate_filename(job_id)
+    record_path = _find_analysis_job_path(job_id)
+    if not record_path:
+        abort(404, description="Analysis job not found.")
+
+    return send_file(
+        record_path,
+        as_attachment=True,
+        download_name=f"{job_id}.json",
+        mimetype='application/json'
+    )
 
 @app.route('/api/analysis/jobs/clear', methods=['POST'])
 def clear_analysis_jobs():

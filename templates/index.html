@@ -614,6 +614,63 @@
                 </div>
             </div>
 
+            <div id="analysis-config-modal-overlay" class="modal-overlay" style="display: none; z-index: 9998;">
+                <div class="annotation-modal" style="max-width: 560px; width: 92%;">
+                    <div class="modal-header">
+                        <h3 id="analysis-config-title"><i class="ph ph-brain"></i> Analysis Configuration</h3>
+                        <button type="button" id="close-analysis-config-btn" class="icon-btn"><i class="ph ph-x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="analysis-config-description" style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.92rem; line-height: 1.5;">
+                            Choose which Ollama instance and model should be used for this analysis job.
+                        </p>
+                        <div class="input-group" id="analysis-span-group" style="display: none;">
+                            <label for="analysis-span-select">Analysis Scope / Time Span</label>
+                            <div class="select-wrapper">
+                                <i class="ph ph-clock-counter-clockwise icon-left"></i>
+                                <select id="analysis-span-select" class="form-select config-input">
+                                    <option value="Event Point">Event Point (Right Now)</option>
+                                    <option value="Last 1 Minute">Last 1 Minute</option>
+                                    <option value="Last 5 Minutes">Last 5 Minutes</option>
+                                    <option value="Last 15 Minutes">Last 15 Minutes</option>
+                                    <option value="Entire Session">Entire Session</option>
+                                </select>
+                                <i class="ph ph-caret-down icon-right"></i>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="analysis-ollama-url">Ollama URL</label>
+                            <div class="input-with-icon">
+                                <i class="ph ph-plugs-connected"></i>
+                                <input type="url" id="analysis-ollama-url" placeholder="http://localhost:11434">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="analysis-model-select">Model</label>
+                            <div class="select-wrapper">
+                                <i class="ph ph-robot icon-left"></i>
+                                <select id="analysis-model-select" disabled>
+                                    <option value="" disabled selected>Fetch models to load options</option>
+                                </select>
+                                <i class="ph ph-caret-down icon-right"></i>
+                            </div>
+                            <div id="analysis-fetch-error" class="error-label"
+                                style="display: none; color: var(--status-error); font-size: 0.82rem; margin-top: 0.6rem; padding: 0.4rem 0.6rem; border-radius: 4px; background: rgba(var(--status-error-rgb, 255, 68, 68), 0.1);">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
+                        <button type="button" id="analysis-fetch-models-btn" class="btn btn-secondary" style="width: auto;">
+                            <i class="ph ph-arrows-clockwise"></i> Fetch Models
+                        </button>
+                        <div style="display: flex; gap: 0.75rem; margin-left: auto;">
+                            <button type="button" id="cancel-analysis-config-btn" class="btn btn-secondary">Cancel</button>
+                            <button type="button" id="confirm-analysis-config-btn" class="btn btn-primary">Run Analysis</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Global Alerts Container -->
             <div id="alerts-container" class="alerts-container"></div>
 
