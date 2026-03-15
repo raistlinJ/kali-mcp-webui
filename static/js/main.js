@@ -54,7 +54,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let _eventSource = null;
     let _serviceRunning = false;
     let _chatBusy = false;
-    let _currentRunId = null;
+    let _logInitialCleared = false;
+    
+    // SVG Templates
+    const ICON_SVG = {
+        POWER: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24a8,8,0,0,1,8,8v80a8,8,0,0,1-16,0V32A8,8,0,0,1,128,24ZM198.63,62.63a8,8,0,0,0-11.26,11.4c26.46,26.11,26.46,68.63,0,94.74a67,67,0,0,1-94.74,0c-26.46-26.11-26.46-68.63,0-94.74a8,8,0,0,0-11.26-11.4c-32.73,32.31-32.73,84.89,0,117.2a83,83,0,0,0,117.26,0C231.36,147.52,231.36,94.94,198.63,62.63Z"></path></svg>`,
+        STOP: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM160,104v48a8,8,0,0,1-8,8H104a8,8,0,0,1-8-8V104a8,8,0,0,1,8-8h48A8,8,0,0,1,160,104Z"></path></svg>`,
+        SEND: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M231.87,114l-168-104A16,16,0,0,0,40.92,37.32L71.55,112H136a8,8,0,0,1,0,16H71.55L40.92,202.68A16,16,0,0,0,63.87,222a15.88,15.88,0,0,0,10-3.51l168-104a16,16,0,0,0,0-27.18Z"></path></svg>`,
+        SPINNER: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256" class="spinning"><path d="M136,32v40a8,8,0,0,1-16,0V32a8,8,0,0,1,16,0Z"></path><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Z" opacity="0.3"></path></svg>`
+    };
 
     // ---------------------------------------------------------------
     // Vertical Tab Navigation
@@ -234,6 +242,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Log Helpers
     // ---------------------------------------------------------------
     function appendLog(html, cssClass = '') {
+        if (!_logInitialCleared) {
+            liveLogViewer.innerHTML = '';
+            _logInitialCleared = true;
+        }
         const entry = document.createElement('div');
         entry.className = `log-entry ${cssClass}`;
         entry.innerHTML = html;
@@ -273,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         startBtn.disabled = true;
-        startBtn.querySelector('i').className = 'ph ph-spinner-gap spin';
+        startBtn.innerHTML = ICON_SVG.SPINNER + '<span>Stopping service…</span>';
         updateStatus('running', 'Stopping service…');
 
         try {
@@ -376,19 +388,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             showAlert(error.message);
             setConfigEnabled(true);
-            startBtn.className = 'btn btn-primary';
-            startBtn.querySelector('i').className = 'ph ph-power';
-            startBtn.disabled = false;
-            updateStatus('idle');
+            updateStatus('error', 'Error');
+            resetStartBtn();
         }
     });
 
     function resetStartBtn() {
-        startBtn.className = 'btn btn-primary';
-        const icon = startBtn.querySelector('i');
-        icon.className = 'ph ph-power';
-        icon.classList.remove('ph-spinner-gap', 'spin');
-        startBtn.querySelector('span').textContent = 'Start Service';
+        startBtn.classList.remove('btn-danger');
+        startBtn.classList.add('btn-primary');
+        startBtn.innerHTML = ICON_SVG.POWER + '<span>Start Service</span>';
         startBtn.disabled = false;
         startBtn.style.display = 'inline-flex';
     }
@@ -468,12 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sendPromptBtn.classList.remove('btn-primary');
         sendPromptBtn.classList.add('btn-danger');
         sendPromptBtn.title = "Cancel/Abort";
-        
-        const sendIcon = sendPromptBtn.querySelector('i');
-        if (sendIcon) {
-            sendIcon.classList.remove('ph-paper-plane-tilt');
-            sendIcon.classList.add('ph-stop-circle');
-        }
+        sendPromptBtn.innerHTML = ICON_SVG.STOP;
 
         appendLog(`<span class="log-label">👤 You</span> ${escapeHtml(prompt)}`, 'log-prompt');
 
@@ -497,16 +500,11 @@ document.addEventListener('DOMContentLoaded', () => {
         _chatBusy = false;
         
         // Restore the send button
-        sendPromptBtn.classList.remove('btn-danger');
+        sendPromptBtn.classList.remove('btn-danger', 'btn-secondary');
         sendPromptBtn.classList.add('btn-primary');
         sendPromptBtn.title = "Send";
         sendPromptBtn.disabled = false;
-        
-        const sendIcon = sendPromptBtn.querySelector('i');
-        if (sendIcon) {
-            sendIcon.classList.remove('ph-stop-circle', 'ph-spinner-gap', 'spin');
-            sendIcon.classList.add('ph-paper-plane-tilt');
-        }
+        sendPromptBtn.innerHTML = ICON_SVG.SEND;
 
         if (_serviceRunning) {
             chatPromptInput.disabled = false;
@@ -662,6 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
         _serviceRunning = false;
         _chatBusy = false;
         _currentRunId = null;
+        _logInitialCleared = false; // Reset for next run
         updateStatus('success', 'Service Stopped');
         
         resetStartBtn();
