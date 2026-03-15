@@ -316,6 +316,136 @@ def _extract_nmap_summary(result_text: str) -> tuple[str | None, str | None]:
     return host, None
 
 
+def _tool_arg_label(arguments: dict, fallback: str = 'the requested target') -> str:
+    label = str((arguments or {}).get('args') or '').strip()
+    return label or fallback
+
+
+def _extract_benign_empty_summary(tool_name: str, result_text: str, arguments: dict) -> str | None:
+    normalized = (result_text or '').strip()
+    normalized_lower = normalized.lower()
+    label = _tool_arg_label(arguments)
+
+    if tool_name == 'msf_search' and 'no results from search' in normalized_lower:
+        return f"Metasploit search returned no matching modules for {label}."
+
+    if tool_name == 'msf_run' and 'exploit completed, but no session was created' in normalized_lower:
+        return f"Metasploit ran for {label}, but it did not create a session."
+
+    if tool_name == 'searchsploit' and ('no results' in normalized_lower or 'exploits: no results' in normalized_lower):
+        return f"Searchsploit returned no matching entries for {label}."
+
+    if tool_name == 'nmap':
+        host, summary = _extract_nmap_summary(normalized)
+        if summary == 'no open ports detected':
+            target_label = host or label
+            return f"{target_label}: no open ports detected."
+
+    if tool_name == 'rustscan' and 'no open ports found' in normalized_lower:
+        return f"Rustscan found no open ports for {label}."
+
+    if tool_name == 'masscan' and ('found 0 hosts' in normalized_lower or '0 hosts scanned' in normalized_lower):
+        return f"Masscan did not identify any responsive hosts or open ports for {label}."
+
+    if tool_name in {'amass', 'subfinder'} and (not normalized or 'no names were discovered' in normalized_lower or 'no assets were discovered' in normalized_lower):
+        return f"{tool_name} did not discover any subdomains for {label}."
+
+    if tool_name in {'gobuster', 'dirb', 'ffuf', 'wfuzz'}:
+        no_result_markers = [
+            'no results',
+            '0 hits',
+            '0 words found',
+            '0 directories found',
+            '0 files found',
+            'no valid results',
+        ]
+        if not normalized or any(marker in normalized_lower for marker in no_result_markers):
+            return f"{tool_name} did not find any matching paths or content for {label}."
+
+    if tool_name == 'nikto' and ('0 host(s) tested' in normalized_lower or '0 item(s) reported' in normalized_lower):
+        return f"Nikto did not report any findings for {label}."
+
+    if tool_name == 'sqlmap' and (
+        'all tested parameters do not appear to be injectable' in normalized_lower
+        or 'does not seem to be injectable' in normalized_lower
+        or 'no injection point found' in normalized_lower
+    ):
+        return f"sqlmap did not identify injectable parameters for {label}."
+
+    if tool_name == 'wpscan' and 'wordpress not detected' in normalized_lower:
+        return f"WPScan did not detect a WordPress target for {label}."
+
+    if tool_name == 'whatweb' and (not normalized or 'unassigned' == normalized_lower):
+        return f"WhatWeb did not produce a fingerprint for {label}."
+
+    if tool_name in {'john', 'hashcat'} and (
+        '0g' in normalized_lower
+        or 'recovered........: 0/' in normalized_lower
+        or 'no hashes loaded' in normalized_lower
+    ):
+        return f"{tool_name} did not recover any credentials for {label}."
+
+    if tool_name in {'hydra', 'medusa', 'crowbar'} and (
+        '0 valid password found' in normalized_lower
+        or '0 valid passwords found' in normalized_lower
+        or 'no valid password found' in normalized_lower
+        or 'no credentials were discovered' in normalized_lower
+    ):
+        return f"{tool_name} did not find valid credentials for {label}."
+
+    if tool_name == 'commix' and (
+        'does not seem injectable' in normalized_lower
+        or '0 injection point' in normalized_lower
+        or 'no injection points found' in normalized_lower
+    ):
+        return f"Commix did not identify command injection for {label}."
+
+    if tool_name in {'proxychains', 'ssh', 'netcat', 'ncat', 'tcpdump', 'aircrack-ng', 'recon-ng', 'msfconsole', 'shell'} and not normalized:
+        return f"{tool_name} completed successfully with no output for {label}."
+
+    if not normalized:
+        return f"{tool_name} completed successfully but returned no output for {label}."
+
+    return None
+
+
+def _can_auto_finalize_benign_empty(tool_results: list[dict]) -> bool:
+    if not tool_results:
+        return False
+
+    summaries = []
+    for item in tool_results:
+        if item.get('exit_code', 0) != 0:
+            return False
+        summary = _extract_benign_empty_summary(
+            item.get('tool', 'unknown'),
+            item.get('result', '') or '',
+            item.get('args', {}) or {},
+        )
+        if not summary:
+            return False
+        summaries.append(summary)
+
+    return bool(summaries)
+
+
+def _build_benign_empty_finalization(tool_results: list[dict]) -> str:
+    summaries = []
+    for item in tool_results:
+        summary = _extract_benign_empty_summary(
+            item.get('tool', 'unknown'),
+            item.get('result', '') or '',
+            item.get('args', {}) or {},
+        )
+        if summary:
+            summaries.append(summary)
+
+    if summaries:
+        return ' '.join(summaries)
+
+    return _build_tool_result_fallback('', tool_results)
+
+
 def _build_tool_result_fallback(prompt: str, tool_results: list[dict]) -> str:
     nmap_findings = []
     generic_findings = []
@@ -834,6 +964,15 @@ class MCPSession:
             if not tool_calls and not content.strip():
                 if turn_tool_results:
                     self.messages.pop()
+                    if _can_auto_finalize_benign_empty(turn_tool_results):
+                        benign_content = _build_benign_empty_finalization(turn_tool_results)
+                        self.messages.append({"role": "assistant", "content": benign_content})
+                        self._logger.log_response(benign_content)
+                        _emit(self.event_callback, "chat_done", {
+                            "message": "Finalized benign no-findings tool result without retry."
+                        })
+                        return
+
                     action = await self._prompt_post_tool_reply_decision(prompt, turn_tool_results, cancel_event)
                     if action == "retry":
                         recovered_content = await self._retry_empty_reply_after_tools(prompt, turn_tool_results)
