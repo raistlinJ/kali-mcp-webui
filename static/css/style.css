@@ -882,6 +882,72 @@ option {
     color: var(--text-secondary);
 }
 
+.session-summary-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--panel-border);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.session-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.session-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    min-width: 0;
+}
+
+.session-summary-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+}
+
+.session-summary-value {
+    font-size: 0.88rem;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.session-policy-blocks {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+}
+
+.session-policy-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 0.85rem;
+}
+
+.session-policy-card h4 {
+    margin: 0 0 0.5rem;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+}
+
+.session-policy-list {
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.session-policy-list li {
+    word-break: break-word;
+}
+
 .tool-call-card {
     background: var(--panel-bg);
     border: 1px solid var(--panel-border);
@@ -1358,6 +1424,12 @@ option {
     max-width: 300px;
 }
 
+.tools-badge-policy {
+    background: rgba(59, 130, 246, 0.12);
+    color: #93c5fd;
+    border-color: rgba(59, 130, 246, 0.22);
+}
+
 .live-log-header-actions {
     display: flex;
     align-items: center;
@@ -1402,7 +1474,12 @@ option {
 .job-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 0.4rem; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.05); }
 .job-meta { font-size: 0.8rem; color: var(--text-secondary); display: flex; gap: 1rem; }
 .job-actions-dropdown { position: relative; }
-.job-actions-menu { right: 0; left: auto; min-width: 160px; }
+.job-actions-menu { top: calc(100% + 0.5rem); bottom: auto; right: 0; left: auto; margin-bottom: 0; min-width: 160px; transform-origin: top right; z-index: 300; }
 .job-actions-menu li { white-space: nowrap; }
+
+#analysis-jobs-list {
+    max-height: none;
+    overflow: visible;
+}
 .spinning { animation: spin 2s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

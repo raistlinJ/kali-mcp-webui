@@ -119,6 +119,30 @@
 
                         <div class="divider"></div>
 
+                        <div class="form-section">
+                            <h2 class="section-title">
+                                <i class="ph ph-funnel"></i>
+                                Target Access Policy
+                            </h2>
+
+                            <div class="input-group">
+                                <label for="allow-targets">Allow List</label>
+                                <textarea id="allow-targets" rows="4" spellcheck="false"
+                                    placeholder="*">*</textarea>
+                                <span class="input-hint">One entry per line. Supports <strong>*</strong>, IPs,
+                                    CIDRs, hostnames, and URLs. Default is <strong>*</strong> to allow anything.</span>
+                            </div>
+
+                            <div class="input-group">
+                                <label for="disallow-targets">Disallow List</label>
+                                <textarea id="disallow-targets" rows="4" spellcheck="false"
+                                    placeholder="Leave blank for none"></textarea>
+                                <span class="input-hint">One entry per line. Disallow rules override allow rules.</span>
+                            </div>
+                        </div>
+
+                        <div class="divider"></div>
+
                         <!-- MCP Kali Server Section -->
                         <div class="form-section">
                             <h2 class="section-title" title="Configure the command used to launch the mcp-kali-server">
@@ -409,6 +433,7 @@
                                     <i class="ph ph-file-zip"></i> Download Archive
                                 </button>
                             </div>
+                            <div class="session-summary-panel" id="session-summary-panel" style="display:none;"></div>
                             <div class="detail-content" id="detail-content">
                                 <div class="empty-state">Select a session above.</div>
                             </div>
@@ -455,6 +480,8 @@
                         <div class="chat-header-actions"
                             style="display: flex; justify-content: flex-end; padding: 0.5rem 0; gap: 0.5rem;">
                             <span id="service-tools-badge" class="tools-badge"
+                                style="display:none; font-size: 0.75rem;"></span>
+                            <span id="service-policy-badge" class="tools-badge tools-badge-policy"
                                 style="display:none; font-size: 0.75rem;"></span>
                             <button type="button" id="chat-download-btn" class="btn btn-secondary"
                                 style="padding: 0.3rem 0.6rem; font-size: 0.82rem; display: none;"

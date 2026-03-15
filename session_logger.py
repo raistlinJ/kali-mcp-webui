@@ -195,6 +195,13 @@ class SessionLogger:
         
         self._emit_event("annotation", {"text": text, "span": span})
 
+    def update_metadata(self, updates: dict):
+        """Merge new fields into session metadata and persist them."""
+        if not updates:
+            return
+        self._metadata.update(updates)
+        self._write_metadata()
+
     def finalize(self, status: str = "completed"):
         """Mark the session as finished and write end time to metadata."""
         self._metadata["end_time"] = _now_iso()

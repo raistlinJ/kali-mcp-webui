@@ -61,39 +61,71 @@ def _analysis_job_markdown_path(run_id: str, job_id: str) -> str:
     return os.path.join(_analysis_jobs_dir(run_id), f"{job_id}.md")
 
 
+def _to_json_safe(value):
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+
+    if isinstance(value, dict):
+        return {str(k): _to_json_safe(v) for k, v in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [_to_json_safe(item) for item in value]
+
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        try:
+            return _to_json_safe(model_dump())
+        except Exception:
+            pass
+
+    to_dict = getattr(value, "dict", None)
+    if callable(to_dict):
+        try:
+            return _to_json_safe(to_dict())
+        except Exception:
+            pass
+
+    raw_dict = getattr(value, "__dict__", None)
+    if isinstance(raw_dict, dict) and raw_dict:
+        return _to_json_safe(raw_dict)
+
+    return str(value)
+
+
 def _write_analysis_job_record(run_id: str, job_id: str, record: dict):
     os.makedirs(_analysis_jobs_dir(run_id), exist_ok=True)
+    safe_record = _to_json_safe(record)
 
     json_path = _analysis_job_json_path(run_id, job_id)
     with open(json_path, 'w') as f:
-        json.dump(record, f, indent=2)
+        json.dump(safe_record, f, indent=2)
 
     markdown_path = _analysis_job_markdown_path(run_id, job_id)
     with open(markdown_path, 'w') as f:
         f.write(f"# Analysis Job {job_id}\n\n")
-        f.write(f"- Run ID: {record.get('run_id', 'unknown')}\n")
-        f.write(f"- Status: {record.get('status', 'unknown')}\n")
-        f.write(f"- Span: {record.get('span', 'unknown')}\n")
-        f.write(f"- Started: {record.get('start_time', 'unknown')}\n")
-        f.write(f"- Completed: {record.get('end_time') or 'in-progress'}\n")
-        f.write(f"- Ollama URL: {record.get('ollama_url') or 'unknown'}\n")
-        f.write(f"- Model: {record.get('model') or 'unknown'}\n\n")
+        f.write(f"- Run ID: {safe_record.get('run_id', 'unknown')}\n")
+        f.write(f"- Status: {safe_record.get('status', 'unknown')}\n")
+        f.write(f"- Span: {safe_record.get('span', 'unknown')}\n")
+        f.write(f"- Started: {safe_record.get('start_time', 'unknown')}\n")
+        f.write(f"- Completed: {safe_record.get('end_time') or 'in-progress'}\n")
+        f.write(f"- Ollama URL: {safe_record.get('ollama_url') or 'unknown'}\n")
+        f.write(f"- Model: {safe_record.get('model') or 'unknown'}\n\n")
 
-        if record.get('error'):
+        if safe_record.get('error'):
             f.write("## Error\n\n")
-            f.write(f"```text\n{record['error']}\n```\n\n")
+            f.write(f"```text\n{safe_record['error']}\n```\n\n")
 
-        if record.get('system_prompt'):
+        if safe_record.get('system_prompt'):
             f.write("## System Prompt\n\n")
-            f.write(f"```text\n{record['system_prompt']}\n```\n\n")
+            f.write(f"```text\n{safe_record['system_prompt']}\n```\n\n")
 
-        if record.get('user_prompt'):
+        if safe_record.get('user_prompt'):
             f.write("## User Prompt\n\n")
-            f.write(f"```text\n{record['user_prompt']}\n```\n\n")
+            f.write(f"```text\n{safe_record['user_prompt']}\n```\n\n")
 
-        if record.get('response'):
+        if safe_record.get('response'):
             f.write("## Response\n\n")
-            f.write(record['response'])
+            f.write(safe_record['response'])
             f.write("\n")
 
 
@@ -111,6 +143,21 @@ def _load_analysis_job_record(job_id: str):
         return None
     with open(record_path, 'r') as f:
         return json.load(f)
+
+
+def _load_run_metadata(run_id: str | None):
+    if not run_id:
+        return None
+
+    metadata_path = os.path.join(RUNS_DIR, run_id, "metadata.json")
+    if not os.path.isfile(metadata_path):
+        return None
+
+    try:
+        with open(metadata_path, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 
 def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None):
@@ -155,18 +202,68 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         with open(annotations_path, 'r') as f:
             annotations = f.read()
 
+    tool_calls_dir = os.path.join(session_dir, "tool_calls")
+    tool_records = []
+    if os.path.isdir(tool_calls_dir):
+        for fname in sorted(os.listdir(tool_calls_dir)):
+            if not fname.endswith('.json'):
+                continue
+            try:
+                with open(os.path.join(tool_calls_dir, fname), 'r') as f:
+                    tool_records.append(json.load(f))
+            except Exception:
+                pass
+
+    tool_stats = {}
+    for record in tool_records:
+        tool_name = record.get('tool', 'unknown')
+        stat = tool_stats.setdefault(tool_name, {
+            'count': 0,
+            'total_duration_ms': 0,
+            'failures': 0,
+        })
+        stat['count'] += 1
+        stat['total_duration_ms'] += int(record.get('duration_ms', 0) or 0)
+        if int(record.get('exit_code', 0) or 0) != 0:
+            stat['failures'] += 1
+
+    tool_summary_lines = []
+    for tool_name in sorted(tool_stats):
+        stat = tool_stats[tool_name]
+        avg_duration = stat['total_duration_ms'] // max(stat['count'], 1)
+        tool_summary_lines.append(
+            f"- {tool_name}: {stat['count']} call(s), avg {avg_duration} ms, failures {stat['failures']}"
+        )
+    tool_summary = "\n".join(tool_summary_lines) if tool_summary_lines else "No tool calls recorded."
+
+    condensed_tool_records = []
+    for record in tool_records[-40:]:
+        condensed_tool_records.append({
+            'seq': record.get('seq'),
+            'tool': record.get('tool'),
+            'args': record.get('args'),
+            'duration_ms': record.get('duration_ms'),
+            'exit_code': record.get('exit_code'),
+            'result_preview': (record.get('result') or '')[:600],
+        })
+
     ollama_url = 'http://localhost:11434'
     model = 'llama3'
 
     meta_path = os.path.join(session_dir, "metadata.json")
+    available_tools = []
     if os.path.isfile(meta_path):
         try:
             with open(meta_path, 'r') as f:
                 meta = json.load(f)
                 ollama_url = meta.get('ollama_url', ollama_url)
                 model = meta.get('model', model)
+                available_tools = meta.get('available_tools', []) or []
         except Exception:
             pass
+
+    available_tools = [str(tool) for tool in available_tools if tool]
+    available_tools_text = ", ".join(available_tools) if available_tools else "Unknown or not captured for this run."
 
     if ollama_url_override:
         ollama_url = ollama_url_override
@@ -176,26 +273,48 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
     if span_req in ("Entire Session", "Event Point", ""):
         system_prompt = (
             "You are a Senior Penetration Testing Analyst reviewing a recent engagement. "
-            "Your job is to read the attached transcript and user annotations, and provide a Post-Mortem Analysis in Markdown. "
-            "Focus specifically on areas of improvement:\n"
-            "1. Did the agent miss opportunities to use an existing tool that would have resulted in more efficient success?\n"
-            "2. Could a new MCP tool be built or scripted to automate a tedious manual process seen in the logs?\n"
-            "3. How efficiently did the agent leverage the user's annotations?\n"
-            "Keep the response professional, actionable, and formatted nicely in Markdown."
+            "Your job is to analyze the transcript, annotations, and structured tool-call history, then produce a rigorous efficiency review in Markdown. "
+            "Prioritize concrete operational inefficiencies, missed opportunities to use existing tools, and candidate MCP tools that would reduce time, turns, or manual effort.\n\n"
+            "Output using these sections exactly:\n"
+            "1. Executive Summary\n"
+            "2. Observed Inefficiencies\n"
+            "3. Existing Tool Opportunities\n"
+            "4. Candidate New MCP Tools\n"
+            "5. Estimated Efficiency Reductions\n"
+            "6. Recommended Next Changes\n\n"
+            "For each inefficiency or opportunity, include:\n"
+            "- What happened\n"
+            "- Evidence from the transcript or tool history\n"
+            "- Why it was inefficient\n"
+            "- Whether it should be solved by better prompting, an existing enabled tool, or a new MCP tool\n"
+            "- Estimated reduction in time, turns, or manual steps\n"
+            "- Implementation difficulty: low, medium, or high\n\n"
+            "You must explicitly compare observed behavior against the enabled tool inventory. Call out when a tool was available but unused.\n"
+            "Be explicit when estimating savings. Use approximate but defensible ranges like 'save 1-2 tool calls', 'reduce manual steps by 50-70%', or 'cut repeated search attempts from 5 turns to 2'. "
+            "If evidence is weak, say so rather than inventing certainty."
         )
     else:
         system_prompt = (
             f"You are a Senior Penetration Testing Analyst monitoring a LIVE engagement. "
             f"You are reviewing the logs from the {span_req.upper()}. "
-            "Your job is to read the attached slice of the transcript and provide a rapid, real-time Analysis in Markdown. "
-            "Focus specifically on areas of immediate tactical improvement:\n"
-            "1. Is the agent stuck in a loop, and could an existing tool be used to bypass the blocker?\n"
-            "2. Could a new MCP tool be built quickly right now to automate what the agent is struggling with?\n"
-            "3. What tactical pivot do you suggest based on the recent annotations?\n"
-            "Keep the response punchy, actionable, and formatted nicely in Markdown."
+            "Your job is to analyze the recent transcript slice, annotations, and tool-call history to identify immediate tactical inefficiencies and the fastest ways to reduce them.\n\n"
+            "Output using these sections exactly:\n"
+            "1. Immediate Issues\n"
+            "2. Existing Tool Pivots\n"
+            "3. Quick MCP Tool Candidates\n"
+            "4. Estimated Short-Term Reductions\n"
+            "5. Next Best Action\n\n"
+            "For each point, include evidence, why it matters now, whether an already enabled tool could solve it, and an estimate of how many turns, repeated commands, or manual steps could be avoided. "
+            "Prefer tactical recommendations that can be acted on immediately during the current engagement."
         )
 
-    user_prompt = f"### Transcript ({span_req}) ###\n{transcript}\n\n### Annotations (JSON Lines) ###\n{'No annotations.' if not annotations else annotations}"
+    user_prompt = (
+        f"### Transcript ({span_req}) ###\n{transcript}\n\n"
+        f"### Annotations (JSON Lines) ###\n{'No annotations.' if not annotations else annotations}\n\n"
+        f"### Enabled Tool Inventory ###\n{available_tools_text}\n\n"
+        f"### Tool Usage Summary ###\n{tool_summary}\n\n"
+        f"### Recent Tool Call Records (JSON) ###\n{json.dumps(condensed_tool_records, indent=2)}"
+    )
 
     return {
         "run_id": run_id,
@@ -250,6 +369,7 @@ def session_start():
     server_command = data.get('server_command')
     tools_config = data.get('tools_config')
     context_window = int(data.get('context_window', 8192))
+    network_policy = data.get('network_policy') or {"allow": ["*"], "disallow": []}
 
     if not model:
         return jsonify({'success': False, 'error': 'No model selected'}), 400
@@ -302,6 +422,7 @@ def session_start():
             run_id=run_id,
             event_callback=_event_callback,
             context_window=context_window,
+            network_policy=network_policy,
         )
 
         async def _start():
@@ -520,9 +641,11 @@ def session_stop():
 def session_status():
     """Return current session status."""
     with _session_lock:
+        run_id = _session_state["run_id"]
         return jsonify({
             'status': _session_state["status"],
-            'run_id': _session_state["run_id"],
+            'run_id': run_id,
+            'metadata': _load_run_metadata(run_id),
         })
 
 
@@ -748,11 +871,14 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
             {"role": "user", "content": request_data["user_prompt"]}
         ]
     )
-    response_text = resp.get("message", {}).get("content", "No analysis returned.")
+    safe_resp = _to_json_safe(resp)
+    response_text = "No analysis returned."
+    if isinstance(safe_resp, dict):
+        response_text = safe_resp.get("message", {}).get("content", response_text)
     return {
         **request_data,
         "response": response_text,
-        "raw_response": resp,
+        "raw_response": safe_resp,
     }
 
 @app.route('/api/analysis/jobs', methods=['GET'])
@@ -760,7 +886,7 @@ def list_analysis_jobs():
     """Return all background analysis jobs."""
     with _analysis_lock:
         sorted_jobs = sorted(
-            [{"job_id": k, **v} for k, v in _analysis_jobs.items()],
+            [_to_json_safe({"job_id": k, **v}) for k, v in _analysis_jobs.items()],
             key=lambda x: x["start_time"],
             reverse=True
         )
@@ -782,7 +908,7 @@ def get_analysis_job(job_id):
     if not record:
         abort(404, description="Analysis job not found.")
 
-    return jsonify(record)
+    return jsonify(_to_json_safe(record))
 
 
 @app.route('/api/analysis/jobs/<job_id>/download', methods=['GET'])

@@ -22,6 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('start-service-btn');
     const modelSelect = document.getElementById('model-select');
     const ollamaUrlInput = document.getElementById('ollama-url');
+    const allowTargetsInput = document.getElementById('allow-targets');
+    const disallowTargetsInput = document.getElementById('disallow-targets');
 
     const kaliCommandType = document.getElementById('kali-command-type');
     const toolsConfigSection = document.getElementById('tools-config-section');
@@ -35,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const liveLogPanel = document.getElementById('live-log-panel');
     const liveLogViewer = document.getElementById('live-log-viewer');
     const toolsBadge = document.getElementById('service-tools-badge');
+    const policyBadge = document.getElementById('service-policy-badge');
 
     // Chat Console UI
     const chatConsoleBar = document.getElementById('chat-console-bar');
@@ -61,12 +64,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatDownloadBtn = document.getElementById('chat-download-btn');
     const sessionDownloadBtn = document.getElementById('session-download-btn');
     const sessionAnalyzeBtn = document.getElementById('session-analyze-btn');
+    const sessionSummaryPanel = document.getElementById('session-summary-panel');
     const tabAnalysis = document.getElementById('tab-analysis');
     const analysisJobsList = document.getElementById('analysis-jobs-list');
     const clearJobsBtn = document.getElementById('clear-jobs-btn');
     
     let _analysisCache = {};
     let _analysisJobsInterval = null;
+    let _sessionsById = {};
 
     let _eventSource = null;
     let _serviceRunning = false;
@@ -268,6 +273,14 @@ document.addEventListener('DOMContentLoaded', () => {
     toolCheckboxes.forEach(cb => cb.addEventListener('change', updateToolsJson));
     proxychainsRouteAllCheckbox?.addEventListener('change', updateToolsJson);
     updateToolsJson();
+
+    function parsePolicyList(rawValue, defaultValue = []) {
+        const lines = String(rawValue || '')
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(Boolean);
+        return lines.length ? lines : defaultValue;
+    }
 
     // ---------------------------------------------------------------
     // Fetch Models
@@ -481,6 +494,98 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function normalizePolicy(policy) {
+        const allow = Array.isArray(policy?.allow) && policy.allow.length ? policy.allow : ['*'];
+        const disallow = Array.isArray(policy?.disallow) ? policy.disallow : [];
+        return { allow, disallow };
+    }
+
+    function policyPreview(entries, emptyLabel) {
+        if (!entries.length) return emptyLabel;
+        if (entries.length === 1) return entries[0];
+        return `${entries[0]} +${entries.length - 1}`;
+    }
+
+    function formatPolicyBadge(policy) {
+        const normalized = normalizePolicy(policy);
+        return `Targets: allow ${policyPreview(normalized.allow, 'none')} | block ${policyPreview(normalized.disallow, 'none')}`;
+    }
+
+    function renderPolicyList(entries, emptyLabel) {
+        if (!entries.length) {
+            return `<li>${escapeHtml(emptyLabel)}</li>`;
+        }
+        return entries.map(entry => `<li>${escapeHtml(entry)}</li>`).join('');
+    }
+
+    function renderSessionSummary(session) {
+        if (!session) {
+            sessionSummaryPanel.style.display = 'none';
+            sessionSummaryPanel.innerHTML = '';
+            return;
+        }
+
+        const policy = normalizePolicy(session.network_policy);
+        const availableTools = Array.isArray(session.available_tools) ? session.available_tools : [];
+        const startTime = session.start_time ? new Date(session.start_time).toLocaleString() : '—';
+        const model = session.model || '—';
+        const ollamaUrl = session.ollama_url || '—';
+        const toolCount = session.available_tool_count || availableTools.length || 0;
+        const toolSummary = toolCount ? `${toolCount} tool(s)` : 'No tool inventory saved';
+
+        sessionSummaryPanel.innerHTML = `
+            <div class="session-summary-grid">
+                <div class="session-summary-item">
+                    <span class="session-summary-label">Run ID</span>
+                    <span class="session-summary-value">${escapeHtml(session.run_id || '—')}</span>
+                </div>
+                <div class="session-summary-item">
+                    <span class="session-summary-label">Started</span>
+                    <span class="session-summary-value">${escapeHtml(startTime)}</span>
+                </div>
+                <div class="session-summary-item">
+                    <span class="session-summary-label">Model</span>
+                    <span class="session-summary-value">${escapeHtml(model)}</span>
+                </div>
+                <div class="session-summary-item">
+                    <span class="session-summary-label">Ollama URL</span>
+                    <span class="session-summary-value">${escapeHtml(ollamaUrl)}</span>
+                </div>
+                <div class="session-summary-item">
+                    <span class="session-summary-label">Tool Inventory</span>
+                    <span class="session-summary-value">${escapeHtml(toolSummary)}</span>
+                </div>
+                <div class="session-summary-item">
+                    <span class="session-summary-label">Target Policy</span>
+                    <span class="session-summary-value">${escapeHtml(formatPolicyBadge(policy))}</span>
+                </div>
+            </div>
+            <div class="session-policy-blocks">
+                <div class="session-policy-card">
+                    <h4>Allowed Targets</h4>
+                    <ul class="session-policy-list">${renderPolicyList(policy.allow, 'None')}</ul>
+                </div>
+                <div class="session-policy-card">
+                    <h4>Blocked Targets</h4>
+                    <ul class="session-policy-list">${renderPolicyList(policy.disallow, 'None')}</ul>
+                </div>
+            </div>
+        `;
+        sessionSummaryPanel.style.display = 'flex';
+    }
+
+    function setLivePolicyBadge(policy) {
+        if (!policyBadge) return;
+        if (!policy) {
+            policyBadge.style.display = 'none';
+            policyBadge.textContent = '';
+            return;
+        }
+
+        policyBadge.textContent = formatPolicyBadge(policy);
+        policyBadge.style.display = 'inline-block';
+    }
+
     function appendLog(html, cssClass = '') {
         if (!_logInitialCleared) {
             liveLogViewer.innerHTML = '';
@@ -587,6 +692,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const cmdType = kaliCommandType.value;
         const extraArgs = document.getElementById('kali-args').value.trim();
         const contextWindow = parseInt(document.getElementById('context-window').value, 10);
+        const networkPolicy = {
+            allow: parsePolicyList(allowTargetsInput?.value, ['*']),
+            disallow: parsePolicyList(disallowTargetsInput?.value, []),
+        };
 
         let command = '';
         if (cmdType === 'python') {
@@ -621,13 +730,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow })
+                body: JSON.stringify({ url, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, network_policy: networkPolicy })
             });
             const data = await response.json();
 
             if (data.success) {
                 _serviceRunning = true;
                 _currentRunId = data.run_id;
+                _sessionsById[data.run_id] = {
+                    run_id: data.run_id,
+                    network_policy: data.network_policy || networkPolicy,
+                    available_tools: Array.isArray(data.tools) ? data.tools : [],
+                    available_tool_count: Array.isArray(data.tools) ? data.tools.length : 0,
+                    ...(data.metadata || {}),
+                };
                 persistLiveLog();
                 
                 // Switch button to Stop state
@@ -639,6 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     toolsBadge.textContent = `${data.tools.length} tool(s): ${data.tools.join(', ')}`;
                     toolsBadge.style.display = 'inline-block';
                 }
+                setLivePolicyBadge(data.network_policy || networkPolicy);
                 
                 updateStatus('running', 'Service Running - Chat Active');
                 
@@ -973,6 +1090,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetStartBtn();
         setConfigEnabled(true);
         toolsBadge.style.display = 'none';
+        setLivePolicyBadge(null);
         
         // Disable active chat inputs
         chatPromptInput.disabled = true;
@@ -1047,6 +1165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadSessions() {
         try {
             const res = await fetch('/api/sessions'); const data = await res.json();
+            _sessionsById = Object.fromEntries((data.sessions || []).map(session => [session.run_id, session]));
             renderSessionList(data.sessions || []);
         } catch (e) { sessionsList.innerHTML = '<div class="empty-state">Could not load sessions.</div>'; }
     }
@@ -1083,6 +1202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionsList.querySelectorAll('.session-card').forEach(c => c.classList.toggle('active', c.dataset.run === runId));
         sessionDownloadBtn.style.display = 'inline-block';
         sessionAnalyzeBtn.style.display = 'inline-block';
+        renderSessionSummary(_sessionsById[runId]);
         if (_analysisCache[runId]) tabAnalysis.style.display = 'inline-block';
         await renderTab(_currentTab === 'analysis' && !_analysisCache[runId] ? 'transcript' : _currentTab);
     }
@@ -1180,6 +1300,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("Service is already active, restoring UI state...", data);
                 _serviceRunning = true;
                 _currentRunId = data.run_id;
+                if (data.metadata?.run_id) {
+                    _sessionsById[data.metadata.run_id] = data.metadata;
+                }
 
                 // Sync UI elements
                 setConfigEnabled(false);
@@ -1188,6 +1311,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 startBtn.disabled = false;
 
                 updateStatus('running', 'Service Running - Chat Active');
+
+                if (Array.isArray(data.metadata?.available_tools) && data.metadata.available_tools.length) {
+                    toolsBadge.textContent = `${data.metadata.available_tools.length} tool(s): ${data.metadata.available_tools.join(', ')}`;
+                    toolsBadge.style.display = 'inline-block';
+                }
+                setLivePolicyBadge(data.metadata?.network_policy || null);
 
                 if (!restoreLiveLog(_currentRunId)) {
                     _logInitialCleared = liveLogViewer.children.length > 0;
@@ -1208,6 +1337,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Optional: switch to chat tab if running
                 switchTab('chat-pane');
             } else {
+                setLivePolicyBadge(null);
                 const lastRunId = localStorage.getItem(LAST_ACTIVE_RUN_STORAGE_KEY);
                 if (lastRunId) {
                     restoreLiveLog(lastRunId);
