@@ -544,10 +544,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function resizeChatPromptInput() {
+        const minHeight = 52;
+        const maxHeight = 250;
         const viewportScrollY = window.scrollY;
 
         chatPromptInput.style.height = 'auto';
-        chatPromptInput.style.height = `${chatPromptInput.scrollHeight}px`;
+        const nextHeight = Math.max(minHeight, Math.min(maxHeight, chatPromptInput.scrollHeight));
+        chatPromptInput.style.height = `${nextHeight}px`;
 
         // Keep the viewport stable while the auto-growing prompt recalculates.
         if (document.activeElement === chatPromptInput && window.scrollY !== viewportScrollY) {
