@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (name === 'msf_run') {
                     toolDefinition = {
                         name: "msf_run",
-                        description: "Execute a Metasploit module. Format: '<module_path>; set RHOSTS <target>; run'.",
+                        description: "Execute a Metasploit module. Format: '[module_path]; set RHOSTS [target]; run'.",
                         command: "msfconsole",
                         base_args: ["-q", "-x", "use {args}; exit"],
                         allow_args: true
@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (name === 'shell') {
                     toolDefinition = {
                         name: 'shell',
-                        description: 'Run an allowlisted local shell command for host inspection. Allowed commands: ls, cat, grep, ip, ss, ps, uname, id, pwd, whoami, find.',
+                        description: 'Run an allowlisted local shell command for host inspection. Allowed commands: ls, cat, grep, docker, ip, ss, ps, uname, id, pwd, whoami, find.',
                         command: cmd,
                         args: ['{args}'],
                         allow_args: true

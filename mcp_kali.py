@@ -4,6 +4,7 @@ import subprocess
 import time
 import os
 import shlex
+import re
 from mcp.server import Server
 from mcp.types import Tool, TextContent
 
@@ -13,6 +14,7 @@ _ALLOWED_SHELL_COMMANDS = {
     "ls",
     "cat",
     "grep",
+    "docker",
     "ip",
     "ss",
     "ps",
@@ -23,6 +25,13 @@ _ALLOWED_SHELL_COMMANDS = {
     "find",
 }
 _DISALLOWED_SHELL_TOKENS = {"|", "||", "&", "&&", ";", ">", ">>", "<", "<<"}
+_ANSI_ESCAPE_RE = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+
+
+def _strip_ansi(text: str) -> str:
+    if not text:
+        return text
+    return _ANSI_ESCAPE_RE.sub("", text)
 
 # Session logging — optional: if session_logger.py is unavailable the server still works
 try:
@@ -88,7 +97,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     if name == "shell":
         user_args = (arguments.get("args", "") or "").strip()
         if not user_args:
-            return [TextContent(type="text", text="Error: shell requires a command, e.g. 'ls -la' or 'ip addr'")]
+            return [TextContent(type="text", text="Error: shell requires a command, e.g. 'ls -la', 'ip addr', or 'docker ps'")]
 
         try:
             shell_parts = shlex.split(user_args)
@@ -129,8 +138,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         duration_ms = int((time.time() - t0) * 1000)
 
-        output = result.stdout
-        stderr = result.stderr or ""
+        output = _strip_ansi(result.stdout or "")
+        stderr = _strip_ansi(result.stderr or "")
         if stderr:
             output += f"\nSTDERR:\n{stderr}"
 

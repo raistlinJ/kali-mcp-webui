@@ -70,19 +70,51 @@ _SUMMARISE_SYSTEM_PROMPT = (
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _sanitize_tool_schema_value(value):
+    """Normalize tool schema text so XML-based model adapters do not choke on it."""
+    if isinstance(value, str):
+        return value.replace("<", "[").replace(">", "]")
+    if isinstance(value, list):
+        return [_sanitize_tool_schema_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _sanitize_tool_schema_value(item) for key, item in value.items()}
+    return value
+
 def _mcp_tool_to_ollama(tool) -> dict:
     """Convert an MCP Tool object to the Ollama function-calling schema."""
     return {
         "type": "function",
         "function": {
             "name": tool.name,
-            "description": tool.description or f"Run {tool.name}",
-            "parameters": tool.inputSchema if tool.inputSchema else {
+            "description": _sanitize_tool_schema_value(tool.description or f"Run {tool.name}"),
+            "parameters": _sanitize_tool_schema_value(tool.inputSchema) if tool.inputSchema else {
                 "type": "object",
                 "properties": {},
             },
         },
     }
+
+
+def _mcp_tool_to_ollama_minimal(tool) -> dict:
+    """Minimal tool schema fallback for models that choke on richer XML/function payloads."""
+    return {
+        "type": "function",
+        "function": {
+            "name": tool.name,
+            "description": f"Run {tool.name}",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "args": {"type": "string"},
+                },
+            },
+        },
+    }
+
+
+def _is_xml_schema_error(exc: Exception) -> bool:
+    message = str(exc or "")
+    return "XML syntax error" in message and "status code: 500" in message
 
 
 def _emit(callback, event_type: str, data: dict):
@@ -282,6 +314,7 @@ class MCPSession:
         
         self.tool_names: list[str] = []
         self._ollama_tools: list[dict] = []
+        self._ollama_tools_minimal: list[dict] = []
         self._model_max_ctx: int = context_window
 
         # Internals
@@ -372,6 +405,7 @@ class MCPSession:
         tools_result = await self._session.list_tools()
         mcp_tools = tools_result.tools
         self._ollama_tools = [_mcp_tool_to_ollama(t) for t in mcp_tools]
+        self._ollama_tools_minimal = [_mcp_tool_to_ollama_minimal(t) for t in mcp_tools]
         self.tool_names = [t.name for t in mcp_tools]
 
         if not self.tool_names:
@@ -440,13 +474,28 @@ class MCPSession:
             _emit(self.event_callback, "status", {
                 "message": f"Calling {self.model} (turn {iteration + 1}) …"
             })
-            response = await asyncio.to_thread(
-                self._client.chat,
-                model=self.model,
-                messages=self.messages,
-                tools=self._ollama_tools if self._ollama_tools else None,
-                options={"num_ctx": self.context_window},
-            )
+            try:
+                response = await asyncio.to_thread(
+                    self._client.chat,
+                    model=self.model,
+                    messages=self.messages,
+                    tools=self._ollama_tools if self._ollama_tools else None,
+                    options={"num_ctx": self.context_window},
+                )
+            except Exception as exc:
+                if self._ollama_tools and self._ollama_tools_minimal and _is_xml_schema_error(exc):
+                    _emit(self.event_callback, "status", {
+                        "message": "Model hit Ollama XML tool-schema bug; retrying with simplified tool metadata …"
+                    })
+                    response = await asyncio.to_thread(
+                        self._client.chat,
+                        model=self.model,
+                        messages=self.messages,
+                        tools=self._ollama_tools_minimal,
+                        options={"num_ctx": self.context_window},
+                    )
+                else:
+                    raise
 
             # Parse original message output
             original_msg = response.get("message", response)
