@@ -551,6 +551,31 @@ def session_cancel_prompt():
     else:
         return jsonify({'success': False, 'error': 'No prompt currently running to cancel.'}), 400
 
+
+@app.route('/api/session/post_tool_reply_action', methods=['POST'])
+def session_post_tool_reply_action():
+    """Resolve a paused post-tool empty-reply incident with retry or cancel."""
+    with _session_lock:
+        if _session_state["status"] != "running":
+            return jsonify({
+                'success': False,
+                'error': 'No active session.',
+            }), 409
+        session = _session_state["session"]
+
+    data = request.json or {}
+    action = (data.get('action') or '').strip().lower()
+    if action not in {'retry', 'cancel'}:
+        return jsonify({'success': False, 'error': 'Action must be retry or cancel.'}), 400
+
+    if not session or not hasattr(session, 'resolve_post_tool_reply_decision'):
+        return jsonify({'success': False, 'error': 'Session cannot resolve post-tool reply decisions.'}), 409
+
+    if not session.resolve_post_tool_reply_decision(action):
+        return jsonify({'success': False, 'error': 'No pending post-tool reply decision to resolve.'}), 409
+
+    return jsonify({'success': True, 'message': f'{action.title()} request sent.'})
+
 @app.route('/api/sessions/<run_id>/annotate', methods=['POST'])
 def session_annotate(run_id):
     """Add a human-in-the-loop annotation to the run log."""

@@ -297,6 +297,65 @@ def _truncate_tool_output(text: str, max_chars: int = 8000) -> str:
     )
 
 
+def _extract_nmap_summary(result_text: str) -> tuple[str | None, str | None]:
+    host_match = re.search(r'Nmap scan report for\s+(.+)', result_text)
+    host = host_match.group(1).strip() if host_match else None
+
+    if re.search(r'All\s+\d+\s+scanned\s+ports.*ignored states', result_text, re.IGNORECASE):
+        return host, 'no open ports detected'
+
+    open_ports = re.findall(r'^(\d+)/(tcp|udp)\s+open\s+([^\s]+)', result_text, re.MULTILINE)
+    if open_ports:
+        ports = ', '.join(f"{port}/{proto} ({service})" for port, proto, service in open_ports[:6])
+        extra = '' if len(open_ports) <= 6 else f" +{len(open_ports) - 6} more"
+        return host, f"open ports: {ports}{extra}"
+
+    if re.search(r'0 hosts up', result_text, re.IGNORECASE):
+        return host, 'host did not respond as up during the scan'
+
+    return host, None
+
+
+def _build_tool_result_fallback(prompt: str, tool_results: list[dict]) -> str:
+    nmap_findings = []
+    generic_findings = []
+
+    for item in tool_results:
+        tool_name = item.get('tool', 'unknown')
+        result_text = item.get('result', '') or ''
+        exit_code = item.get('exit_code', 0)
+
+        if tool_name == 'nmap':
+            host, summary = _extract_nmap_summary(result_text)
+            if summary:
+                label = host or item.get('args', {}).get('args', 'target')
+                nmap_findings.append(f"{label}: {summary}")
+                continue
+
+        if exit_code == 0:
+            preview = result_text.strip().splitlines()
+            generic_findings.append(f"{tool_name}: {preview[0] if preview else 'completed with no output'}")
+        else:
+            generic_findings.append(f"{tool_name}: failed ({result_text.strip() or 'no error text'})")
+
+    if nmap_findings and all('no open ports detected' in finding for finding in nmap_findings):
+        joined = '; '.join(nmap_findings)
+        return (
+            f"I ran the follow-up scans, but they did not reveal any open ports or exposed services. {joined}. "
+            "Without reachable services, there is nothing meaningful to vulnerability-scan at the service layer yet. "
+            "The next step would be broader host discovery, UDP checks, or validating whether filtering is hiding services."
+        )
+
+    findings = nmap_findings + generic_findings
+    if findings:
+        return "I completed the follow-up tooling. Results: " + '; '.join(findings[:8]) + "."
+
+    return (
+        "The requested tools finished successfully, but the model failed to produce a final answer. "
+        "The latest tool results are available in the log and can be used to continue from here."
+    )
+
+
 def _extract_tool_info(tc) -> tuple[str, dict]:
     """Safely extract function name and arguments from a tool call (dict or object)."""
     func = getattr(tc, "function", None)
@@ -474,6 +533,96 @@ class MCPSession:
         self._logger: SessionLogger | None = None
         self._started = False
         self._chat_lock = asyncio.Lock()
+        self._pending_post_tool_reply = None
+
+    async def _retry_empty_reply_after_tools(self, prompt: str, tool_results: list[dict]) -> str | None:
+        _emit(self.event_callback, "status", {
+            "message": "Model returned an empty post-tool reply; retrying once without tools for a final answer …"
+        })
+
+        recovery_prompt = (
+            "Provide the final user-facing answer based only on these completed tool results. "
+            "Do not call tools. Be concise and explicit. If scans show no open ports or exposed services, say that clearly and explain that vulnerability scanning cannot proceed meaningfully without reachable services.\n\n"
+            f"Original user request:\n{prompt}\n\n"
+            "Completed tool results:\n"
+            f"{json.dumps(tool_results[-8:], ensure_ascii=True)}"
+        )
+
+        try:
+            response = await asyncio.to_thread(
+                self._client.chat,
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a network security assistant writing the final answer after tools have already completed. Do not call tools."
+                    },
+                    {
+                        "role": "user",
+                        "content": recovery_prompt,
+                    },
+                ],
+                options={"num_ctx": self.context_window},
+            )
+            message = response.get("message", response)
+            content = message.get("content", getattr(message, "content", "")) or ""
+            if content.strip():
+                return content.strip()
+        except Exception as exc:
+            _emit(self.event_callback, "status", {
+                "message": f"Retry call failed ({exc})."
+            })
+
+        return None
+
+    async def _prompt_post_tool_reply_decision(self, prompt: str, tool_results: list[dict], cancel_event: asyncio.Event | None) -> str:
+        loop = asyncio.get_running_loop()
+        decision_future = loop.create_future()
+        self._pending_post_tool_reply = {
+            "future": decision_future,
+            "loop": loop,
+            "prompt": prompt,
+            "tool_results": tool_results,
+        }
+
+        _emit(self.event_callback, "status", {
+            "message": "Model failed to produce a final reply after tools. Waiting for user decision: retry or cancel and restore."
+        })
+        _emit(self.event_callback, "post_tool_reply_decision", {
+            "message": "The model completed the tool calls but returned an empty final reply. Retry the final answer, or cancel and restore to the state before the failed model response.",
+            "options": ["retry", "cancel"],
+        })
+
+        try:
+            while True:
+                if cancel_event and cancel_event.is_set():
+                    return "cancel"
+                try:
+                    return await asyncio.wait_for(asyncio.shield(decision_future), timeout=0.25)
+                except asyncio.TimeoutError:
+                    continue
+        finally:
+            self._pending_post_tool_reply = None
+
+    def resolve_post_tool_reply_decision(self, action: str) -> bool:
+        if action not in {"retry", "cancel"}:
+            return False
+
+        pending = self._pending_post_tool_reply
+        if not pending:
+            return False
+
+        loop = pending.get("loop")
+        future = pending.get("future")
+        if not loop or not future:
+            return False
+
+        def _resolve():
+            if not future.done():
+                future.set_result(action)
+
+        loop.call_soon_threadsafe(_resolve)
+        return True
 
     async def start(self) -> list[str]:
         """
@@ -607,6 +756,7 @@ class MCPSession:
         """Core agent loop for a single chat turn."""
         self._logger.log_prompt(prompt)
         self.messages.append({"role": "user", "content": prompt})
+        turn_tool_results: list[dict] = []
 
         max_iterations = 20
         for iteration in range(max_iterations):
@@ -682,6 +832,38 @@ class MCPSession:
                 self._logger.log_response(content)
 
             if not tool_calls and not content.strip():
+                if turn_tool_results:
+                    self.messages.pop()
+                    action = await self._prompt_post_tool_reply_decision(prompt, turn_tool_results, cancel_event)
+                    if action == "retry":
+                        recovered_content = await self._retry_empty_reply_after_tools(prompt, turn_tool_results)
+                        if recovered_content:
+                            self.messages.append({"role": "assistant", "content": recovered_content})
+                            self._logger.log_response(recovered_content)
+                            _emit(self.event_callback, "response", {"text": recovered_content})
+                            _emit(self.event_callback, "chat_done", {
+                                "message": "Recovered final answer after user-approved retry."
+                            })
+                            return
+
+                        _emit(self.event_callback, "error", {
+                            "message": "Retry failed to produce a final answer. The conversation was restored to before the failed model response."
+                        })
+                        _emit(self.event_callback, "chat_done", {
+                            "message": "Retry failed. Conversation restored to before the failed model reply."
+                        })
+                        return
+
+                    _emit(self.event_callback, "status", {
+                        "message": "Discarded the failed post-tool reply and restored the conversation to the last valid state."
+                    })
+                    _emit(self.event_callback, "chat_done", {
+                        "message": "Cancelled retry. Conversation restored to before the failed model reply."
+                    })
+                    return
+
+                self.messages.pop()
+
                 detail = "Model returned an empty reply with no tool calls."
                 if self.tool_names:
                     detail += " This usually indicates the selected model is not reliably using tools with Ollama for this prompt."
@@ -760,6 +942,13 @@ class MCPSession:
                         "content": context_result,
                         "name": tool_name,
                     })
+                    turn_tool_results.append({
+                        "tool": tool_name,
+                        "args": tool_args,
+                        "result": result_text,
+                        "exit_code": exit_code,
+                        "duration_ms": duration_ms,
+                    })
 
                 except Exception as exc:
                     duration_ms = int((time.time() - t0) * 1000)
@@ -774,6 +963,13 @@ class MCPSession:
                     self.messages.append({
                         "role": "tool",
                         "content": err_msg,
+                    })
+                    turn_tool_results.append({
+                        "tool": tool_name,
+                        "args": tool_args,
+                        "result": err_msg,
+                        "exit_code": -1,
+                        "duration_ms": duration_ms,
                     })
 
         # Hit iteration limit for this turn

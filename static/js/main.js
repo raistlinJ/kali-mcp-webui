@@ -27,7 +27,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const kaliCommandType = document.getElementById('kali-command-type');
     const toolsConfigSection = document.getElementById('tools-config-section');
+    const toolsConfigEmpty = document.getElementById('tools-config-empty');
+    const configToolsTabBtn = document.getElementById('config-tools-tab-btn');
     const proxychainsRouteAllCheckbox = document.getElementById('proxychains-route-all');
+    const configSubtabBtns = document.querySelectorAll('.config-subtab-btn');
+    const configSubtabPanels = document.querySelectorAll('.config-subtab-panel');
 
     const statusBadge = document.getElementById('status-badge');
     const statusText = statusBadge.querySelector('.status-text');
@@ -54,6 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmModalOverlay = document.getElementById('confirm-modal-overlay');
     const confirmStopBtn = document.getElementById('confirm-stop-btn');
     const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+    const postToolReplyModalOverlay = document.getElementById('post-tool-reply-modal-overlay');
+    const postToolReplyMessage = document.getElementById('post-tool-reply-message');
+    const retryPostToolReplyBtn = document.getElementById('retry-post-tool-reply-btn');
+    const cancelPostToolReplyBtn = document.getElementById('cancel-post-tool-reply-btn');
     
     const annotationAction = document.getElementById('annotation-action');
     const annotationText = document.getElementById('annotation-text');
@@ -79,6 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _logInitialCleared = false;
     let _sessionToStopId = null;
     let _currentRunId = null;
+    let _awaitingPostToolReplyDecision = false;
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
     let _analysisConfigResolver = null;
@@ -134,9 +143,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    function switchConfigSubtab(targetPanelId) {
+        configSubtabBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.configTarget === targetPanelId);
+        });
+        configSubtabPanels.forEach(panel => {
+            panel.classList.toggle('active', panel.id === targetPanelId);
+        });
+    }
+
+    configSubtabBtns.forEach(btn => {
+        btn.addEventListener('click', () => switchConfigSubtab(btn.dataset.configTarget));
+    });
+
     // Toggle tools config visibility
     kaliCommandType.addEventListener('change', (e) => {
-        toolsConfigSection.style.display = e.target.value === 'apt' ? 'none' : 'block';
+        const usesApt = e.target.value === 'apt';
+        toolsConfigSection.style.display = usesApt ? 'none' : 'flex';
+        toolsConfigEmpty.style.display = usesApt ? 'flex' : 'none';
+        configToolsTabBtn.classList.toggle('config-subtab-btn-muted', usesApt);
     });
     kaliCommandType.dispatchEvent(new Event('change'));
 
@@ -631,6 +656,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     chatStopBtn.addEventListener('click', () => askToStopSession(null));
 
+    function closePostToolReplyModal() {
+        _awaitingPostToolReplyDecision = false;
+        postToolReplyModalOverlay.style.display = 'none';
+        retryPostToolReplyBtn.disabled = false;
+        cancelPostToolReplyBtn.disabled = false;
+    }
+
+    async function resolvePostToolReply(action) {
+        if (!_serviceRunning || !_awaitingPostToolReplyDecision) return;
+
+        retryPostToolReplyBtn.disabled = true;
+        cancelPostToolReplyBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/session/post_tool_reply_action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action })
+            });
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Could not resolve post-tool reply decision.');
+            }
+
+            closePostToolReplyModal();
+        } catch (error) {
+            retryPostToolReplyBtn.disabled = false;
+            cancelPostToolReplyBtn.disabled = false;
+            showAlert(error.message, 'error');
+        }
+    }
+
+    retryPostToolReplyBtn.addEventListener('click', () => resolvePostToolReply('retry'));
+    cancelPostToolReplyBtn.addEventListener('click', () => resolvePostToolReply('cancel'));
+
     async function stopTargetedSession(runId) {
         try {
             const response = await fetch(`/api/sessions/${runId}/stop`, { method: 'POST' });
@@ -904,6 +965,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setChatReady() {
         _chatBusy = false;
+        closePostToolReplyModal();
         
         // Restore the send button
         sendPromptBtn.classList.remove('btn-danger', 'btn-secondary');
@@ -1082,6 +1144,7 @@ document.addEventListener('DOMContentLoaded', () => {
         _currentRunId = null;
         _logInitialCleared = false; // Reset for next run
         updateStatus('success', 'Service Stopped');
+        closePostToolReplyModal();
 
         if (stoppedRunId) {
             persistLiveLog(stoppedRunId);
@@ -1128,6 +1191,12 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'context_usage': updateContextBar(event); break;
             case 'service_started': appendLog(`<span class="log-label">🟢 Service Started</span>`, 'log-done'); break;
             case 'service_stopped': appendLog(`<span class="log-label">🔴 Service Stopped</span>`, 'log-status'); break;
+            case 'post_tool_reply_decision':
+                _awaitingPostToolReplyDecision = true;
+                postToolReplyMessage.textContent = event.message || 'The model completed the tool calls but returned an empty final reply.';
+                postToolReplyModalOverlay.style.display = 'flex';
+                appendLog(`<span class="log-label">⚠️ Decision Needed</span> ${escapeHtml(event.message || 'Choose whether to retry the final answer or cancel and restore.')}`, 'log-status');
+                break;
             case 'chat_done':
                 appendLog(`<span class="log-label">✅ Turn Complete</span> ${escapeHtml(event.message || 'Ready for next prompt.')}`, 'log-done');
                 setChatReady(); break;

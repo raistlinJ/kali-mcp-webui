@@ -257,6 +257,15 @@ body {
         flex: 1;
         padding: 0.75rem 1rem;
     }
+
+    .config-subtabs {
+        flex-direction: column;
+    }
+
+    .config-subtab-btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 /* Form Styles */
@@ -264,6 +273,55 @@ body {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+}
+
+.config-subtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.config-subtab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.7rem 1rem;
+    border-radius: 999px;
+    border: 1px solid var(--panel-border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.config-subtab-btn:hover {
+    color: var(--text-primary);
+    border-color: rgba(59, 130, 246, 0.3);
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.config-subtab-btn.active {
+    color: var(--accent-primary);
+    border-color: rgba(59, 130, 246, 0.35);
+    background: rgba(59, 130, 246, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.08);
+}
+
+.config-subtab-btn-muted {
+    opacity: 0.7;
+}
+
+.config-subtab-panel {
+    display: none;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.config-subtab-panel.active {
+    display: flex;
 }
 
 .form-section {
@@ -290,6 +348,13 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+.config-card-lite {
+    padding: 1rem;
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
 }
 
 .input-group label {
@@ -372,6 +437,71 @@ body {
 
 .json-editor-details summary:hover {
     background: rgba(255, 255, 255, 0.08);
+}
+
+.config-collapse {
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.025);
+    overflow: hidden;
+}
+
+.config-collapse summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    cursor: pointer;
+    padding: 1rem 1.1rem;
+    color: var(--text-primary);
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.02);
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.config-collapse summary::-webkit-details-marker {
+    display: none;
+}
+
+.config-collapse summary:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.config-collapse summary span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.config-collapse .collapse-caret {
+    color: var(--text-secondary);
+    transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.config-collapse[open] .collapse-caret {
+    transform: rotate(180deg);
+    color: var(--accent-primary);
+}
+
+.config-collapse .tools-grid {
+    padding: 0 1rem 1rem;
+}
+
+.config-subtab-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.1rem;
+    border: 1px dashed rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-secondary);
+}
+
+.config-subtab-empty i {
+    color: var(--accent-primary);
+    font-size: 1.1rem;
 }
 
 /* Input & Select fields */
