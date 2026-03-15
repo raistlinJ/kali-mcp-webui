@@ -241,6 +241,10 @@ body {
     height: 100%;
 }
 
+#chat-pane.active {
+    height: auto;
+}
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
@@ -1197,6 +1201,10 @@ option {
     height: auto;
     max-height: none;
     min-width: 0;
+}
+
+#live-log-panel {
+    height: auto !important;
 }
 
 .chat-header-actions {
