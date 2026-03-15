@@ -226,73 +226,81 @@ document.addEventListener('DOMContentLoaded', () => {
         return wrappedTool;
     }
 
-    function updateToolsJson() {
+    function buildSelectedToolsConfig() {
         const selectedTools = [];
         const routeViaProxychains = Boolean(proxychainsRouteAllCheckbox?.checked);
 
         toolCheckboxes.forEach(cb => {
-            if (cb.checked) {
-                const name = cb.value;
-                const cmd = cb.dataset.cmd;
-                let toolDefinition;
-
-                if (name === 'msf_search') {
-                    toolDefinition = {
-                        name: "msf_search",
-                        description: "Search for Metasploit modules by keyword (e.g., 'jboss').",
-                        command: "msfconsole",
-                        base_args: ["-q", "-x", "search {args}; exit"],
-                        allow_args: true
-                    };
-                } else if (name === 'msf_run') {
-                    toolDefinition = {
-                        name: "msf_run",
-                        description: "Execute a Metasploit module. Format: '[module_path]; set RHOSTS [target]; run'.",
-                        command: "msfconsole",
-                        base_args: ["-q", "-x", "use {args}; exit"],
-                        allow_args: true
-                    };
-                } else if (name === 'proxychains') {
-                    toolDefinition = {
-                        name: 'proxychains',
-                        description: 'Run a network command through proxychains. Example args: "nmap -sT scanme.nmap.org" or "curl http://example.com".',
-                        command: cmd,
-                        args: ['{args}'],
-                        allow_args: true
-                    };
-                } else if (name === 'ssh') {
-                    toolDefinition = {
-                        name: 'ssh',
-                        description: 'Open an SSH client connection or run a remote command. Example args: "user@host" or "user@host uname -a".',
-                        command: cmd,
-                        args: ['{args}'],
-                        allow_args: true
-                    };
-                } else if (name === 'shell') {
-                    toolDefinition = {
-                        name: 'shell',
-                        description: 'Run an allowlisted local shell command for host inspection. Allowed commands: ls, cat, grep, docker, ip, ss, ps, uname, id, pwd, whoami, find.',
-                        command: cmd,
-                        args: ['{args}'],
-                        allow_args: true
-                    };
-                } else {
-                    toolDefinition = { name: name, command: cmd, args: ["{args}"], allow_args: true };
-                }
-
-                if (routeViaProxychains) {
-                    toolDefinition = wrapToolWithProxychains(toolDefinition);
-                }
-
-                selectedTools.push(toolDefinition);
+            if (!cb.checked) {
+                return;
             }
+
+            const name = cb.value;
+            const cmd = cb.dataset.cmd;
+            let toolDefinition;
+
+            if (name === 'msf_search') {
+                toolDefinition = {
+                    name: "msf_search",
+                    description: "Search for Metasploit modules by keyword (e.g., 'jboss').",
+                    command: "msfconsole",
+                    base_args: ["-q", "-x", "search {args}; exit"],
+                    allow_args: true
+                };
+            } else if (name === 'msf_run') {
+                toolDefinition = {
+                    name: "msf_run",
+                    description: "Execute a Metasploit module. Format: '[module_path]; set RHOSTS [target]; run'.",
+                    command: "msfconsole",
+                    base_args: ["-q", "-x", "use {args}; exit"],
+                    allow_args: true
+                };
+            } else if (name === 'proxychains') {
+                toolDefinition = {
+                    name: 'proxychains',
+                    description: 'Run a network command through proxychains. Example args: "nmap -sT scanme.nmap.org" or "curl http://example.com".',
+                    command: cmd,
+                    args: ['{args}'],
+                    allow_args: true
+                };
+            } else if (name === 'ssh') {
+                toolDefinition = {
+                    name: 'ssh',
+                    description: 'Open an SSH client connection or run a remote command. Example args: "user@host" or "user@host uname -a".',
+                    command: cmd,
+                    args: ['{args}'],
+                    allow_args: true
+                };
+            } else if (name === 'shell') {
+                toolDefinition = {
+                    name: 'shell',
+                    description: 'Run an allowlisted local shell command for host inspection. Allowed commands: ls, cat, grep, docker, ip, ss, ps, uname, id, pwd, whoami, find.',
+                    command: cmd,
+                    args: ['{args}'],
+                    allow_args: true
+                };
+            } else {
+                toolDefinition = { name: name, command: cmd, args: ["{args}"], allow_args: true };
+            }
+
+            if (routeViaProxychains) {
+                toolDefinition = wrapToolWithProxychains(toolDefinition);
+            }
+
+            selectedTools.push(toolDefinition);
         });
+
+        return { tools: selectedTools };
+    }
+
+    function updateToolsJson() {
+        const generatedConfig = buildSelectedToolsConfig();
         try {
             const currentJson = JSON.parse(toolsJsonArea.value || '{"tools": []}');
-            currentJson.tools = selectedTools;
+            currentJson.tools = generatedConfig.tools;
             toolsJsonArea.value = JSON.stringify(currentJson, null, 2);
         } catch (e) {
-            toolsJsonArea.value = JSON.stringify({ tools: selectedTools }, null, 2);
+            toolsJsonArea.value = JSON.stringify(generatedConfig, null, 2);
         }
     }
     toolCheckboxes.forEach(cb => cb.addEventListener('change', updateToolsJson));
@@ -536,6 +544,27 @@ document.addEventListener('DOMContentLoaded', () => {
         return `Targets: allow ${policyPreview(normalized.allow, 'none')} | block ${policyPreview(normalized.disallow, 'none')}`;
     }
 
+    function formatPolicyTooltip(policy) {
+        const normalized = normalizePolicy(policy);
+        const allowText = normalized.allow.length ? normalized.allow.join('\n') : 'None';
+        const disallowText = normalized.disallow.length ? normalized.disallow.join('\n') : 'None';
+        return `Allowed targets:\n${allowText}\n\nBlocked targets:\n${disallowText}`;
+    }
+
+    function setLiveToolsBadge(tools) {
+        const toolList = Array.isArray(tools) ? tools : [];
+        if (!toolList.length) {
+            toolsBadge.style.display = 'none';
+            toolsBadge.textContent = '';
+            toolsBadge.title = '';
+            return;
+        }
+
+        toolsBadge.textContent = `${toolList.length} tool(s): ${toolList.join(', ')}`;
+        toolsBadge.title = toolList.join('\n');
+        toolsBadge.style.display = 'inline-block';
+    }
+
     function renderPolicyList(entries, emptyLabel) {
         if (!entries.length) {
             return `<li>${escapeHtml(emptyLabel)}</li>`;
@@ -604,10 +633,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!policy) {
             policyBadge.style.display = 'none';
             policyBadge.textContent = '';
+            policyBadge.title = '';
             return;
         }
 
         policyBadge.textContent = formatPolicyBadge(policy);
+        policyBadge.title = formatPolicyTooltip(policy);
         policyBadge.style.display = 'inline-block';
     }
 
@@ -768,6 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let toolsConfig = null;
         if (cmdType !== 'apt') {
+            updateToolsJson();
             try { toolsConfig = JSON.parse(toolsJsonArea.value); }
             catch (e) { showAlert('Invalid JSON formatting in kali_tools.json editor.', 'error'); return; }
             if (!Array.isArray(toolsConfig.tools) || toolsConfig.tools.length === 0) {
@@ -813,8 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 startBtn.disabled = false;
 
                 if (data.tools && data.tools.length) {
-                    toolsBadge.textContent = `${data.tools.length} tool(s): ${data.tools.join(', ')}`;
-                    toolsBadge.style.display = 'inline-block';
+                    setLiveToolsBadge(data.tools);
                 }
                 setLivePolicyBadge(data.network_policy || networkPolicy);
                 
@@ -1152,7 +1183,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         resetStartBtn();
         setConfigEnabled(true);
-        toolsBadge.style.display = 'none';
+        setLiveToolsBadge([]);
         setLivePolicyBadge(null);
         
         // Disable active chat inputs
@@ -1382,8 +1413,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateStatus('running', 'Service Running - Chat Active');
 
                 if (Array.isArray(data.metadata?.available_tools) && data.metadata.available_tools.length) {
-                    toolsBadge.textContent = `${data.metadata.available_tools.length} tool(s): ${data.metadata.available_tools.join(', ')}`;
-                    toolsBadge.style.display = 'inline-block';
+                    setLiveToolsBadge(data.metadata.available_tools);
                 }
                 setLivePolicyBadge(data.metadata?.network_policy || null);
 
@@ -1406,6 +1436,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Optional: switch to chat tab if running
                 switchTab('chat-pane');
             } else {
+                setLiveToolsBadge([]);
                 setLivePolicyBadge(null);
                 const lastRunId = localStorage.getItem(LAST_ACTIVE_RUN_STORAGE_KEY);
                 if (lastRunId) {
