@@ -226,7 +226,7 @@ body {
 /* Content Area */
 .content-area {
     flex: 1;
-    min-height: 500px;
+    min-height: 0;
 }
 
 /* Tab Panes */
