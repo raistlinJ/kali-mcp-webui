@@ -538,6 +538,22 @@ def _perform_llm_analysis(run_id, span_req):
             annotations = f.read()
 
     import ollama
+    
+    # Defaults
+    ollama_url = 'http://localhost:11434'
+    model = 'llama3'
+    
+    # Try to load from metadata.json for this specific run
+    meta_path = os.path.join(session_dir, "metadata.json")
+    if os.path.isfile(meta_path):
+        try:
+            with open(meta_path, 'r') as f:
+                meta = json.load(f)
+                ollama_url = meta.get('ollama_url', ollama_url)
+                model = meta.get('model', model)
+        except Exception:
+            pass
+
     if span_req in ("Entire Session", "Event Point", ""):
         system_prompt = (
             "You are a Senior Penetration Testing Analyst reviewing a recent engagement. "
@@ -562,8 +578,7 @@ def _perform_llm_analysis(run_id, span_req):
     
     user_prompt = f"### Transcript ({span_req}) ###\n{transcript}\n\n### Annotations (JSON Lines) ###\n{'No annotations.' if not annotations else annotations}"
     
-    client = ollama.Client(host=app.config.get('OLLAMA_URL', 'http://localhost:11434'))
-    model = app.config.get('MCP_MODEL', 'llama3')
+    client = ollama.Client(host=ollama_url)
     
     resp = client.chat(
         model=model,
