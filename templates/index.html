@@ -158,6 +158,23 @@
                             </h2>
 
                             <div class="input-group">
+                                <label>Execution Routing</label>
+                                <label class="checkbox-container"><input type="checkbox" id="proxychains-route-all">
+                                    Route supported tools through proxychains4</label>
+                                <span class="input-hint">Wraps enabled native tools so commands run as
+                                    <strong>proxychains4 &lt;tool&gt; ...</strong>. The standalone proxychains tool remains available for one-off commands.</span>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Advanced Access</label>
+                                <label class="checkbox-container"><input type="checkbox" data-cmd="__builtin_shell__"
+                                        value="shell" class="tool-checkbox"> Enable constrained shell tool</label>
+                                <span class="input-hint">Allowlisted commands only: <strong>ls, cat, grep, ip, ss,
+                                        ps, uname, id, pwd, whoami, find</strong>. No shell chaining or interactive
+                                    sessions.</span>
+                            </div>
+
+                            <div class="input-group">
                                 <label>Reconnaissance</label>
                                 <div class="tools-grid">
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/nmap"
@@ -220,6 +237,11 @@
                             <div class="input-group">
                                 <label>Vulnerability &amp; Network</label>
                                 <div class="tools-grid">
+                                    <label class="checkbox-container"><input type="checkbox"
+                                            data-cmd="/usr/bin/proxychains4" value="proxychains" class="tool-checkbox">
+                                        proxychains</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/ssh"
+                                            value="ssh" class="tool-checkbox"> ssh</label>
                                     <label class="checkbox-container"><input type="checkbox"
                                             data-cmd="/usr/bin/searchsploit" value="searchsploit" class="tool-checkbox">
                                         searchsploit</label>

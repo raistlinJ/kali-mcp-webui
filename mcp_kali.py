@@ -3,10 +3,26 @@ import sys
 import subprocess
 import time
 import os
+import shlex
 from mcp.server import Server
 from mcp.types import Tool, TextContent
 
 server = Server("mcp-kali")
+
+_ALLOWED_SHELL_COMMANDS = {
+    "ls",
+    "cat",
+    "grep",
+    "ip",
+    "ss",
+    "ps",
+    "uname",
+    "id",
+    "pwd",
+    "whoami",
+    "find",
+}
+_DISALLOWED_SHELL_TOKENS = {"|", "||", "&", "&&", ";", ">", ">>", "<", "<<"}
 
 # Session logging — optional: if session_logger.py is unavailable the server still works
 try:
@@ -68,24 +84,45 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     tool_config = next((t for t in config.get("tools", []) if t["name"] == name), None)
     if not tool_config:
         return [TextContent(type="text", text=f"Error: Tool {name} not found in config")]
-        
-    cmd = [tool_config["command"]]
-    base_args = tool_config.get("base_args", [])
-    user_args = arguments.get("args", "")
 
-    if base_args:
-        # If we have base_args, check for {args} placeholder or just extend
-        has_placeholder = any("{args}" in a for a in base_args)
-        if has_placeholder:
-            cmd.extend([a.replace("{args}", user_args) for a in base_args])
-        else:
-            cmd.extend(base_args)
-            if tool_config.get("allow_args", False) and user_args:
-                import shlex
-                cmd.extend(shlex.split(user_args))
-    elif tool_config.get("allow_args", False) and user_args:
-        import shlex
-        cmd.extend(shlex.split(user_args))
+    if name == "shell":
+        user_args = (arguments.get("args", "") or "").strip()
+        if not user_args:
+            return [TextContent(type="text", text="Error: shell requires a command, e.g. 'ls -la' or 'ip addr'")]
+
+        try:
+            shell_parts = shlex.split(user_args)
+        except ValueError as exc:
+            return [TextContent(type="text", text=f"Error: Invalid shell arguments: {exc}")]
+
+        if not shell_parts:
+            return [TextContent(type="text", text="Error: shell requires a command")]
+
+        shell_command = shell_parts[0]
+        if shell_command not in _ALLOWED_SHELL_COMMANDS:
+            allowed = ", ".join(sorted(_ALLOWED_SHELL_COMMANDS))
+            return [TextContent(type="text", text=f"Error: '{shell_command}' is not allowed. Allowed commands: {allowed}")]
+
+        if any(token in _DISALLOWED_SHELL_TOKENS for token in shell_parts[1:]):
+            return [TextContent(type="text", text="Error: shell does not allow command chaining, pipes, or redirection")]
+
+        cmd = shell_parts
+    else:
+        cmd = [tool_config["command"]]
+        base_args = tool_config.get("base_args", [])
+        user_args = arguments.get("args", "")
+        
+        if base_args:
+            # If we have base_args, check for {args} placeholder or just extend
+            has_placeholder = any("{args}" in a for a in base_args)
+            if has_placeholder:
+                cmd.extend([a.replace("{args}", user_args) for a in base_args])
+            else:
+                cmd.extend(base_args)
+                if tool_config.get("allow_args", False) and user_args:
+                    cmd.extend(shlex.split(user_args))
+        elif tool_config.get("allow_args", False) and user_args:
+            cmd.extend(shlex.split(user_args))
         
     try:
         t0 = time.time()

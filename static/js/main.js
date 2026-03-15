@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const kaliCommandType = document.getElementById('kali-command-type');
     const toolsConfigSection = document.getElementById('tools-config-section');
+    const proxychainsRouteAllCheckbox = document.getElementById('proxychains-route-all');
 
     const statusBadge = document.getElementById('status-badge');
     const statusText = statusBadge.querySelector('.status-text');
@@ -158,32 +159,88 @@ document.addEventListener('DOMContentLoaded', () => {
     const toolCheckboxes = document.querySelectorAll('.tool-checkbox');
     const toolsJsonArea = document.getElementById('kali-tools-json');
 
+    function wrapToolWithProxychains(toolDefinition) {
+        if (!toolDefinition || toolDefinition.name === 'proxychains' || toolDefinition.name === 'shell') {
+            return toolDefinition;
+        }
+
+        const wrappedTool = { ...toolDefinition };
+        const existingBaseArgs = Array.isArray(toolDefinition.base_args) ? [...toolDefinition.base_args] : [];
+
+        wrappedTool.command = '/usr/bin/proxychains4';
+        wrappedTool.base_args = [toolDefinition.command, ...existingBaseArgs];
+        wrappedTool.allow_args = true;
+
+        if (wrappedTool.args) {
+            delete wrappedTool.args;
+        }
+
+        if (wrappedTool.description) {
+            wrappedTool.description = `${wrappedTool.description} Routed through proxychains4.`;
+        }
+
+        return wrappedTool;
+    }
+
     function updateToolsJson() {
         const selectedTools = [];
+        const routeViaProxychains = Boolean(proxychainsRouteAllCheckbox?.checked);
+
         toolCheckboxes.forEach(cb => {
             if (cb.checked) {
                 const name = cb.value;
                 const cmd = cb.dataset.cmd;
+                let toolDefinition;
 
                 if (name === 'msf_search') {
-                    selectedTools.push({
+                    toolDefinition = {
                         name: "msf_search",
                         description: "Search for Metasploit modules by keyword (e.g., 'jboss').",
                         command: "msfconsole",
                         base_args: ["-q", "-x", "search {args}; exit"],
                         allow_args: true
-                    });
+                    };
                 } else if (name === 'msf_run') {
-                    selectedTools.push({
+                    toolDefinition = {
                         name: "msf_run",
                         description: "Execute a Metasploit module. Format: '<module_path>; set RHOSTS <target>; run'.",
                         command: "msfconsole",
                         base_args: ["-q", "-x", "use {args}; exit"],
                         allow_args: true
-                    });
+                    };
+                } else if (name === 'proxychains') {
+                    toolDefinition = {
+                        name: 'proxychains',
+                        description: 'Run a network command through proxychains. Example args: "nmap -sT scanme.nmap.org" or "curl http://example.com".',
+                        command: cmd,
+                        args: ['{args}'],
+                        allow_args: true
+                    };
+                } else if (name === 'ssh') {
+                    toolDefinition = {
+                        name: 'ssh',
+                        description: 'Open an SSH client connection or run a remote command. Example args: "user@host" or "user@host uname -a".',
+                        command: cmd,
+                        args: ['{args}'],
+                        allow_args: true
+                    };
+                } else if (name === 'shell') {
+                    toolDefinition = {
+                        name: 'shell',
+                        description: 'Run an allowlisted local shell command for host inspection. Allowed commands: ls, cat, grep, ip, ss, ps, uname, id, pwd, whoami, find.',
+                        command: cmd,
+                        args: ['{args}'],
+                        allow_args: true
+                    };
                 } else {
-                    selectedTools.push({ name: name, command: cmd, args: ["{args}"], allow_args: true });
+                    toolDefinition = { name: name, command: cmd, args: ["{args}"], allow_args: true };
                 }
+
+                if (routeViaProxychains) {
+                    toolDefinition = wrapToolWithProxychains(toolDefinition);
+                }
+
+                selectedTools.push(toolDefinition);
             }
         });
         try {
@@ -195,6 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     toolCheckboxes.forEach(cb => cb.addEventListener('change', updateToolsJson));
+    proxychainsRouteAllCheckbox?.addEventListener('change', updateToolsJson);
     updateToolsJson();
 
     // ---------------------------------------------------------------
