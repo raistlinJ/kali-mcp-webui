@@ -233,6 +233,11 @@ async def _maybe_summarise(
     return compacted
 
 
+def _emit_chat_cancelled(event_callback):
+    _emit(event_callback, "status", {"message": "Chat cancelled by user."})
+    _emit(event_callback, "chat_done", {"message": "Prompt cancelled. Ready for next prompt."})
+
+
 # ---------------------------------------------------------------------------
 # MCPSession — persistent connection with chat loop
 # ---------------------------------------------------------------------------
@@ -414,7 +419,7 @@ class MCPSession:
         max_iterations = 20
         for iteration in range(max_iterations):
             if cancel_event and cancel_event.is_set():
-                _emit(self.event_callback, "status", {"message": "Chat cancelled by user."})
+                _emit_chat_cancelled(self.event_callback)
                 return
 
             # Context management: summarise if needed
@@ -491,7 +496,7 @@ class MCPSession:
             # Execute each tool call via MCP
             for tc in tool_calls:
                 if cancel_event and cancel_event.is_set():
-                    _emit(self.event_callback, "status", {"message": "Chat cancelled by user."})
+                    _emit_chat_cancelled(self.event_callback)
                     return
 
                 tool_name, tool_args = _extract_tool_info(tc)

@@ -61,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let _logInitialCleared = false;
     let _sessionToStopId = null;
     let _currentRunId = null;
+    const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
+    const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
     
     // SVG Templates
     const ICON_SVG = {
@@ -256,6 +258,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------------
     // Log Helpers
     // ---------------------------------------------------------------
+    function getLiveLogStorageKey(runId = _currentRunId) {
+        return runId ? `${LIVE_LOG_STORAGE_PREFIX}${runId}` : null;
+    }
+
+    function persistLiveLog(runId = _currentRunId) {
+        const storageKey = getLiveLogStorageKey(runId);
+        if (!storageKey) return;
+
+        try {
+            localStorage.setItem(storageKey, JSON.stringify({
+                html: liveLogViewer.innerHTML,
+                cleared: _logInitialCleared,
+                savedAt: Date.now(),
+            }));
+            localStorage.setItem(LAST_ACTIVE_RUN_STORAGE_KEY, runId);
+        } catch (err) {
+            console.warn('Failed to persist live log state:', err);
+        }
+    }
+
+    function restoreLiveLog(runId = _currentRunId) {
+        const storageKey = getLiveLogStorageKey(runId);
+        if (!storageKey) return false;
+
+        try {
+            const raw = localStorage.getItem(storageKey);
+            if (!raw) return false;
+
+            const payload = JSON.parse(raw);
+            if (!payload || typeof payload.html !== 'string') return false;
+
+            liveLogViewer.innerHTML = payload.html;
+            _logInitialCleared = Boolean(payload.cleared || payload.html.trim());
+            return true;
+        } catch (err) {
+            console.warn('Failed to restore live log state:', err);
+            return false;
+        }
+    }
+
     function appendLog(html, cssClass = '') {
         if (!_logInitialCleared) {
             liveLogViewer.innerHTML = '';
@@ -266,8 +308,13 @@ document.addEventListener('DOMContentLoaded', () => {
         entry.innerHTML = html;
         liveLogViewer.appendChild(entry);
         liveLogViewer.scrollTop = liveLogViewer.scrollHeight;
+        persistLiveLog();
     }
-    function clearLog() { liveLogViewer.innerHTML = ''; }
+    function clearLog() {
+        liveLogViewer.innerHTML = '';
+        _logInitialCleared = false;
+        persistLiveLog();
+    }
     function closeSse() {
         if (_eventSource) { _eventSource.close(); _eventSource = null; }
     }
@@ -398,6 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 _serviceRunning = true;
                 _currentRunId = data.run_id;
+                persistLiveLog();
                 
                 // Switch button to Stop state
                 startBtn.className = 'btn btn-danger';
@@ -704,11 +752,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleServiceStopped() {
         if (!_serviceRunning && statusText.textContent === 'Idle') return; // Already cleaned up
 
+        const stoppedRunId = _currentRunId;
         _serviceRunning = false;
         _chatBusy = false;
         _currentRunId = null;
         _logInitialCleared = false; // Reset for next run
         updateStatus('success', 'Service Stopped');
+
+        if (stoppedRunId) {
+            persistLiveLog(stoppedRunId);
+        }
         
         resetStartBtn();
         setConfigEnabled(true);
@@ -921,6 +974,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 startBtn.disabled = false;
 
                 updateStatus('running', 'Service Running - Chat Active');
+
+                if (!restoreLiveLog(_currentRunId)) {
+                    _logInitialCleared = liveLogViewer.children.length > 0;
+                }
                 
                 // Enable Chat Console inputs
                 navChatBtn.disabled = false;
@@ -936,6 +993,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Optional: switch to chat tab if running
                 switchTab('chat-pane');
+            } else {
+                const lastRunId = localStorage.getItem(LAST_ACTIVE_RUN_STORAGE_KEY);
+                if (lastRunId) {
+                    restoreLiveLog(lastRunId);
+                }
             }
         } catch (err) {
             console.error("Failed to check initial service status:", err);
