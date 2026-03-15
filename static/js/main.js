@@ -59,6 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let _serviceRunning = false;
     let _chatBusy = false;
     let _logInitialCleared = false;
+    let _sessionToStopId = null;
+    let _currentRunId = null;
     
     // SVG Templates
     const ICON_SVG = {
@@ -273,20 +275,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------------
     // Start / Stop Service
     // ---------------------------------------------------------------
-    function askToStopSession() {
+    function askToStopSession(runId = null) {
+        _sessionToStopId = runId;
         confirmModalOverlay.style.display = 'flex';
     }
 
     confirmCancelBtn.addEventListener('click', () => {
         confirmModalOverlay.style.display = 'none';
+        _sessionToStopId = null;
     });
 
     confirmStopBtn.addEventListener('click', () => {
         confirmModalOverlay.style.display = 'none';
-        stopService();
+        if (_sessionToStopId) {
+            stopTargetedSession(_sessionToStopId);
+        } else {
+            stopService();
+        }
     });
 
-    chatStopBtn.addEventListener('click', askToStopSession);
+    chatStopBtn.addEventListener('click', () => askToStopSession(null));
+
+    async function stopTargetedSession(runId) {
+        try {
+            const response = await fetch(`/api/sessions/${runId}/stop`, { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                showAlert(data.message, 'success');
+                loadSessions(); 
+                if (runId === _currentRunId) {
+                    handleServiceStopped();
+                }
+            } else {
+                throw new Error(data.error || 'Failed to stop session');
+            }
+        } catch (error) {
+            showAlert(error.message);
+        } finally {
+            _sessionToStopId = null;
+        }
+    }
 
     async function stopService() {
         if (!_serviceRunning) {
@@ -771,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sessionsList.querySelectorAll('.btn-stop-session').forEach(btn => btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            askToStopSession();
+            askToStopSession(btn.dataset.stopRun);
         }));
     }
 

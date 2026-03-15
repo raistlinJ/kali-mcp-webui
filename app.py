@@ -394,6 +394,36 @@ def session_stream():
     )
 
 
+@app.route('/api/sessions/<run_id>/stop', methods=['POST'])
+def session_targeted_stop(run_id):
+    """Stop or clean up a specific session by run_id."""
+    with _session_lock:
+        active_id = _session_state["run_id"]
+        status = _session_state["status"]
+        if active_id == run_id and status != "idle":
+            # If it's the active one and it's actually running, use global stop
+            return session_stop()
+
+    # If not active or already idle in memory, cleanup the disk metadata
+    meta_path = os.path.join(RUNS_DIR, run_id, "metadata.json")
+    if os.path.isfile(meta_path):
+        try:
+            with open(meta_path, 'r') as f:
+                meta = json.load(f)
+            if meta.get("status") == "running":
+                meta["status"] = "completed"
+                if not meta.get("end_time"):
+                    from datetime import datetime, timezone
+                    meta["end_time"] = datetime.now(timezone.utc).isoformat()
+                with open(meta_path, 'w') as f:
+                    json.dump(meta, f, indent=2)
+                return jsonify({'success': True, 'message': f'Session {run_id} marked as completed.'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    return jsonify({'success': True, 'message': 'Session already idle or cleaned up.'})
+
+
 # -----------------------------------------------------------------------
 # Sessions History API
 # -----------------------------------------------------------------------
