@@ -787,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div style="display: flex; align-items: center;">
                     <span class="session-status ${s.status || 'unknown'}">${s.status || 'unknown'}</span>
-                    ${s.status === 'running' ? `<button class="btn-stop-session" title="Stop Running Session" data-stop-run="${s.run_id}"><i class="ph ph-stop"></i></button>` : ''}
+                    ${s.status === 'running' ? `<button class="btn-stop-session" title="Stop Running Session" data-stop-run="${s.run_id}">${ICON_SVG.STOP}</button>` : ''}
                 </div>
             </div>`;
         }).join('');

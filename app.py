@@ -410,18 +410,22 @@ def session_targeted_stop(run_id):
         try:
             with open(meta_path, 'r') as f:
                 meta = json.load(f)
-            if meta.get("status") == "running":
+            
+            # Case-insensitive status check
+            current_status = str(meta.get("status", "")).lower()
+            if current_status in ("running", "starting", "stopping"):
                 meta["status"] = "completed"
                 if not meta.get("end_time"):
                     from datetime import datetime, timezone
                     meta["end_time"] = datetime.now(timezone.utc).isoformat()
+                
                 with open(meta_path, 'w') as f:
                     json.dump(meta, f, indent=2)
                 return jsonify({'success': True, 'message': f'Session {run_id} marked as completed.'})
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            return jsonify({'success': False, 'error': f"Failed to update metadata: {str(e)}"}), 500
 
-    return jsonify({'success': True, 'message': 'Session already idle or cleaned up.'})
+    return jsonify({'success': True, 'message': 'Session already finalized or could not be found.'})
 
 
 # -----------------------------------------------------------------------
