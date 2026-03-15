@@ -449,6 +449,19 @@
                 </div>
             </div>
 
+            <!-- Generic Progress/Loading Modal -->
+            <div id="progress-modal-overlay" class="modal-overlay" style="display: none; z-index: 9999;">
+                <div class="annotation-modal" style="max-width: 400px; text-align: center; padding: 2.5rem;">
+                    <div class="loading-spinner-large" id="progress-spinner">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="var(--accent-primary)" viewBox="0 0 256 256" class="spinning">
+                            <path d="M136,32V72a8,8,0,0,1-16,0V32a8,8,0,0,1,16,0Zm88,88H184a8,8,0,0,0,0,16h40a8,8,0,0,0,0-16ZM72,128a8,8,0,0,0-8-8H24a8,8,0,0,0,0,16H64A8,8,0,0,0,72,128Zm118.07,56.07a8,8,0,0,0-11.31,11.31l28.28,28.29a8,8,0,0,0,11.32-11.32ZM77.24,65.93,48.97,37.66A8,8,0,1,0,37.66,49l28.28,28.28a8,8,0,1,0,11.3-11.31Zm112.83,0a8,8,0,0,1,0,11.31L161.79,105.52a8,8,0,1,1-11.31-11.31l28.28-28.28A8,8,0,0,1,190.07,65.93Zm-112.83,112.8a8,8,0,0,1-11.32,0L37.66,207a8,8,0,1,1,11.31-11.31l28.27,28.28A8,8,0,0,1,77.24,178.73Z"></path>
+                        </svg>
+                    </div>
+                    <h3 id="progress-title" style="margin-top: 1.5rem; font-size: 1.25rem;">Working...</h3>
+                    <p id="progress-message" style="margin-top: 0.5rem; opacity: 0.8; font-size: 0.95rem;">Please wait a moment.</p>
+                </div>
+            </div>
+
             <!-- Global Alerts Container -->
             <div id="alerts-container" class="alerts-container"></div>
 

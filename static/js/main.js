@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // DOM References
     // ---------------------------------------------------------------
     const fetchBtn = document.getElementById('fetch-models-btn');
+    const progressModal = document.getElementById('progress-modal-overlay');
+    const progressTitle = document.getElementById('progress-title');
+    const progressMsg = document.getElementById('progress-message');
     const startBtn = document.getElementById('start-service-btn');
     const modelSelect = document.getElementById('model-select');
     const ollamaUrlInput = document.getElementById('ollama-url');
@@ -196,9 +199,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = ollamaUrlInput.value.trim();
         if (!url) { showAlert('Please enter an Ollama Instance URL'); return; }
 
-        const icon = fetchBtn.querySelector('i');
-        icon.classList.add('spin');
+        // Start progress
         fetchBtn.disabled = true;
+        
+        // Show progress modal
+        progressTitle.innerText = "Fetching Models";
+        progressMsg.innerText = `Connecting to ${url}...`;
+        progressModal.style.display = 'flex';
 
         try {
             const response = await fetch('/api/models', {
@@ -228,13 +235,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else { throw new Error(data.error || 'Failed to fetch models'); }
         } catch (error) {
-            showAlert(error.message);
+            showAlert(error.message, 'error');
             modelSelect.innerHTML = '<option value="" disabled selected>Failed to load models</option>';
             modelSelect.disabled = true;
             startBtn.disabled = true;
         } finally {
-            icon.classList.remove('spin');
             fetchBtn.disabled = false;
+            progressModal.style.display = 'none';
         }
     });
 
