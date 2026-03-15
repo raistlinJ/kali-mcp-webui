@@ -181,7 +181,7 @@ def session_start():
     thread.start()
 
     # Wait for start() to complete (with timeout)
-    success = start_done.wait(timeout=30)
+    success = start_done.wait(timeout=45) # Slightly longer timeout
 
     if success and start_result["success"]:
         return jsonify({
@@ -191,20 +191,17 @@ def session_start():
             'message': f'Service started with {len(start_result["tools"])} tool(s).',
         })
     else:
-        # TIMEOUT or ERROR: Force cleanup so we're not stuck in "starting"
-        with _session_lock:
-            _session_state["status"] = "idle"
-            loop = _session_state["loop"]
-            _session_state["session"] = None
-            _session_state["loop"] = None
-
-        if loop:
-            try:
-                loop.call_soon_threadsafe(loop.stop)
-            except Exception:
-                pass
-
+        # TIMEOUT or ERROR: 
         error_msg = start_result["error"] or "Timed out starting session."
+        
+        # Cleanup state if we timed out
+        if not success:
+            with _session_lock:
+                _session_state["status"] = "idle"
+                _session_state["session"] = None
+                # We don't forcefully stop the loop here to avoid RuntimeError 
+                # inside the background thread. The thread should exit on its own.
+
         return jsonify({
             'success': False,
             'error': error_msg,

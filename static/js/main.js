@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let command = '';
         if (cmdType === 'python') {
-            command = 'uv run --with mcp mcp_kali.py';
+            command = 'python3 mcp_kali.py';
         } else if (cmdType === 'apt') {
             command = 'python3 apt_logger_wrapper.py';
         }
