@@ -250,9 +250,9 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (name === 'msf_run') {
                 toolDefinition = {
                     name: "msf_run",
-                    description: "Execute a Metasploit module. Format: '[module_path]; set RHOSTS [target]; run'.",
+                    description: "Execute a Metasploit command sequence. Example: 'use auxiliary/scanner/http/jboss_vulnscan; set RHOSTS 10.0.2.2; run'.",
                     command: "msfconsole",
-                    base_args: ["-q", "-x", "use {args}; exit"],
+                    base_args: ["-q", "-x", "{args}; exit"],
                     allow_args: true
                 };
             } else if (name === 'proxychains') {
