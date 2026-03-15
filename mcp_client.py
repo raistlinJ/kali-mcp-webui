@@ -369,6 +369,12 @@ class MCPSession:
         self._ollama_tools = [_mcp_tool_to_ollama(t) for t in mcp_tools]
         self.tool_names = [t.name for t in mcp_tools]
 
+        if not self.tool_names:
+            _emit(self.event_callback, "error", {
+                "message": "MCP server started but exposed 0 tools. Configure at least one Kali tool before starting the session."
+            })
+            raise RuntimeError("MCP server exposed 0 tools")
+
         _emit(self.event_callback, "status", {
             "message": f"MCP server ready — {len(mcp_tools)} tool(s): {', '.join(self.tool_names)}"
         })
@@ -462,6 +468,18 @@ class MCPSession:
 
             if content:
                 self._logger.log_response(content)
+
+            if not tool_calls and not content.strip():
+                detail = "Model returned an empty reply with no tool calls."
+                if self.tool_names:
+                    detail += " This usually indicates the selected model is not reliably using tools with Ollama for this prompt."
+                else:
+                    detail += " No tools are configured for this session."
+                _emit(self.event_callback, "error", {"message": detail})
+                _emit(self.event_callback, "chat_done", {
+                    "message": "No response generated. Check tool configuration or switch to a stronger tool-calling model."
+                })
+                return
 
             # If no tool calls, this turn is done
             if not tool_calls:

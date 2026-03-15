@@ -97,12 +97,23 @@ def session_start():
     if not server_command:
         return jsonify({'success': False, 'error': 'No server command provided'}), 400
 
+    is_apt = "/usr/share/mcp-kali-server/mcp_server.py" in server_command
+
+    if not is_apt:
+        tool_count = 0
+        if isinstance(tools_config, dict):
+            tool_count = len(tools_config.get('tools', []) or [])
+        if tool_count == 0:
+            return jsonify({
+                'success': False,
+                'error': 'No Kali tools are enabled. Select at least one tool before starting a native session.',
+            }), 400
+
     # Write tools config if provided
     if tools_config:
         with open(os.path.abspath('kali_tools.json'), 'w') as f:
             json.dump(tools_config, f, indent=2)
 
-    is_apt = "/usr/share/mcp-kali-server/mcp_server.py" in server_command
     server_type = "apt" if is_apt else "native"
     run_id = _make_run_id(server_type)
 
@@ -397,12 +408,16 @@ def session_stream():
 @app.route('/api/sessions/<run_id>/stop', methods=['POST'])
 def session_targeted_stop(run_id):
     """Stop or clean up a specific session by run_id."""
+    should_stop_active = False
     with _session_lock:
         active_id = _session_state["run_id"]
         status = _session_state["status"]
         if active_id == run_id and status != "idle":
-            # If it's the active one and it's actually running, use global stop
-            return session_stop()
+            should_stop_active = True
+
+    if should_stop_active:
+        # Delegate after releasing the lock; session_stop() acquires it itself.
+        return session_stop()
 
     # If not active or already idle in memory, cleanup the disk metadata
     meta_path = os.path.join(RUNS_DIR, run_id, "metadata.json")

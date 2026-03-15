@@ -1246,6 +1246,7 @@ option {
     padding: 1.25rem 0;
     border-top: 1px solid var(--panel-border);
     background: transparent;
+    overflow-anchor: none;
 }
 
 .chat-console-wrapper {
@@ -1272,6 +1273,7 @@ option {
     min-height: 52px;
     max-height: 250px;
     overflow-y: auto;
+    overflow-anchor: none;
     font-size: 1rem;
     line-height: 1.5;
     font-family: 'Inter', sans-serif;

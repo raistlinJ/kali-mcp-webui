@@ -370,6 +370,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cmdType !== 'apt') {
             try { toolsConfig = JSON.parse(toolsJsonArea.value); }
             catch (e) { showAlert('Invalid JSON formatting in kali_tools.json editor.', 'error'); return; }
+            if (!Array.isArray(toolsConfig.tools) || toolsConfig.tools.length === 0) {
+                showAlert('Select at least one Kali tool before starting a native session.', 'error');
+                return;
+            }
         }
 
         if (!model || !command) return;
@@ -491,9 +495,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function resizeChatPromptInput() {
+        const viewportScrollY = window.scrollY;
+
+        chatPromptInput.style.height = 'auto';
+        chatPromptInput.style.height = `${chatPromptInput.scrollHeight}px`;
+
+        // Keep the viewport stable while the auto-growing prompt recalculates.
+        if (document.activeElement === chatPromptInput && window.scrollY !== viewportScrollY) {
+            window.scrollTo({ top: viewportScrollY, left: window.scrollX });
+        }
+    }
+
     chatPromptInput.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = this.scrollHeight + 'px';
+        resizeChatPromptInput();
     });
 
     chatPromptInput.addEventListener('keydown', (e) => {
@@ -509,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         _chatBusy = true;
         chatPromptInput.value = '';
-        chatPromptInput.style.height = 'auto';
+        resizeChatPromptInput();
         chatPromptInput.disabled = true;
         
         // Morph the send button into a stop button

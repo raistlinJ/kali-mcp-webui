@@ -161,7 +161,7 @@
                                 <label>Reconnaissance</label>
                                 <div class="tools-grid">
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/nmap"
-                                            value="nmap" class="tool-checkbox"> nmap</label>
+                                            value="nmap" class="tool-checkbox" checked> nmap</label>
                                     <label class="checkbox-container"><input type="checkbox"
                                             data-cmd="/usr/bin/rustscan" value="rustscan" class="tool-checkbox">
                                         rustscan</label>
@@ -264,7 +264,16 @@
                                     </summary>
                                     <textarea id="kali-tools-json" rows="8" spellcheck="false"
                                         style="margin-top: 1rem;">{
-  "tools": []
+    "tools": [
+        {
+            "name": "nmap",
+            "command": "/usr/bin/nmap",
+            "args": [
+                "{args}"
+            ],
+            "allow_args": true
+        }
+    ]
 }</textarea>
                                 </details>
                             </div>
