@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressModal = document.getElementById('progress-modal-overlay');
     const progressTitle = document.getElementById('progress-title');
     const progressMsg = document.getElementById('progress-message');
+    const ollamaFetchError = document.getElementById('ollama-fetch-error');
     const startBtn = document.getElementById('start-service-btn');
     const modelSelect = document.getElementById('model-select');
     const ollamaUrlInput = document.getElementById('ollama-url');
@@ -201,6 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Start progress
         fetchBtn.disabled = true;
+        ollamaFetchError.style.display = 'none';
+        ollamaFetchError.innerText = '';
         
         // Show progress modal
         progressTitle.innerText = "Fetching Models";
@@ -236,6 +239,9 @@ document.addEventListener('DOMContentLoaded', () => {
             } else { throw new Error(data.error || 'Failed to fetch models'); }
         } catch (error) {
             showAlert(error.message, 'error');
+            ollamaFetchError.innerText = `❌ ${error.message}`;
+            ollamaFetchError.style.display = 'block';
+            
             modelSelect.innerHTML = '<option value="" disabled selected>Failed to load models</option>';
             modelSelect.disabled = true;
             startBtn.disabled = true;
@@ -341,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!model || !command) return;
 
         setConfigEnabled(false);
-        startBtn.querySelector('i').className = 'ph ph-spinner-gap spin';
+        startBtn.innerHTML = ICON_SVG.SPINNER + '<span>Starting service…</span>';
         startBtn.disabled = true;
         updateStatus('running', 'Starting service…');
 
@@ -363,8 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Switch button to Stop state
                 startBtn.className = 'btn btn-danger';
-                startBtn.querySelector('i').className = 'ph ph-stop';
-                startBtn.querySelector('span').textContent = 'Stop Service';
+                startBtn.innerHTML = ICON_SVG.STOP + '<span>Stop Service</span>';
                 startBtn.disabled = false;
 
                 if (data.tools && data.tools.length) {
@@ -523,12 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!_chatBusy || !_serviceRunning) return;
         
         // Disable the stop button and turn into spinner so they can't spam it
-        sendPromptBtn.disabled = true;
-        const sendIcon = sendPromptBtn.querySelector('i');
-        if (sendIcon) {
-            sendIcon.classList.remove('ph-stop-circle');
-            sendIcon.classList.add('ph-spinner-gap', 'spin');
-        }
+        sendPromptBtn.innerHTML = ICON_SVG.SPINNER;
 
         appendLog('<span class="log-label">⏹️</span> Cancelling prompt...', 'log-status');
         
@@ -537,10 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             appendLog(`<span class="log-label">❌ Error</span> ${escapeHtml('Failed to send cancel signal.')}`, 'log-error');
             sendPromptBtn.disabled = false;
-            if (sendIcon) {
-                sendIcon.classList.remove('ph-spinner-gap', 'spin');
-                sendIcon.classList.add('ph-stop-circle');
-            }
+            sendPromptBtn.innerHTML = ICON_SVG.STOP;
         }
     }
 
@@ -877,8 +874,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Sync UI elements
                 setConfigEnabled(false);
                 startBtn.className = 'btn btn-danger';
-                startBtn.querySelector('i').className = 'ph ph-stop';
-                startBtn.querySelector('span').textContent = 'Stop Service';
+                startBtn.innerHTML = ICON_SVG.STOP + '<span>Stop Service</span>';
                 startBtn.disabled = false;
 
                 updateStatus('running', 'Service Running - Chat Active');
