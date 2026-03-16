@@ -82,11 +82,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionSummaryPanel = document.getElementById('session-summary-panel');
     const tabAnalysis = document.getElementById('tab-analysis');
     const analysisJobsList = document.getElementById('analysis-jobs-list');
+    const analysisJobsSummary = document.getElementById('analysis-jobs-summary');
     const clearJobsBtn = document.getElementById('clear-jobs-btn');
     
     let _analysisCache = {};
     let _analysisJobsInterval = null;
     let _openAnalysisJobMenuId = null;
+    let _analysisJobPathFilter = 'all';
     let _sessionsById = {};
     let _policyDraft = { allow: ['*'], disallow: [] };
 
@@ -1774,7 +1776,64 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function buildAnalysisJobSummary(jobs) {
+        const counts = { all: jobs.length, initial: 0, rewrite: 0, fallback: 0, failed: 0 };
+        jobs.forEach(job => {
+            const path = String(job.completion_path || '').toLowerCase();
+            if (Object.prototype.hasOwnProperty.call(counts, path)) {
+                counts[path] += 1;
+            }
+        });
+        return counts;
+    }
+
+    function renderAnalysisJobsSummary(jobs) {
+        if (!analysisJobsSummary) {
+            return;
+        }
+
+        if (!jobs.length) {
+            analysisJobsSummary.style.display = 'none';
+            analysisJobsSummary.innerHTML = '';
+            return;
+        }
+
+        const counts = buildAnalysisJobSummary(jobs);
+        const items = [
+            { key: 'all', label: 'All Jobs' },
+            { key: 'initial', label: 'Initial Pass' },
+            { key: 'rewrite', label: 'Rewrite Pass' },
+            { key: 'fallback', label: 'Fallback Pass' },
+            { key: 'failed', label: 'Failed' },
+        ];
+
+        analysisJobsSummary.style.display = 'flex';
+        analysisJobsSummary.innerHTML = `
+            <div class="analysis-summary-kicker">Reliability Summary</div>
+            <div class="analysis-summary-chips">
+                ${items.map(item => `
+                    <button
+                        type="button"
+                        class="analysis-summary-chip ${_analysisJobPathFilter === item.key ? 'analysis-summary-chip-active' : ''}"
+                        data-analysis-filter="${item.key}">
+                        <span>${escapeHtml(item.label)}</span>
+                        <strong>${counts[item.key] || 0}</strong>
+                    </button>
+                `).join('')}
+            </div>
+        `;
+
+        analysisJobsSummary.querySelectorAll('[data-analysis-filter]').forEach(button => {
+            button.addEventListener('click', () => {
+                _analysisJobPathFilter = button.dataset.analysisFilter || 'all';
+                renderAnalysisJobs(jobs);
+            });
+        });
+    }
+
     function renderAnalysisJobs(jobs) {
+        renderAnalysisJobsSummary(jobs);
+
         if (!jobs.length) {
             analysisJobsList.innerHTML = `
                 <div class="empty-state">
@@ -1784,9 +1843,23 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        analysisJobsList.innerHTML = jobs.map(job => {
+        const filteredJobs = _analysisJobPathFilter === 'all'
+            ? jobs
+            : jobs.filter(job => String(job.completion_path || '').toLowerCase() === _analysisJobPathFilter);
+
+        if (!filteredJobs.length) {
+            analysisJobsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="ph ph-funnel" style="font-size: 2.2rem; opacity: 0.3; margin-bottom: 1rem;"></i>
+                    <p>No analysis jobs match the selected completion path filter.</p>
+                </div>`;
+            return;
+        }
+
+        analysisJobsList.innerHTML = filteredJobs.map(job => {
             const requestedOutputs = Array.isArray(job.analysis_outputs) ? job.analysis_outputs : [];
             const outputLabels = ['Core Efficiency Review', ...requestedOutputs.map(formatAnalysisOutputLabel)];
+            const completionPathLabel = formatAnalysisCompletionPath(job.completion_path);
             const date = new Date(job.start_time).toLocaleString();
             const statusClass = `status-${job.status}`;
             const statusIcon = job.status === 'running' ? 'ph-spinner spinning' : (job.status === 'success' ? 'ph-check-circle' : 'ph-x-circle');
@@ -1840,6 +1913,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${outputLabels.map(label => `<span class="job-output-chip">${escapeHtml(label)}</span>`).join('')}
                         </div>
                     </div>
+                    ${completionPathLabel ? `
+                        <div class="job-attempt-summary">
+                            <span class="job-output-summary-label">Completion Path</span>
+                            <span class="job-attempt-chip job-attempt-chip-${escapeHtml(String(job.completion_path || '').toLowerCase())}">${escapeHtml(completionPathLabel)}</span>
+                        </div>
+                    ` : ''}
                     <div class="job-footer">
                         <div class="job-meta">
                             <span><i class="ph ph-calendar"></i> ${date}</span>
@@ -1913,6 +1992,22 @@ document.addEventListener('DOMContentLoaded', () => {
             .join(' ');
     }
 
+    function formatAnalysisCompletionPath(value) {
+        if (value === 'initial') {
+            return 'Initial Pass';
+        }
+        if (value === 'rewrite') {
+            return 'Rewrite Pass';
+        }
+        if (value === 'fallback') {
+            return 'Fallback Template Pass';
+        }
+        if (value === 'failed') {
+            return 'Failed';
+        }
+        return '';
+    }
+
     window.viewAnalysisResult = async function(jobId) {
         try {
             const res = await fetch(`/api/analysis/jobs/${jobId}`);
@@ -1933,6 +2028,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const renderedUserPrompt = escapeHtml(job.user_prompt || 'Not captured.');
                 const renderedError = job.error ? `<div class="status-error" style="margin-bottom: 1rem;">${escapeHtml(job.error)}</div>` : '';
                 const requestedOutputs = Array.isArray(job.analysis_outputs) ? job.analysis_outputs : [];
+                const completionPathLabel = formatAnalysisCompletionPath(job.completion_path);
                 const renderedOutputs = ['Core Efficiency Review', ...requestedOutputs.map(formatAnalysisOutputLabel)]
                     .map(label => `<span class="job-output-chip">${escapeHtml(label)}</span>`)
                     .join('');
@@ -1946,6 +2042,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div style="display: grid; gap: 1rem; font-size: 0.95rem; line-height: 1.6; color: var(--text-primary);">
                                 <div>
                                     <strong>Status:</strong> ${escapeHtml(job.status || 'unknown')}<br>
+                                    <strong>Completion Path:</strong> ${escapeHtml(completionPathLabel || 'Pending')}<br>
                                     <strong>Span:</strong> ${escapeHtml(job.span || 'unknown')}<br>
                                     <strong>Ollama URL:</strong> ${escapeHtml(job.ollama_url || 'unknown')}<br>
                                     <strong>Model:</strong> ${escapeHtml(job.model || 'unknown')}
