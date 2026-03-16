@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const toolsConfigSection = document.getElementById('tools-config-section');
     const toolsConfigEmpty = document.getElementById('tools-config-empty');
     const configToolsTabBtn = document.getElementById('config-tools-tab-btn');
-    const proxychainsRouteAllCheckbox = document.getElementById('proxychains-route-all');
     const configSubtabBtns = document.querySelectorAll('.config-subtab-btn');
     const configSubtabPanels = document.querySelectorAll('.config-subtab-panel');
 
@@ -215,32 +214,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const shellSequenceCheckbox = document.querySelector('.tool-checkbox[value="shell_sequence"]');
     const toolsJsonArea = document.getElementById('kali-tools-json');
 
-    function wrapToolWithProxychains(toolDefinition) {
-        if (!toolDefinition || toolDefinition.name === 'proxychains' || toolDefinition.name === 'shell' || toolDefinition.name === 'shell_extended' || toolDefinition.name === 'shell_sequence' || toolDefinition.name === 'shell_dangerous') {
-            return toolDefinition;
-        }
-
-        const wrappedTool = { ...toolDefinition };
-        const existingBaseArgs = Array.isArray(toolDefinition.base_args) ? [...toolDefinition.base_args] : [];
-
-        wrappedTool.command = '/usr/bin/proxychains4';
-        wrappedTool.base_args = [toolDefinition.command, ...existingBaseArgs];
-        wrappedTool.allow_args = true;
-
-        if (wrappedTool.args) {
-            delete wrappedTool.args;
-        }
-
-        if (wrappedTool.description) {
-            wrappedTool.description = `${wrappedTool.description} Routed through proxychains4.`;
-        }
-
-        return wrappedTool;
-    }
-
     function buildSelectedToolsConfig() {
         const selectedTools = [];
-        const routeViaProxychains = Boolean(proxychainsRouteAllCheckbox?.checked);
         const shellExtendedEnabled = Boolean(shellExtendedCheckbox?.checked);
 
         toolCheckboxes.forEach(cb => {
@@ -327,10 +302,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 toolDefinition = { name: name, command: cmd, args: ["{args}"], allow_args: true };
             }
 
-            if (routeViaProxychains) {
-                toolDefinition = wrapToolWithProxychains(toolDefinition);
-            }
-
             selectedTools.push(toolDefinition);
         });
 
@@ -367,7 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateToolsJson();
     });
     toolCheckboxes.forEach(cb => cb.addEventListener('change', updateToolsJson));
-    proxychainsRouteAllCheckbox?.addEventListener('change', updateToolsJson);
     updateShellSequenceDependency();
     updateToolsJson();
 
