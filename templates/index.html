@@ -750,6 +750,32 @@
                             </div>
                         </div>
                         <div class="input-group">
+                            <label>Analysis Outputs</label>
+                            <div class="analysis-output-grid">
+                                <label class="checkbox-container analysis-output-option analysis-output-option-static">
+                                    <input type="checkbox" checked disabled>
+                                    <span>
+                                        Core Efficiency Review
+                                        <small>Always included: inefficiencies, tool opportunities, reductions, next changes.</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-container analysis-output-option">
+                                    <input type="checkbox" class="analysis-output-checkbox" value="tooling_assets" checked>
+                                    <span>
+                                        Recommended Tooling Assets
+                                        <small>Suggest new MCP tools, enhancements, and Markdown playbooks with starter prompts.</small>
+                                    </span>
+                                </label>
+                                <label class="checkbox-container analysis-output-option">
+                                    <input type="checkbox" class="analysis-output-checkbox" value="progress_analysis" checked>
+                                    <span>
+                                        Progress Analysis
+                                        <small>Summarize major findings, current state, blockers, and estimated time or turn reductions.</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="input-group">
                             <label for="analysis-ollama-url">Ollama URL</label>
                             <div class="input-with-icon">
                                 <i class="ph ph-plugs-connected"></i>

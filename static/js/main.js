@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const analysisModelSelect = document.getElementById('analysis-model-select');
     const analysisSpanGroup = document.getElementById('analysis-span-group');
     const analysisSpanSelect = document.getElementById('analysis-span-select');
+    const analysisOutputCheckboxes = document.querySelectorAll('.analysis-output-checkbox');
     const analysisFetchBtn = document.getElementById('analysis-fetch-models-btn');
     const analysisFetchError = document.getElementById('analysis-fetch-error');
     const confirmAnalysisConfigBtn = document.getElementById('confirm-analysis-config-btn');
@@ -101,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
     let _analysisConfigResolver = null;
     let _analysisConfigOptions = null;
+    const DEFAULT_ANALYSIS_OUTPUTS = ['tooling_assets', 'progress_analysis'];
     
     // SVG Templates
     const ICON_SVG = {
@@ -492,6 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
         includeSpan = false,
         defaultSpan = 'Entire Session',
         fixedSpan = null,
+        selectedOutputs = DEFAULT_ANALYSIS_OUTPUTS,
     } = {}) {
         if (_analysisConfigResolver) {
             closeAnalysisConfigModal(null);
@@ -506,6 +509,10 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisFetchError.innerText = '';
         analysisSpanGroup.style.display = includeSpan ? 'flex' : 'none';
         analysisSpanSelect.value = defaultSpan;
+        const selectedOutputSet = new Set(Array.isArray(selectedOutputs) && selectedOutputs.length ? selectedOutputs : DEFAULT_ANALYSIS_OUTPUTS);
+        analysisOutputCheckboxes.forEach(checkbox => {
+            checkbox.checked = selectedOutputSet.has(checkbox.value);
+        });
         analysisModelSelect.innerHTML = suggestedModel
             ? `<option value="${escapeHtml(suggestedModel)}" selected>${escapeHtml(suggestedModel)}</option>`
             : '<option value="" disabled selected>Fetch models to load options</option>';
@@ -542,6 +549,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const span = _analysisConfigOptions?.includeSpan
             ? analysisSpanSelect.value
             : (_analysisConfigOptions?.fixedSpan || 'Entire Session');
+        const analysis_outputs = Array.from(analysisOutputCheckboxes)
+            .filter(checkbox => checkbox.checked)
+            .map(checkbox => checkbox.value);
 
         if (!ollamaUrl) {
             showAlert('Please enter an Ollama Instance URL', 'error');
@@ -552,7 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        closeAnalysisConfigModal({ ollama_url: ollamaUrl, model, span });
+        closeAnalysisConfigModal({ ollama_url: ollamaUrl, model, span, analysis_outputs });
     });
 
     cancelAnalysisConfigBtn.addEventListener('click', () => closeAnalysisConfigModal(null));
@@ -1454,6 +1464,156 @@ document.addEventListener('DOMContentLoaded', () => {
         await renderTab(_currentTab === 'analysis' && !_analysisCache[runId] ? 'transcript' : _currentTab);
     }
 
+    function parseRecommendedToolingAssets(responseText) {
+        const source = String(responseText || '');
+        const headingRegex = /^#{1,6}\s+Recommended Tooling Assets\s*$/gim;
+        const headingMatch = headingRegex.exec(source);
+        if (!headingMatch) {
+            return { assets: [], markdownWithoutSection: source };
+        }
+
+        const sectionStart = headingMatch.index;
+        const afterHeadingIndex = headingRegex.lastIndex;
+        const trailingText = source.slice(afterHeadingIndex);
+        const nextHeadingOffset = trailingText.search(/\n#{1,6}\s+/m);
+        const sectionEnd = nextHeadingOffset >= 0 ? afterHeadingIndex + nextHeadingOffset + 1 : source.length;
+        const sectionBody = source.slice(afterHeadingIndex, sectionEnd).trim();
+        const markdownWithoutSection = `${source.slice(0, sectionStart).trimEnd()}\n\n${source.slice(sectionEnd).trimStart()}`.trim();
+
+        const assets = [];
+        const fieldOrder = [
+            'Type',
+            'Name',
+            'Problem',
+            'Expected Gain',
+            'Why Better Than Prompting Alone',
+            'Starter Prompt',
+        ];
+        const fieldSet = new Set(fieldOrder.map(field => field.toLowerCase()));
+        let currentAsset = null;
+        let currentField = null;
+
+        sectionBody.split(/\r?\n/).forEach(rawLine => {
+            const line = rawLine.trimEnd();
+            const fieldMatch = line.match(/^\s*-\s*(Type|Name|Problem|Expected Gain|Why Better Than Prompting Alone|Starter Prompt):\s*(.*)$/i);
+            if (fieldMatch) {
+                const fieldName = fieldOrder.find(field => field.toLowerCase() === fieldMatch[1].toLowerCase());
+                if (!fieldName) {
+                    return;
+                }
+                if (fieldName === 'Type') {
+                    if (currentAsset && Object.keys(currentAsset).length) {
+                        assets.push(currentAsset);
+                    }
+                    currentAsset = {};
+                }
+                if (!currentAsset) {
+                    currentAsset = {};
+                }
+                currentField = fieldName;
+                currentAsset[currentField] = fieldMatch[2].trim();
+                return;
+            }
+
+            if (!currentAsset || !currentField) {
+                return;
+            }
+
+            const trimmed = line.trim();
+            if (!trimmed) {
+                return;
+            }
+
+            const potentialField = trimmed.match(/^-\s*([^:]+):/);
+            if (potentialField && fieldSet.has(potentialField[1].trim().toLowerCase())) {
+                return;
+            }
+
+            currentAsset[currentField] = currentAsset[currentField]
+                ? `${currentAsset[currentField]}\n${trimmed}`
+                : trimmed;
+        });
+
+        if (currentAsset && Object.keys(currentAsset).length) {
+            assets.push(currentAsset);
+        }
+
+        return { assets, markdownWithoutSection };
+    }
+
+    function renderRecommendedToolingAssets(assets) {
+        if (!Array.isArray(assets) || !assets.length) {
+            return '';
+        }
+
+        return `
+            <section class="analysis-tool-assets">
+                <div class="analysis-tool-assets-header">
+                    <span class="analysis-tool-assets-kicker">Structured Section</span>
+                    <h4>Recommended Tooling Assets</h4>
+                </div>
+                <div class="analysis-tool-assets-grid">
+                    ${assets.map(asset => {
+                        const type = escapeHtml(asset.Type || 'Unspecified');
+                        const name = escapeHtml(asset.Name || 'Unnamed asset');
+                        const problem = marked.parseInline(escapeHtml(asset.Problem || 'Not provided.'));
+                        const gain = marked.parseInline(escapeHtml(asset['Expected Gain'] || 'Not provided.'));
+                        const why = marked.parseInline(escapeHtml(asset['Why Better Than Prompting Alone'] || 'Not provided.'));
+                        const starterPrompt = escapeHtml(asset['Starter Prompt'] || 'Not provided.');
+
+                        return `
+                            <article class="analysis-tool-card">
+                                <div class="analysis-tool-card-topline">
+                                    <span class="analysis-tool-type">${type}</span>
+                                    <h5>${name}</h5>
+                                </div>
+                                <dl class="analysis-tool-card-fields">
+                                    <div>
+                                        <dt>Problem</dt>
+                                        <dd>${problem}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Expected Gain</dt>
+                                        <dd>${gain}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Why Better Than Prompting Alone</dt>
+                                        <dd>${why}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Starter Prompt</dt>
+                                        <dd><pre>${starterPrompt}</pre></dd>
+                                    </div>
+                                </dl>
+                            </article>
+                        `;
+                    }).join('')}
+                </div>
+            </section>
+        `;
+    }
+
+    function renderAnalysisResponseContent(responseSource) {
+        const responseText = String(responseSource || '').trim();
+        if (!responseText) {
+            return '<p>No response captured yet.</p>';
+        }
+
+        const { assets, markdownWithoutSection } = parseRecommendedToolingAssets(responseText);
+        const markdownSource = String(markdownWithoutSection || responseText).trim();
+        const renderedMarkdown = markdownSource ? marked.parse(markdownSource) : '';
+        const assetsSection = renderRecommendedToolingAssets(assets);
+
+        return `
+            <div class="analysis-response-layout">
+                ${assetsSection}
+                <div class="markdown-body analysis-markdown">
+                    ${renderedMarkdown || '<p>No response captured yet.</p>'}
+                </div>
+            </div>
+        `;
+    }
+
     async function renderTab(tab) {
         _currentTab = tab;
         document.querySelectorAll('.detail-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
@@ -1474,7 +1634,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch { detailContent.innerHTML = '<div class="empty-state">Could not load artifacts.</div>'; }
         } else if (tab === 'analysis') {
             if (_analysisCache[_browseRunId]) {
-                detailContent.innerHTML = `<div class="analysis-result" style="padding: 1rem;"><pre style="white-space: pre-wrap; font-family: 'Inter', sans-serif; line-height: 1.5; font-size: 0.95rem;">${escapeHtml(_analysisCache[_browseRunId])}</pre></div>`;
+                detailContent.innerHTML = `<div class="analysis-result" style="padding: 1rem;">${renderAnalysisResponseContent(_analysisCache[_browseRunId])}</div>`;
             } else {
                 detailContent.innerHTML = '<div class="empty-state">No analysis generated yet. Click "Analyze Session" to run inference.</div>';
             }
@@ -1625,6 +1785,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         analysisJobsList.innerHTML = jobs.map(job => {
+            const requestedOutputs = Array.isArray(job.analysis_outputs) ? job.analysis_outputs : [];
+            const outputLabels = ['Core Efficiency Review', ...requestedOutputs.map(formatAnalysisOutputLabel)];
             const date = new Date(job.start_time).toLocaleString();
             const statusClass = `status-${job.status}`;
             const statusIcon = job.status === 'running' ? 'ph-spinner spinning' : (job.status === 'success' ? 'ph-check-circle' : 'ph-x-circle');
@@ -1672,6 +1834,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             <p class="job-preview-text">${responsePreview}</p>
                         </div>
                     ` : ''}
+                    <div class="job-output-summary">
+                        <span class="job-output-summary-label">Outputs</span>
+                        <div class="job-output-chips">
+                            ${outputLabels.map(label => `<span class="job-output-chip">${escapeHtml(label)}</span>`).join('')}
+                        </div>
+                    </div>
                     <div class="job-footer">
                         <div class="job-meta">
                             <span><i class="ph ph-calendar"></i> ${date}</span>
@@ -1731,6 +1899,20 @@ document.addEventListener('DOMContentLoaded', () => {
         _openAnalysisJobMenuId = null;
     }
 
+    function formatAnalysisOutputLabel(value) {
+        if (value === 'tooling_assets') {
+            return 'Recommended Tooling Assets';
+        }
+        if (value === 'progress_analysis') {
+            return 'Progress Analysis';
+        }
+        return String(value || '')
+            .split('_')
+            .filter(Boolean)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+    }
+
     window.viewAnalysisResult = async function(jobId) {
         try {
             const res = await fetch(`/api/analysis/jobs/${jobId}`);
@@ -1746,10 +1928,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const modal = document.createElement('div');
                 modal.className = 'modal-overlay';
                 modal.style.display = 'flex';
-                const renderedResponse = responseSource ? marked.parse(responseSource) : '<p>No response captured yet.</p>';
+                const renderedResponse = renderAnalysisResponseContent(responseSource);
                 const renderedSystemPrompt = escapeHtml(job.system_prompt || 'Not captured.');
                 const renderedUserPrompt = escapeHtml(job.user_prompt || 'Not captured.');
                 const renderedError = job.error ? `<div class="status-error" style="margin-bottom: 1rem;">${escapeHtml(job.error)}</div>` : '';
+                const requestedOutputs = Array.isArray(job.analysis_outputs) ? job.analysis_outputs : [];
+                const renderedOutputs = ['Core Efficiency Review', ...requestedOutputs.map(formatAnalysisOutputLabel)]
+                    .map(label => `<span class="job-output-chip">${escapeHtml(label)}</span>`)
+                    .join('');
                 modal.innerHTML = `
                     <div class="annotation-modal" style="max-width: 800px; width: 90%;">
                         <div class="modal-header">
@@ -1764,6 +1950,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <strong>Ollama URL:</strong> ${escapeHtml(job.ollama_url || 'unknown')}<br>
                                     <strong>Model:</strong> ${escapeHtml(job.model || 'unknown')}
                                 </div>
+                                <div class="job-output-summary">
+                                    <span class="job-output-summary-label">Requested Outputs</span>
+                                    <div class="job-output-chips">${renderedOutputs}</div>
+                                </div>
                                 ${renderedError}
                                 <div>
                                     <h4 style="margin-bottom: 0.5rem;">System Prompt</h4>
@@ -1775,7 +1965,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div>
                                     <h4 style="margin-bottom: 0.5rem;">Response</h4>
-                                    <div class="markdown-body" style="font-size: 0.95rem; line-height: 1.6; color: var(--text-primary);">
+                                    <div style="font-size: 0.95rem; line-height: 1.6; color: var(--text-primary);">
                                         ${renderedResponse}
                                     </div>
                                 </div>
