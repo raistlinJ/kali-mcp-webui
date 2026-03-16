@@ -23,8 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelSelect = document.getElementById('model-select');
     const ollamaUrlInput = document.getElementById('ollama-url');
     const maxTurnsInput = document.getElementById('max-turns');
-    const allowTargetsInput = document.getElementById('allow-targets');
-    const disallowTargetsInput = document.getElementById('disallow-targets');
+    const policyTargetsInput = document.getElementById('policy-targets');
+    const policyEntryHint = document.getElementById('policy-entry-hint');
+    const policyEntryTypeInputs = document.querySelectorAll('input[name="policy-entry-type"]');
 
     const kaliCommandType = document.getElementById('kali-command-type');
     const toolsConfigSection = document.getElementById('tools-config-section');
@@ -87,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _analysisJobsInterval = null;
     let _openAnalysisJobMenuId = null;
     let _sessionsById = {};
+    let _policyDraft = { allow: ['*'], disallow: [] };
 
     let _eventSource = null;
     let _serviceRunning = false;
@@ -376,6 +378,51 @@ document.addEventListener('DOMContentLoaded', () => {
             .filter(Boolean);
         return lines.length ? lines : defaultValue;
     }
+
+    function getSelectedPolicyEntryType() {
+        const selected = Array.from(policyEntryTypeInputs).find(input => input.checked);
+        return selected?.value === 'disallow' ? 'disallow' : 'allow';
+    }
+
+    function updatePolicyEntryEditor() {
+        if (!policyTargetsInput) {
+            return;
+        }
+
+        const entryType = getSelectedPolicyEntryType();
+        const values = Array.isArray(_policyDraft[entryType]) ? _policyDraft[entryType] : [];
+        const defaultValue = entryType === 'allow' ? ['*'] : [];
+        const textValue = (values.length ? values : defaultValue).join('\n');
+
+        policyTargetsInput.value = textValue;
+        policyTargetsInput.placeholder = entryType === 'allow' ? '*' : 'Leave blank for none';
+
+        if (policyEntryHint) {
+            policyEntryHint.innerHTML = entryType === 'allow'
+                ? 'Editing the <strong>allow list</strong>. One entry per line. Supports <strong>*</strong>, IPs, CIDRs, hostnames, and URLs. Default is <strong>*</strong> to allow anything.'
+                : 'Editing the <strong>deny list</strong>. One entry per line. Deny rules override allow rules.';
+        }
+    }
+
+    function syncPolicyDraftFromEditor() {
+        if (!policyTargetsInput) {
+            return;
+        }
+
+        const entryType = getSelectedPolicyEntryType();
+        const defaultValue = entryType === 'allow' ? ['*'] : [];
+        _policyDraft[entryType] = parsePolicyList(policyTargetsInput.value, defaultValue);
+    }
+
+    policyEntryTypeInputs.forEach(input => {
+        input.addEventListener('change', () => {
+            syncPolicyDraftFromEditor();
+            updatePolicyEntryEditor();
+        });
+    });
+
+    policyTargetsInput?.addEventListener('input', syncPolicyDraftFromEditor);
+    updatePolicyEntryEditor();
 
     // ---------------------------------------------------------------
     // Fetch Models
@@ -893,12 +940,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = ollamaUrlInput.value.trim();
         const model = modelSelect.value;
         const cmdType = kaliCommandType.value;
-        const extraArgs = document.getElementById('kali-args').value.trim();
         const contextWindow = parseInt(document.getElementById('context-window').value, 10);
         const maxTurns = parseInt(maxTurnsInput.value, 10);
+        syncPolicyDraftFromEditor();
         const networkPolicy = {
-            allow: parsePolicyList(allowTargetsInput?.value, ['*']),
-            disallow: parsePolicyList(disallowTargetsInput?.value, []),
+            allow: Array.isArray(_policyDraft.allow) && _policyDraft.allow.length ? [..._policyDraft.allow] : ['*'],
+            disallow: Array.isArray(_policyDraft.disallow) ? [..._policyDraft.disallow] : [],
         };
 
         if (!Number.isInteger(maxTurns) || maxTurns < 1 || maxTurns > 100) {
@@ -912,7 +959,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (cmdType === 'apt') {
             command = 'python3 apt_logger_wrapper.py';
         }
-        if (extraArgs) command += ' ' + extraArgs;
 
         let toolsConfig = null;
         if (cmdType !== 'apt') {

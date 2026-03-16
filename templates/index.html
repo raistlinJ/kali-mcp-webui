@@ -188,18 +188,23 @@
                                 </h2>
 
                                 <div class="input-group">
-                                    <label for="allow-targets">Allow List</label>
-                                    <textarea id="allow-targets" rows="4" spellcheck="false"
-                                        placeholder="*">*</textarea>
-                                    <span class="input-hint">One entry per line. Supports <strong>*</strong>, IPs,
-                                        CIDRs, hostnames, and URLs. Default is <strong>*</strong> to allow anything.</span>
+                                    <label>Policy Entry Type</label>
+                                    <div class="policy-entry-toggle" role="radiogroup" aria-label="Target access policy entry type">
+                                        <label class="policy-entry-option">
+                                            <input type="radio" name="policy-entry-type" value="allow" checked>
+                                            <span>Allow List</span>
+                                        </label>
+                                        <label class="policy-entry-option">
+                                            <input type="radio" name="policy-entry-type" value="disallow">
+                                            <span>Deny List</span>
+                                        </label>
+                                    </div>
+                                    <span class="input-hint" id="policy-entry-hint">Editing the <strong>allow list</strong>. One entry per line. Supports <strong>*</strong>, IPs, CIDRs, hostnames, and URLs. Default is <strong>*</strong> to allow anything.</span>
                                 </div>
 
                                 <div class="input-group">
-                                    <label for="disallow-targets">Disallow List</label>
-                                    <textarea id="disallow-targets" rows="4" spellcheck="false"
-                                        placeholder="Leave blank for none"></textarea>
-                                    <span class="input-hint">One entry per line. Disallow rules override allow rules.</span>
+                                    <label for="policy-targets">Policy Entries</label>
+                                    <textarea id="policy-targets" rows="5" spellcheck="false" placeholder="*">*</textarea>
                                 </div>
                             </div>
 
@@ -220,14 +225,6 @@
                                             <option value="apt">APT Package (mcp-kali-server)</option>
                                         </select>
                                         <i class="ph ph-caret-down icon-right"></i>
-                                    </div>
-                                </div>
-
-                                <div class="input-group">
-                                    <label for="kali-args">Server Arguments / Config Paths</label>
-                                    <div class="input-with-icon">
-                                        <i class="ph ph-sliders"></i>
-                                        <input type="text" id="kali-args" value="" placeholder="Optional Server Arguments">
                                     </div>
                                 </div>
                             </div>
@@ -456,9 +453,6 @@
                                 Refresh
                             </button>
                         </div>
-                        <div class="sessions-list" id="sessions-list">
-                            <div class="empty-state">No sessions yet. Run an agent to start logging.</div>
-                        </div>
                         <div class="session-detail" id="session-detail" style="display:none;">
                             <div class="detail-tabs" id="detail-tabs">
                                 <button class="detail-tab active" data-tab="transcript"><i class="ph ph-chat-text"></i>
@@ -489,8 +483,11 @@
                             </div>
                             <div class="session-summary-panel" id="session-summary-panel" style="display:none;"></div>
                             <div class="detail-content" id="detail-content">
-                                <div class="empty-state">Select a session above.</div>
+                                <div class="empty-state">Select a session below.</div>
                             </div>
+                        </div>
+                        <div class="sessions-list" id="sessions-list">
+                            <div class="empty-state">No sessions yet. Run an agent to start logging.</div>
                         </div>
                     </div>
                 </div> <!-- End Past Sessions Tab -->
