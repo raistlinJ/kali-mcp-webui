@@ -85,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let _analysisCache = {};
     let _analysisJobsInterval = null;
+    let _openAnalysisJobMenuId = null;
     let _sessionsById = {};
 
     let _eventSource = null;
@@ -1677,6 +1678,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeAnalysisJobMenus();
                 if (!isOpen) {
                     menu.classList.add('show');
+                    _openAnalysisJobMenuId = jobId;
                 }
             });
         });
@@ -1695,12 +1697,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+
+        if (_openAnalysisJobMenuId) {
+            const openMenu = analysisJobsList.querySelector(`.job-actions-menu[data-job-id="${_openAnalysisJobMenuId}"]`);
+            if (openMenu) {
+                openMenu.classList.add('show');
+            } else {
+                _openAnalysisJobMenuId = null;
+            }
+        }
     }
 
     function closeAnalysisJobMenus() {
         analysisJobsList.querySelectorAll('.job-actions-menu.show').forEach(menu => {
             menu.classList.remove('show');
         });
+        _openAnalysisJobMenuId = null;
     }
 
     window.viewAnalysisResult = async function(jobId) {
