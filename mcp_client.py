@@ -54,6 +54,9 @@ _CHARS_PER_TOKEN = 4
 # Default context window budget (tokens).  Can be overridden via `context_window`.
 DEFAULT_CONTEXT_WINDOW = 8192
 
+# Default maximum LLM/tool iterations allowed for a single user prompt.
+DEFAULT_MAX_TURNS = 20
+
 # When estimated token usage exceeds this fraction of the budget, trigger
 # summarisation of older messages.
 _SUMMARISE_THRESHOLD = 0.75
@@ -400,7 +403,7 @@ def _extract_benign_empty_summary(tool_name: str, result_text: str, arguments: d
     ):
         return f"Commix did not identify command injection for {label}."
 
-    if tool_name in {'proxychains', 'ssh', 'netcat', 'ncat', 'tcpdump', 'aircrack-ng', 'recon-ng', 'msfconsole', 'shell'} and not normalized:
+    if tool_name in {'proxychains', 'ssh', 'netcat', 'ncat', 'tcpdump', 'aircrack-ng', 'recon-ng', 'msfconsole', 'shell', 'shell_extended', 'shell_sequence', 'shell_dangerous'} and not normalized:
         return f"{tool_name} completed successfully with no output for {label}."
 
     if not normalized:
@@ -541,7 +544,7 @@ async def _maybe_summarise(
         return messages  # no action needed
 
     _emit(event_callback, "status", {
-        "message": f"Context ~{est_tokens} tokens (budget {context_window}) — summarising older history …"
+        "message": f"Context ~{est_tokens} tokens (budget {context_window}) — summarizing older history …"
     })
 
     # Split: keep the most recent messages intact
@@ -631,12 +634,14 @@ class MCPSession:
         run_id: str | None = None,
         event_callback=None,
         context_window: int = DEFAULT_CONTEXT_WINDOW,
+        max_turns: int = DEFAULT_MAX_TURNS,
         network_policy: dict | None = None,
     ):
         self.ollama_url = ollama_url
         self.model = model
         self.server_command = server_command
         self.context_window = context_window
+        self.max_turns = max_turns
         self.event_callback = event_callback
         self.run_id = run_id or make_run_id("agent")
         self.network_policy = _normalize_network_policy(network_policy)
@@ -647,7 +652,7 @@ class MCPSession:
         self.messages: list[dict] = [
             {
                 "role": "system",
-                "content": "You are a network security assistant. You must wait for all tools to finish executing. NEVER attempt to run tools in the background (e.g., using `&` or `nohup`). You MUST allow the system to execute the tool synchronously so you can read and analyze the output before replying. You must obey the target access policy without exception. Allowed targets: " + allow_text + ". Disallowed targets: " + disallow_text + ". If a target is out of scope, do not attempt the action."
+                "content": "You are a network security assistant. You must wait for all tools to finish executing. NEVER attempt to run tools in the background (e.g., using `&` or `nohup`). You MUST allow the system to execute the tool synchronously so you can read and analyze the output before replying. The shell_dangerous tool requires explicit user verification before execution; only request it when clearly necessary and expect an approval gate before it runs. You must obey the target access policy without exception. Allowed targets: " + allow_text + ". Disallowed targets: " + disallow_text + ". If a target is out of scope, do not attempt the action."
             }
         ]
         
@@ -664,6 +669,7 @@ class MCPSession:
         self._started = False
         self._chat_lock = asyncio.Lock()
         self._pending_post_tool_reply = None
+        self._pending_dangerous_tool_approval = None
 
     async def _retry_empty_reply_after_tools(self, prompt: str, tool_results: list[dict]) -> str | None:
         _emit(self.event_callback, "status", {
@@ -734,6 +740,40 @@ class MCPSession:
         finally:
             self._pending_post_tool_reply = None
 
+    async def _prompt_dangerous_tool_approval(self, tool_name: str, tool_args: dict, cancel_event: asyncio.Event | None) -> str:
+        loop = asyncio.get_running_loop()
+        decision_future = loop.create_future()
+        command_text = (tool_args or {}).get("args", "") if isinstance(tool_args, dict) else str(tool_args)
+        self._pending_dangerous_tool_approval = {
+            "future": decision_future,
+            "loop": loop,
+            "tool": tool_name,
+            "args": tool_args,
+            "command": command_text,
+        }
+
+        _emit(self.event_callback, "status", {
+            "message": f"Dangerous tool approval required before executing {tool_name}."
+        })
+        _emit(self.event_callback, "dangerous_tool_approval", {
+            "tool": tool_name,
+            "args": tool_args,
+            "command": command_text,
+            "message": "The model requested a dangerous shell command. Review the command below and approve or cancel execution.",
+            "options": ["approve", "cancel"],
+        })
+
+        try:
+            while True:
+                if cancel_event and cancel_event.is_set():
+                    return "cancel"
+                try:
+                    return await asyncio.wait_for(asyncio.shield(decision_future), timeout=0.25)
+                except asyncio.TimeoutError:
+                    continue
+        finally:
+            self._pending_dangerous_tool_approval = None
+
     def resolve_post_tool_reply_decision(self, action: str) -> bool:
         if action not in {"retry", "cancel"}:
             return False
@@ -746,6 +786,36 @@ class MCPSession:
         future = pending.get("future")
         if not loop or not future:
             return False
+
+        def _resolve():
+            if not future.done():
+                future.set_result(action)
+
+        loop.call_soon_threadsafe(_resolve)
+        return True
+
+    def resolve_dangerous_tool_approval(self, action: str) -> bool:
+        if action not in {"approve", "cancel"}:
+            return False
+
+        pending = self._pending_dangerous_tool_approval
+        if not pending:
+            return False
+
+        loop = pending.get("loop")
+        future = pending.get("future")
+        if not loop or not future:
+            return False
+
+        if self._logger:
+            command_text = pending.get("command", "")
+            tool_name = pending.get("tool", "shell_dangerous")
+            decision_text = (
+                f"Approved dangerous command for {tool_name}: {command_text}"
+                if action == "approve"
+                else f"Denied dangerous command for {tool_name}: {command_text}"
+            )
+            self._logger.log_human_decision(decision_text, category="dangerous_tool_approval")
 
         def _resolve():
             if not future.done():
@@ -770,13 +840,14 @@ class MCPSession:
                 "model": self.model,
                 "ollama_url": self.ollama_url,
                 "context_window": self.context_window,
+                "max_turns": self.max_turns,
                 "network_policy": self.network_policy,
             },
             event_callback=self.event_callback,
         )
 
         _emit(self.event_callback, "status", {
-            "message": f"Starting session {self.run_id} (context: {self.context_window} tokens) …"
+            "message": f"Starting session {self.run_id} (context: {self.context_window} tokens, max turns: {self.max_turns}) …"
         })
 
         # Parse server command
@@ -843,6 +914,7 @@ class MCPSession:
             self._logger.update_metadata({
                 "available_tools": self.tool_names,
                 "available_tool_count": len(self.tool_names),
+                "max_turns": self.max_turns,
             })
 
         if not self.tool_names:
@@ -888,7 +960,7 @@ class MCPSession:
         self.messages.append({"role": "user", "content": prompt})
         turn_tool_results: list[dict] = []
 
-        max_iterations = 20
+        max_iterations = self.max_turns
         for iteration in range(max_iterations):
             if cancel_event and cancel_event.is_set():
                 _emit_chat_cancelled(self.event_callback)
@@ -1028,11 +1100,6 @@ class MCPSession:
 
                 tool_name, tool_args = _extract_tool_info(tc)
 
-                _emit(self.event_callback, "tool_call", {
-                    "tool": tool_name,
-                    "args": tool_args,
-                })
-
                 policy_allowed, policy_message = _evaluate_network_policy(self.network_policy, tool_args)
                 if not policy_allowed:
                     err_msg = f"Policy blocked tool call to {tool_name}: {policy_message}"
@@ -1050,6 +1117,37 @@ class MCPSession:
                     })
                     _emit(self.event_callback, "status", {"message": err_msg})
                     continue
+
+                if tool_name == "shell_dangerous":
+                    approval = await self._prompt_dangerous_tool_approval(tool_name, tool_args, cancel_event)
+                    if approval != "approve":
+                        denial_msg = "Dangerous shell command was cancelled by the user before execution."
+                        self._logger.log_tool_call(
+                            name=tool_name,
+                            args=tool_args,
+                            result=denial_msg,
+                            duration_ms=0,
+                            exit_code=-1,
+                        )
+                        self.messages.append({
+                            "role": "tool",
+                            "content": denial_msg,
+                            "name": tool_name,
+                        })
+                        turn_tool_results.append({
+                            "tool": tool_name,
+                            "args": tool_args,
+                            "result": denial_msg,
+                            "exit_code": -1,
+                            "duration_ms": 0,
+                        })
+                        _emit(self.event_callback, "status", {"message": denial_msg})
+                        continue
+
+                _emit(self.event_callback, "tool_call", {
+                    "tool": tool_name,
+                    "args": tool_args,
+                })
 
                 t0 = time.time()
                 try:

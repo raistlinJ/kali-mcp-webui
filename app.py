@@ -129,6 +129,21 @@ def _write_analysis_job_record(run_id: str, job_id: str, record: dict):
             f.write("\n")
 
 
+def _update_analysis_job_state(run_id: str, job_id: str, **updates):
+    updates = {k: v for k, v in updates.items() if v is not None}
+    if not updates:
+        return
+
+    updates["last_update_time"] = datetime.now().isoformat()
+
+    with _analysis_lock:
+        current = dict(_analysis_jobs.get(job_id, {}))
+        current.update(updates)
+        _analysis_jobs[job_id] = current
+
+    _write_analysis_job_record(run_id, job_id, current)
+
+
 def _find_analysis_job_path(job_id: str) -> str | None:
     for run_id in os.listdir(RUNS_DIR) if os.path.isdir(RUNS_DIR) else []:
         candidate = _analysis_job_json_path(run_id, job_id)
@@ -369,7 +384,11 @@ def session_start():
     server_command = data.get('server_command')
     tools_config = data.get('tools_config')
     context_window = int(data.get('context_window', 8192))
+    max_turns = int(data.get('max_turns', 20))
     network_policy = data.get('network_policy') or {"allow": ["*"], "disallow": []}
+
+    if max_turns < 1 or max_turns > 100:
+        return jsonify({'success': False, 'error': 'max_turns must be between 1 and 100'}), 400
 
     if not model:
         return jsonify({'success': False, 'error': 'No model selected'}), 400
@@ -422,6 +441,7 @@ def session_start():
             run_id=run_id,
             event_callback=_event_callback,
             context_window=context_window,
+            max_turns=max_turns,
             network_policy=network_policy,
         )
 
@@ -573,6 +593,31 @@ def session_post_tool_reply_action():
 
     if not session.resolve_post_tool_reply_decision(action):
         return jsonify({'success': False, 'error': 'No pending post-tool reply decision to resolve.'}), 409
+
+    return jsonify({'success': True, 'message': f'{action.title()} request sent.'})
+
+
+@app.route('/api/session/dangerous_tool_action', methods=['POST'])
+def session_dangerous_tool_action():
+    """Resolve a paused dangerous-tool execution request with approve or cancel."""
+    with _session_lock:
+        if _session_state["status"] != "running":
+            return jsonify({
+                'success': False,
+                'error': 'No active session.',
+            }), 409
+        session = _session_state["session"]
+
+    data = request.json or {}
+    action = (data.get('action') or '').strip().lower()
+    if action not in {'approve', 'cancel'}:
+        return jsonify({'success': False, 'error': 'Action must be approve or cancel.'}), 400
+
+    if not session or not hasattr(session, 'resolve_dangerous_tool_approval'):
+        return jsonify({'success': False, 'error': 'Session cannot resolve dangerous tool approvals.'}), 409
+
+    if not session.resolve_dangerous_tool_approval(action):
+        return jsonify({'success': False, 'error': 'No pending dangerous tool approval to resolve.'}), 409
 
     return jsonify({'success': True, 'message': f'{action.title()} request sent.'})
 
@@ -828,11 +873,13 @@ def analyze_session(run_id):
     initial_record = {
         "job_id": job_id,
         "status": "running",
+        "status_detail": "Queued",
         "run_id": run_id,
         "span": span_req,
         "ollama_url": ollama_url_override,
         "model": model_override,
         "start_time": start_time,
+        "last_update_time": start_time,
         "end_time": None,
         "result": None,
         "response": None,
@@ -848,17 +895,20 @@ def analyze_session(run_id):
 
     def _job_wrapper():
         try:
+            _update_analysis_job_state(run_id, job_id, status_detail="Preparing prompts and transcript context")
             details = _perform_llm_analysis(
                 run_id,
                 span_req,
                 ollama_url_override=ollama_url_override,
                 model_override=model_override,
+                progress_callback=lambda detail: _update_analysis_job_state(run_id, job_id, status_detail=detail),
             )
             completed_record = {
                 **_analysis_jobs.get(job_id, {}),
                 **details,
                 "job_id": job_id,
                 "status": "success",
+                "status_detail": "Completed",
                 "end_time": datetime.now().isoformat(),
                 "result": details.get("response"),
                 "response": details.get("response"),
@@ -873,6 +923,7 @@ def analyze_session(run_id):
                 **_analysis_jobs.get(job_id, {}),
                 "job_id": job_id,
                 "status": "failed",
+                "status_detail": "Failed",
                 "end_time": datetime.now().isoformat(),
                 "error": str(e),
             }
@@ -883,12 +934,23 @@ def analyze_session(run_id):
     threading.Thread(target=_job_wrapper, daemon=True).start()
     return jsonify({"success": True, "job_id": job_id})
 
-def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None):
+def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, progress_callback=None):
     """Internal helper to do the actual Ollama work."""
     import ollama
+
+    def _progress(detail: str):
+        if progress_callback:
+            try:
+                progress_callback(detail)
+            except Exception:
+                pass
+
+    _progress("Loading transcript, annotations, and tool-call history")
     request_data = _prepare_llm_analysis(run_id, span_req, ollama_url_override, model_override)
+    _progress("Connecting to Ollama and preparing analysis request")
     client = ollama.Client(host=request_data["ollama_url"])
 
+    _progress(f"Waiting for model response from {request_data['model']}")
     resp = client.chat(
         model=request_data["model"],
         messages=[
@@ -896,10 +958,12 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
             {"role": "user", "content": request_data["user_prompt"]}
         ]
     )
+    _progress("Processing model response")
     safe_resp = _to_json_safe(resp)
     response_text = "No analysis returned."
     if isinstance(safe_resp, dict):
         response_text = safe_resp.get("message", {}).get("content", response_text)
+    _progress("Finalizing analysis result")
     return {
         **request_data,
         "response": response_text,

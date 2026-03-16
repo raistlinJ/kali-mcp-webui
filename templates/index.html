@@ -168,6 +168,15 @@
                                     <span class="input-hint">Older messages are auto-summarised when approaching
                                         limit</span>
                                 </div>
+
+                                <div class="input-group">
+                                    <label for="max-turns">Max Tool/Model Turns Per Prompt</label>
+                                    <div class="input-with-icon">
+                                        <i class="ph ph-repeat"></i>
+                                        <input type="number" id="max-turns" min="1" max="100" step="1" value="20">
+                                    </div>
+                                    <span class="input-hint">Limits the LLM → tool → LLM loop for a single prompt before the turn is stopped.</span>
+                                </div>
                             </div>
                         </div>
 
@@ -246,6 +255,22 @@
                                     <span class="input-hint">Allowlisted commands only: <strong>ls, cat, grep, docker, ip, ss,
                                         ps, uname, id, pwd, whoami, find</strong>. No shell chaining or interactive
                                         sessions.</span>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="__builtin_shell_extended__"
+                                        value="shell_extended" class="tool-checkbox"> Enable extended shell tool</label>
+                                    <span class="input-hint">Read-oriented network commands only: <strong>curl, dig, host,
+                                    nslookup, openssl s_client, tracepath, traceroute, ping</strong>. No shell
+                                    chaining. <strong>curl</strong> is limited to HTTP(S) reads, <strong>openssl</strong>
+                                    only allows <strong>s_client</strong>, and <strong>ping</strong> is count-limited.</span>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="__builtin_shell_sequence__"
+                                        value="shell_sequence" class="tool-checkbox" disabled> Enable shell sequence tool</label>
+                                    <span class="input-hint">Runs up to <strong>3</strong> validated <strong>shell_extended</strong>
+                                    commands in sequence without invoking a shell interpreter. Provide either a JSON array
+                                    or one command per line. Only available when <strong>shell_extended</strong> is enabled.</span>
+                                    <label class="checkbox-container checkbox-container-warning"><input type="checkbox" data-cmd="__builtin_shell_dangerous__"
+                                        value="shell_dangerous" class="tool-checkbox"> <span>Enable dangerous shell tool</span> <span class="config-warning-chip">High Risk</span></label>
+                                    <span class="input-hint"><strong>High risk.</strong> Allows much less restricted shell commands,
+                                    including file edits, redirection, pipes, and multi-step shell logic. Each execution requires
+                                    explicit user approval before the command is run.</span>
                                 </div>
 
                                 <details class="config-collapse" open>
@@ -669,6 +694,27 @@
                     <div class="modal-footer">
                         <button type="button" id="cancel-post-tool-reply-btn" class="btn btn-secondary">Cancel and Restore</button>
                         <button type="button" id="retry-post-tool-reply-btn" class="btn btn-primary">Retry Final Answer</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dangerous-tool-modal-overlay" class="modal-overlay" style="display: none; z-index: 9998;">
+                <div class="annotation-modal" style="max-width: 620px; width: 94%;">
+                    <div class="modal-header">
+                        <h3><i class="ph ph-warning-octagon"></i> Approve Dangerous Command</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p id="dangerous-tool-message" style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; margin: 0;">
+                            The model requested a dangerous shell command.
+                        </p>
+                        <pre id="dangerous-tool-command" class="log-pre" style="margin: 0; max-height: 240px; overflow: auto;"></pre>
+                        <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5; margin: 0; opacity: 0.9;">
+                            Approve runs the command exactly once. Cancel blocks execution and returns a denial result to the model.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="cancel-dangerous-tool-btn" class="btn btn-secondary">Cancel Command</button>
+                        <button type="button" id="approve-dangerous-tool-btn" class="btn btn-danger">Approve and Run</button>
                     </div>
                 </div>
             </div>

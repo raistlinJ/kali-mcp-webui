@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('start-service-btn');
     const modelSelect = document.getElementById('model-select');
     const ollamaUrlInput = document.getElementById('ollama-url');
+    const maxTurnsInput = document.getElementById('max-turns');
     const allowTargetsInput = document.getElementById('allow-targets');
     const disallowTargetsInput = document.getElementById('disallow-targets');
 
@@ -62,6 +63,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const postToolReplyMessage = document.getElementById('post-tool-reply-message');
     const retryPostToolReplyBtn = document.getElementById('retry-post-tool-reply-btn');
     const cancelPostToolReplyBtn = document.getElementById('cancel-post-tool-reply-btn');
+    const dangerousToolModalOverlay = document.getElementById('dangerous-tool-modal-overlay');
+    const dangerousToolMessage = document.getElementById('dangerous-tool-message');
+    const dangerousToolCommand = document.getElementById('dangerous-tool-command');
+    const approveDangerousToolBtn = document.getElementById('approve-dangerous-tool-btn');
+    const cancelDangerousToolBtn = document.getElementById('cancel-dangerous-tool-btn');
     
     const annotationAction = document.getElementById('annotation-action');
     const annotationText = document.getElementById('annotation-text');
@@ -88,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _sessionToStopId = null;
     let _currentRunId = null;
     let _awaitingPostToolReplyDecision = false;
+    let _awaitingDangerousToolApproval = false;
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
     let _analysisConfigResolver = null;
@@ -201,10 +208,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tools Config JSON
     // ---------------------------------------------------------------
     const toolCheckboxes = document.querySelectorAll('.tool-checkbox');
+    const shellExtendedCheckbox = document.querySelector('.tool-checkbox[value="shell_extended"]');
+    const shellSequenceCheckbox = document.querySelector('.tool-checkbox[value="shell_sequence"]');
     const toolsJsonArea = document.getElementById('kali-tools-json');
 
     function wrapToolWithProxychains(toolDefinition) {
-        if (!toolDefinition || toolDefinition.name === 'proxychains' || toolDefinition.name === 'shell') {
+        if (!toolDefinition || toolDefinition.name === 'proxychains' || toolDefinition.name === 'shell' || toolDefinition.name === 'shell_extended' || toolDefinition.name === 'shell_sequence' || toolDefinition.name === 'shell_dangerous') {
             return toolDefinition;
         }
 
@@ -229,6 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function buildSelectedToolsConfig() {
         const selectedTools = [];
         const routeViaProxychains = Boolean(proxychainsRouteAllCheckbox?.checked);
+        const shellExtendedEnabled = Boolean(shellExtendedCheckbox?.checked);
 
         toolCheckboxes.forEach(cb => {
             if (!cb.checked) {
@@ -250,9 +260,10 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (name === 'msf_run') {
                 toolDefinition = {
                     name: "msf_run",
-                    description: "Execute a Metasploit command sequence. Example: 'use auxiliary/scanner/http/jboss_vulnscan; set RHOSTS 10.0.2.2; run'.",
+                    description: "Execute a Metasploit command sequence in batch mode. Example: 'use auxiliary/scanner/http/jboss_vulnscan; set RHOSTS 10.0.2.2; run'. Exploit modules get a short default WfsDelay and non-interactive session handling unless you override them.",
                     command: "msfconsole",
                     base_args: ["-q", "-x", "{args}; exit"],
+                    timeout_seconds: 90,
                     allow_args: true
                 };
             } else if (name === 'proxychains') {
@@ -279,6 +290,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     args: ['{args}'],
                     allow_args: true
                 };
+            } else if (name === 'shell_extended') {
+                toolDefinition = {
+                    name: 'shell_extended',
+                    description: 'Run an extended allowlisted shell command for read-oriented network inspection. Allowed commands: curl, dig, host, nslookup, openssl s_client, tracepath, traceroute, ping. curl is restricted to read-only HTTP(S) requests, openssl is limited to s_client, and ping is count-limited.',
+                    command: cmd,
+                    args: ['{args}'],
+                    timeout_seconds: 90,
+                    allow_args: true
+                };
+            } else if (name === 'shell_sequence') {
+                if (!shellExtendedEnabled) {
+                    return;
+                }
+                toolDefinition = {
+                    name: 'shell_sequence',
+                    description: 'Run up to 3 shell_extended-compatible commands in sequence without a shell interpreter. Args must be either a JSON array of command strings or newline-separated commands. Each command is validated under shell_extended rules before execution.',
+                    command: cmd,
+                    args: ['{args}'],
+                    timeout_seconds: 120,
+                    allow_args: true
+                };
+            } else if (name === 'shell_dangerous') {
+                toolDefinition = {
+                    name: 'shell_dangerous',
+                    description: 'Run a much less restricted shell command for advanced workflows, including file edits, redirection, and multi-step shell logic. Every execution requires explicit user approval before the command is run.',
+                    command: cmd,
+                    args: ['{args}'],
+                    timeout_seconds: 120,
+                    allow_args: true
+                };
             } else {
                 toolDefinition = { name: name, command: cmd, args: ["{args}"], allow_args: true };
             }
@@ -293,6 +334,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return { tools: selectedTools };
     }
 
+    function updateShellSequenceDependency() {
+        if (!shellSequenceCheckbox) {
+            return;
+        }
+
+        const shellExtendedEnabled = Boolean(shellExtendedCheckbox?.checked);
+        shellSequenceCheckbox.disabled = !shellExtendedEnabled;
+        if (shellExtendedEnabled) {
+            shellSequenceCheckbox.removeAttribute('title');
+        } else {
+            shellSequenceCheckbox.checked = false;
+            shellSequenceCheckbox.title = 'Enable shell_extended first';
+        }
+    }
+
     function updateToolsJson() {
         const generatedConfig = buildSelectedToolsConfig();
         try {
@@ -303,8 +359,13 @@ document.addEventListener('DOMContentLoaded', () => {
             toolsJsonArea.value = JSON.stringify(generatedConfig, null, 2);
         }
     }
+    shellExtendedCheckbox?.addEventListener('change', () => {
+        updateShellSequenceDependency();
+        updateToolsJson();
+    });
     toolCheckboxes.forEach(cb => cb.addEventListener('change', updateToolsJson));
     proxychainsRouteAllCheckbox?.addEventListener('change', updateToolsJson);
+    updateShellSequenceDependency();
     updateToolsJson();
 
     function parsePolicyList(rawValue, defaultValue = []) {
@@ -557,11 +618,18 @@ document.addEventListener('DOMContentLoaded', () => {
             toolsBadge.style.display = 'none';
             toolsBadge.textContent = '';
             toolsBadge.title = '';
+            toolsBadge.classList.remove('tools-badge-warning');
             return;
         }
 
-        toolsBadge.textContent = `${toolList.length} tool(s): ${toolList.join(', ')}`;
-        toolsBadge.title = toolList.join('\n');
+        const hasDangerousShell = toolList.includes('shell_dangerous');
+        toolsBadge.textContent = hasDangerousShell
+            ? `${toolList.length} tool(s): ${toolList.join(', ')} | dangerous approval required`
+            : `${toolList.length} tool(s): ${toolList.join(', ')}`;
+        toolsBadge.title = hasDangerousShell
+            ? `${toolList.join('\n')}\n\nWarning: shell_dangerous is enabled and requires explicit user approval before execution.`
+            : toolList.join('\n');
+        toolsBadge.classList.toggle('tools-badge-warning', hasDangerousShell);
         toolsBadge.style.display = 'inline-block';
     }
 
@@ -586,6 +654,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const ollamaUrl = session.ollama_url || '—';
         const toolCount = session.available_tool_count || availableTools.length || 0;
         const toolSummary = toolCount ? `${toolCount} tool(s)` : 'No tool inventory saved';
+        const hasDangerousShell = availableTools.includes('shell_dangerous');
+        const dangerousShellSummary = hasDangerousShell ? 'Enabled: user approval required before execution' : 'Not enabled';
 
         sessionSummaryPanel.innerHTML = `
             <div class="session-summary-grid">
@@ -608,6 +678,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="session-summary-item">
                     <span class="session-summary-label">Tool Inventory</span>
                     <span class="session-summary-value">${escapeHtml(toolSummary)}</span>
+                </div>
+                <div class="session-summary-item ${hasDangerousShell ? 'session-summary-item-warning' : ''}">
+                    <span class="session-summary-label">Dangerous Shell</span>
+                    <span class="session-summary-value">${escapeHtml(dangerousShellSummary)}</span>
                 </div>
                 <div class="session-summary-item">
                     <span class="session-summary-label">Target Policy</span>
@@ -723,6 +797,42 @@ document.addEventListener('DOMContentLoaded', () => {
     retryPostToolReplyBtn.addEventListener('click', () => resolvePostToolReply('retry'));
     cancelPostToolReplyBtn.addEventListener('click', () => resolvePostToolReply('cancel'));
 
+    function closeDangerousToolModal() {
+        _awaitingDangerousToolApproval = false;
+        dangerousToolModalOverlay.style.display = 'none';
+        approveDangerousToolBtn.disabled = false;
+        cancelDangerousToolBtn.disabled = false;
+    }
+
+    async function resolveDangerousToolApproval(action) {
+        if (!_serviceRunning || !_awaitingDangerousToolApproval) return;
+
+        approveDangerousToolBtn.disabled = true;
+        cancelDangerousToolBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/session/dangerous_tool_action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action })
+            });
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Could not resolve dangerous tool approval.');
+            }
+
+            closeDangerousToolModal();
+        } catch (error) {
+            approveDangerousToolBtn.disabled = false;
+            cancelDangerousToolBtn.disabled = false;
+            showAlert(error.message, 'error');
+        }
+    }
+
+    approveDangerousToolBtn.addEventListener('click', () => resolveDangerousToolApproval('approve'));
+    cancelDangerousToolBtn.addEventListener('click', () => resolveDangerousToolApproval('cancel'));
+
     async function stopTargetedSession(runId) {
         try {
             const response = await fetch(`/api/sessions/${runId}/stop`, { method: 'POST' });
@@ -784,10 +894,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const cmdType = kaliCommandType.value;
         const extraArgs = document.getElementById('kali-args').value.trim();
         const contextWindow = parseInt(document.getElementById('context-window').value, 10);
+        const maxTurns = parseInt(maxTurnsInput.value, 10);
         const networkPolicy = {
             allow: parsePolicyList(allowTargetsInput?.value, ['*']),
             disallow: parsePolicyList(disallowTargetsInput?.value, []),
         };
+
+        if (!Number.isInteger(maxTurns) || maxTurns < 1 || maxTurns > 100) {
+            showAlert('Max tool/model turns per prompt must be between 1 and 100.', 'error');
+            return;
+        }
 
         let command = '';
         if (cmdType === 'python') {
@@ -823,7 +939,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, network_policy: networkPolicy })
+                body: JSON.stringify({ url, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, max_turns: maxTurns, network_policy: networkPolicy })
             });
             const data = await response.json();
 
@@ -1236,6 +1352,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 postToolReplyMessage.textContent = event.message || 'The model completed the tool calls but returned an empty final reply.';
                 postToolReplyModalOverlay.style.display = 'flex';
                 break;
+            case 'dangerous_tool_approval':
+                _awaitingDangerousToolApproval = true;
+                dangerousToolMessage.textContent = event.message || 'The model requested a dangerous shell command.';
+                dangerousToolCommand.textContent = String(event.command || '');
+                dangerousToolModalOverlay.style.display = 'flex';
+                break;
             case 'chat_done':
                 appendLog(`<span class="log-label">✅ Turn Complete</span> ${escapeHtml(event.message || 'Ready for next prompt.')}`, 'log-done');
                 setChatReady(); break;
@@ -1489,6 +1611,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const date = new Date(job.start_time).toLocaleString();
             const statusClass = `status-${job.status}`;
             const statusIcon = job.status === 'running' ? 'ph-spinner spinning' : (job.status === 'success' ? 'ph-check-circle' : 'ph-x-circle');
+            const statusDetail = String(job.status_detail || '').trim();
+            const lastUpdateText = job.last_update_time ? new Date(job.last_update_time).toLocaleTimeString() : '';
+            const responsePreviewSource = String(job.response || job.result || job.result_preview || '').trim();
+            const responsePreview = responsePreviewSource
+                ? escapeHtml(responsePreviewSource.replace(/\s+/g, ' ').slice(0, 280))
+                : '';
             
             return `
                 <div class="job-card">
@@ -1503,16 +1631,30 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span>${job.status}</span>
                             </div>
                             <div class="dropdown job-actions-dropdown">
-                                <button class="btn btn-secondary btn-sm job-actions-toggle" type="button" data-job-id="${job.job_id}" style="width: auto; padding: 0.35rem 0.6rem;">
-                                    <i class="ph ph-dots-three-outline-vertical"></i>
+                                <button class="btn btn-secondary job-actions-toggle" type="button" data-job-id="${job.job_id}">
+                                    <span>Actions</span>
+                                    <i class="ph ph-caret-down"></i>
                                 </button>
                                 <ul class="dropdown-menu job-actions-menu" data-job-id="${job.job_id}">
                                     <li data-action="view" data-job-id="${job.job_id}"><i class="ph ph-eye"></i> View</li>
+                                    <li data-action="copy" data-job-id="${job.job_id}"><i class="ph ph-copy"></i> Copy Response</li>
                                     <li data-action="download" data-job-id="${job.job_id}"><i class="ph ph-download-simple"></i> Download</li>
                                 </ul>
                             </div>
                         </div>
                     </div>
+                    ${(job.status === 'running' || statusDetail) ? `
+                        <div class="job-progress ${job.status === 'running' ? 'job-progress-active' : ''}">
+                            <span class="job-progress-label">${escapeHtml(statusDetail || (job.status === 'running' ? 'Working' : job.status || 'Unknown'))}</span>
+                            ${lastUpdateText ? `<span class="job-progress-meta">Updated ${escapeHtml(lastUpdateText)}</span>` : ''}
+                        </div>
+                    ` : ''}
+                    ${job.status === 'success' && responsePreview ? `
+                        <div class="job-preview">
+                            <span class="job-preview-label">Response Preview</span>
+                            <p class="job-preview-text">${responsePreview}</p>
+                        </div>
+                    ` : ''}
                     <div class="job-footer">
                         <div class="job-meta">
                             <span><i class="ph ph-calendar"></i> ${date}</span>
@@ -1546,6 +1688,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeAnalysisJobMenus();
                 if (action === 'view') {
                     window.viewAnalysisResult(jobId);
+                } else if (action === 'copy') {
+                    window.copyAnalysisJobResponse(jobId);
                 } else if (action === 'download') {
                     window.downloadAnalysisJob(jobId);
                 }
@@ -1565,10 +1709,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const job = await res.json();
             
             if (job) {
+                const responseSource = String(
+                    job.response
+                    || job.result
+                    || job.raw_response?.message?.content
+                    || 'No response captured yet.'
+                );
                 const modal = document.createElement('div');
                 modal.className = 'modal-overlay';
                 modal.style.display = 'flex';
-                const renderedResponse = job.response ? marked.parse(job.response) : '<p>No response captured yet.</p>';
+                const renderedResponse = responseSource ? marked.parse(responseSource) : '<p>No response captured yet.</p>';
                 const renderedSystemPrompt = escapeHtml(job.system_prompt || 'Not captured.');
                 const renderedUserPrompt = escapeHtml(job.user_prompt || 'Not captured.');
                 const renderedError = job.error ? `<div class="status-error" style="margin-bottom: 1rem;">${escapeHtml(job.error)}</div>` : '';
@@ -1621,6 +1771,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.downloadAnalysisJob = function(jobId) {
         window.location.href = `/api/analysis/jobs/${jobId}/download`;
+    };
+
+    window.copyAnalysisJobResponse = async function(jobId) {
+        try {
+            const res = await fetch(`/api/analysis/jobs/${jobId}`);
+            const job = await res.json();
+            const responseSource = String(
+                job.response
+                || job.result
+                || job.raw_response?.message?.content
+                || ''
+            ).trim();
+
+            if (!responseSource) {
+                showAlert('No analysis response is available to copy.', 'error');
+                return;
+            }
+
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(responseSource);
+            } else {
+                const tempArea = document.createElement('textarea');
+                tempArea.value = responseSource;
+                tempArea.setAttribute('readonly', '');
+                tempArea.style.position = 'absolute';
+                tempArea.style.left = '-9999px';
+                document.body.appendChild(tempArea);
+                tempArea.select();
+                document.execCommand('copy');
+                tempArea.remove();
+            }
+
+            showAlert('Analysis response copied to clipboard.', 'success');
+        } catch (err) {
+            showAlert('Failed to copy analysis response: ' + err.message, 'error');
+        }
     };
 
     document.addEventListener('click', (event) => {

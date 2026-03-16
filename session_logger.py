@@ -195,6 +195,22 @@ class SessionLogger:
         
         self._emit_event("annotation", {"text": text, "span": span})
 
+    def log_human_decision(self, text: str, category: str = "decision"):
+        """Append an explicit human approval/denial decision to the transcript."""
+        record = {
+            "timestamp": _now_iso(),
+            "category": category,
+            "decision": text,
+        }
+        with open(self._annotations_path, "a") as f:
+            f.write(json.dumps(record) + "\n")
+
+        ts = datetime.now().strftime("%H:%M:%S")
+        with open(self._transcript_path, "a") as f:
+            f.write(f"### 👤 Human Decision [{ts}] ({category})\n\n> {text}\n\n")
+
+        self._emit_event("annotation", {"text": text, "span": category})
+
     def update_metadata(self, updates: dict):
         """Merge new fields into session metadata and persist them."""
         if not updates:
