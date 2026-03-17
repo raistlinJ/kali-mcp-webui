@@ -12,6 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const analysisConfigDescription = document.getElementById('analysis-config-description');
     const analysisOllamaUrlInput = document.getElementById('analysis-ollama-url');
     const analysisProviderSelect = document.getElementById('analysis-provider-select');
+    const providerHelpText = document.getElementById('provider-help-text');
+    const providerUrlHelpText = document.getElementById('provider-url-help-text');
+    const providerApiKeyHelpText = document.getElementById('provider-api-key-help-text');
+    const analysisProviderHelpText = document.getElementById('analysis-provider-help-text');
+    const analysisProviderUrlHelpText = document.getElementById('analysis-provider-url-help-text');
+    const analysisProviderApiKeyHelpText = document.getElementById('analysis-provider-api-key-help-text');
     const analysisApiKeyGroup = document.getElementById('analysis-api-key-group');
     const analysisModelSelect = document.getElementById('analysis-model-select');
     const analysisSpanGroup = document.getElementById('analysis-span-group');
@@ -120,6 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const PROVIDERS = {
         OLLAMA_DIRECT: 'ollama_direct',
         LITELLM: 'litellm',
+        OPENAI: 'openai',
+        CLAUDE: 'claude',
     };
     
     // SVG Templates
@@ -370,45 +378,125 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function normalizeProvider(value) {
-        return value === PROVIDERS.LITELLM ? PROVIDERS.LITELLM : PROVIDERS.OLLAMA_DIRECT;
+        if (value === PROVIDERS.LITELLM) return PROVIDERS.LITELLM;
+        if (value === PROVIDERS.OPENAI) return PROVIDERS.OPENAI;
+        if (value === PROVIDERS.CLAUDE) return PROVIDERS.CLAUDE;
+        return PROVIDERS.OLLAMA_DIRECT;
     }
 
     function providerUsesApiKey(provider) {
-        return normalizeProvider(provider) === PROVIDERS.LITELLM;
+        return normalizeProvider(provider) !== PROVIDERS.OLLAMA_DIRECT;
+    }
+
+    function providerRequiresApiKey(provider) {
+        const normalized = normalizeProvider(provider);
+        return normalized === PROVIDERS.OPENAI || normalized === PROVIDERS.CLAUDE;
     }
 
     function formatProviderLabel(provider) {
-        return normalizeProvider(provider) === PROVIDERS.LITELLM ? 'LiteLLM' : 'Ollama (direct)';
+        const normalized = normalizeProvider(provider);
+        if (normalized === PROVIDERS.LITELLM) return 'LiteLLM';
+        if (normalized === PROVIDERS.OPENAI) return 'OpenAI';
+        if (normalized === PROVIDERS.CLAUDE) return 'Claude';
+        return 'Ollama (direct)';
+    }
+
+    function providerDefaultUrl(provider) {
+        const normalized = normalizeProvider(provider);
+        if (normalized === PROVIDERS.LITELLM) return 'https://your-litellm-host';
+        if (normalized === PROVIDERS.OPENAI) return 'https://api.openai.com';
+        if (normalized === PROVIDERS.CLAUDE) return 'https://api.anthropic.com';
+        return 'http://localhost:11434';
+    }
+
+    function providerHelpContent(provider) {
+        const normalized = normalizeProvider(provider);
+        if (normalized === PROVIDERS.OPENAI) {
+            return {
+                provider: 'Connect directly to the OpenAI API. Use your OpenAI API key and fetch from the public model catalog available to your account.',
+                url: 'Base URL for OpenAI. In most cases use https://api.openai.com.',
+                apiKey: 'Required. Use your OpenAI API key. It is sent only with model discovery and chat requests.',
+            };
+        }
+        if (normalized === PROVIDERS.CLAUDE) {
+            return {
+                provider: 'Connect directly to Anthropic for Claude models. Use your Anthropic API key and fetch the Claude models available to your account.',
+                url: 'Base URL for Anthropic. In most cases use https://api.anthropic.com.',
+                apiKey: 'Required. Use your Anthropic API key. It is sent only with model discovery and chat requests.',
+            };
+        }
+        if (normalized === PROVIDERS.LITELLM) {
+            return {
+                provider: 'Connect through a LiteLLM proxy that exposes an OpenAI-compatible API surface.',
+                url: 'Base URL for your LiteLLM deployment, for example https://your-litellm-host.',
+                apiKey: 'Usually required. Use the LiteLLM or proxy API key expected by that deployment.',
+            };
+        }
+        return {
+            provider: 'Connect directly to a local or remote Ollama instance.',
+            url: 'Base URL for Ollama. In most cases use http://localhost:11434.',
+            apiKey: 'Usually not required for direct Ollama. If your endpoint is protected, provide the API key expected by that gateway.',
+        };
     }
 
     function updateProviderUi() {
         const provider = normalizeProvider(providerSelect?.value);
         const showApiKey = providerUsesApiKey(provider);
+        const help = providerHelpContent(provider);
 
         if (apiKeyGroup) {
             apiKeyGroup.style.display = showApiKey ? 'flex' : 'none';
         }
 
+        if (providerHelpText) {
+            providerHelpText.textContent = help.provider;
+        }
+
+        if (providerUrlHelpText) {
+            providerUrlHelpText.textContent = help.url;
+        }
+
+        if (providerApiKeyHelpText) {
+            providerApiKeyHelpText.textContent = help.apiKey;
+        }
+
         if (ollamaUrlInput) {
-            ollamaUrlInput.placeholder = provider === PROVIDERS.LITELLM
-                ? 'https://your-litellm-host'
-                : 'http://localhost:11434';
+            ollamaUrlInput.placeholder = providerDefaultUrl(provider);
         }
     }
 
     function updateAnalysisProviderUi() {
         const provider = normalizeProvider(analysisProviderSelect?.value);
         const showApiKey = providerUsesApiKey(provider);
+        const help = providerHelpContent(provider);
 
         if (analysisApiKeyGroup) {
             analysisApiKeyGroup.style.display = showApiKey ? 'flex' : 'none';
         }
 
-        if (analysisOllamaUrlInput) {
-            analysisOllamaUrlInput.placeholder = provider === PROVIDERS.LITELLM
-                ? 'https://your-litellm-host'
-                : 'http://localhost:11434';
+        if (analysisProviderHelpText) {
+            analysisProviderHelpText.textContent = help.provider;
         }
+
+        if (analysisProviderUrlHelpText) {
+            analysisProviderUrlHelpText.textContent = help.url;
+        }
+
+        if (analysisProviderApiKeyHelpText) {
+            analysisProviderApiKeyHelpText.textContent = help.apiKey;
+        }
+
+        if (analysisOllamaUrlInput) {
+            analysisOllamaUrlInput.placeholder = providerDefaultUrl(provider);
+        }
+    }
+
+    function validateProviderApiKey(provider, apiKey) {
+        if (providerRequiresApiKey(provider) && !String(apiKey || '').trim()) {
+            showAlert(`Enter an API key for ${formatProviderLabel(provider)}.`, 'error');
+            return false;
+        }
+        return true;
     }
 
     function saveApiKeyToSessionStorage() {
@@ -472,9 +560,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     restoreApiKeyFromSessionStorage();
     updateClearSavedKeyButton();
+    if (providerSelect) {
+        providerSelect.dataset.previousProvider = normalizeProvider(providerSelect.value);
+    }
+    if (analysisProviderSelect) {
+        analysisProviderSelect.dataset.previousProvider = normalizeProvider(analysisProviderSelect.value);
+    }
     updateProviderUi();
 
     providerSelect?.addEventListener('change', () => {
+        const previousProvider = normalizeProvider(providerSelect?.dataset.previousProvider);
+        const nextProvider = normalizeProvider(providerSelect?.value);
+        const currentUrl = ollamaUrlInput?.value.trim() || '';
+        if (ollamaUrlInput && (!currentUrl || currentUrl === providerDefaultUrl(previousProvider))) {
+            ollamaUrlInput.value = providerDefaultUrl(nextProvider);
+        }
+        if (providerSelect) {
+            providerSelect.dataset.previousProvider = nextProvider;
+        }
         updateProviderUi();
         modelSelect.innerHTML = '<option value="" disabled selected>Click \'Fetch\' to load models</option>';
         modelSelect.disabled = true;
@@ -486,6 +589,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     analysisProviderSelect?.addEventListener('change', () => {
+        const previousProvider = normalizeProvider(analysisProviderSelect?.dataset.previousProvider);
+        const nextProvider = normalizeProvider(analysisProviderSelect?.value);
+        const currentUrl = analysisOllamaUrlInput?.value.trim() || '';
+        if (analysisOllamaUrlInput && (!currentUrl || currentUrl === providerDefaultUrl(previousProvider))) {
+            analysisOllamaUrlInput.value = providerDefaultUrl(nextProvider);
+        }
+        if (analysisProviderSelect) {
+            analysisProviderSelect.dataset.previousProvider = nextProvider;
+        }
         updateAnalysisProviderUi();
         analysisModelSelect.innerHTML = '<option value="" disabled selected>Fetch models to load options</option>';
         analysisModelSelect.disabled = true;
@@ -643,6 +755,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const provider = normalizeProvider(providerSelect?.value);
         const apiKey = providerUsesApiKey(provider) ? (apiKeyInput?.value.trim() || '') : '';
         const sslVerify = Boolean(sslVerifyToggle?.checked ?? true);
+        if (!validateProviderApiKey(provider, apiKey)) {
+            return;
+        }
         await fetchModelsIntoSelect({
             url,
             provider,
@@ -689,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisConfigDescription.textContent = description;
         confirmAnalysisConfigBtn.textContent = confirmLabel;
         analysisProviderSelect.value = normalizeProvider(suggestedProvider);
-        analysisOllamaUrlInput.value = suggestedUrl || ollamaUrlInput.value.trim() || 'http://localhost:11434';
+        analysisOllamaUrlInput.value = suggestedUrl || ollamaUrlInput.value.trim() || providerDefaultUrl(suggestedProvider);
         analysisApiKeyInput.value = suggestedApiKey || apiKeyInput?.value.trim() || '';
         if (analysisSslVerifyToggle) {
             analysisSslVerifyToggle.checked = suggestedSslVerify;
@@ -720,6 +835,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const apiKey = providerUsesApiKey(provider) ? (analysisApiKeyInput?.value.trim() || '') : '';
         const sslVerify = Boolean(analysisSslVerifyToggle?.checked ?? true);
         const currentSelectedModel = analysisModelSelect.value;
+        if (!validateProviderApiKey(provider, apiKey)) {
+            return;
+        }
 
         await fetchModelsIntoSelect({
             url,
@@ -754,6 +872,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!ollamaUrl) {
             showAlert('Please enter an instance URL', 'error');
+            return;
+        }
+        if (!validateProviderApiKey(provider, apiKey)) {
             return;
         }
         if (!model) {
@@ -885,7 +1006,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const toolSummary = toolCount ? `${toolCount} tool(s)` : 'No tool inventory saved';
         const hasDangerousShell = availableTools.includes('shell_dangerous');
         const dangerousShellSummary = hasDangerousShell ? 'Enabled: user approval required before execution' : 'Not enabled';
-        const apiAuthSummary = apiAuthEnabled ? 'Configured' : (normalizeProvider(session.llm_provider) === PROVIDERS.LITELLM ? 'Not configured' : 'Not required');
+        const apiAuthSummary = apiAuthEnabled ? 'Configured' : (providerUsesApiKey(session.llm_provider) ? 'Not configured' : 'Not required');
 
         sessionSummaryPanel.innerHTML = `
             <div class="session-summary-grid">
@@ -1131,6 +1252,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const provider = normalizeProvider(providerSelect?.value);
         const apiKey = providerUsesApiKey(provider) ? (apiKeyInput?.value.trim() || '') : '';
         const sslVerify = Boolean(sslVerifyToggle?.checked ?? true);
+        if (!validateProviderApiKey(provider, apiKey)) {
+            return;
+        }
         const model = modelSelect.value;
         const cmdType = kaliCommandType.value;
         const contextWindow = parseInt(document.getElementById('context-window').value, 10);

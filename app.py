@@ -101,7 +101,29 @@ def _normalize_llm_provider(value) -> str:
     normalized = str(value or '').strip().lower()
     if normalized in {'litellm', 'lite-llm', 'lite_llm'}:
         return 'litellm'
+    if normalized in {'openai', 'open-ai'}:
+        return 'openai'
+    if normalized in {'claude', 'anthropic'}:
+        return 'claude'
     return 'ollama_direct'
+
+
+def _provider_display_name(provider: str) -> str:
+    normalized = _normalize_llm_provider(provider)
+    if normalized == 'litellm':
+        return 'LiteLLM'
+    if normalized == 'openai':
+        return 'OpenAI'
+    if normalized == 'claude':
+        return 'Claude'
+    return 'Ollama'
+
+
+def _provider_models_endpoint(provider: str) -> str:
+    normalized = _normalize_llm_provider(provider)
+    if normalized == 'ollama_direct':
+        return '/api/tags'
+    return '/v1/models'
 
 
 def _normalize_ssl_verify(value) -> bool:
@@ -112,17 +134,27 @@ def _normalize_ssl_verify(value) -> bool:
     return str(value).strip().lower() not in {'0', 'false', 'no', 'off'}
 
 
-def _build_llm_http_headers(api_key: str | None) -> dict:
+def _build_llm_http_headers(provider: str, api_key: str | None) -> dict:
+    normalized = _normalize_llm_provider(provider)
+    headers = {}
+
+    if normalized == 'claude':
+        headers['anthropic-version'] = '2023-06-01'
+        if api_key:
+            headers['x-api-key'] = api_key
+        return headers
+
     if not api_key:
-        return {}
-    return {
-        'Authorization': f'Bearer {api_key}',
-        'x-api-key': api_key,
-    }
+        return headers
+
+    headers['Authorization'] = f'Bearer {api_key}'
+    if normalized == 'litellm':
+        headers['x-api-key'] = api_key
+    return headers
 
 
 def _extract_provider_models(provider: str, payload: dict) -> list[str]:
-    if provider == 'litellm':
+    if provider in {'litellm', 'openai', 'claude'}:
         return [
             str(model.get('id'))
             for model in payload.get('data', [])
@@ -137,7 +169,7 @@ def _extract_provider_models(provider: str, payload: dict) -> list[str]:
 
 
 def _analysis_extract_response_text(provider: str, payload: dict) -> str:
-    if provider == 'litellm':
+    if provider in {'litellm', 'openai'}:
         choice = ((payload or {}).get('choices') or [{}])[0]
         message = choice.get('message') or {}
         content = message.get('content')
@@ -151,17 +183,44 @@ def _analysis_extract_response_text(provider: str, payload: dict) -> str:
             return '\n'.join(parts)
         return str(content or '')
 
+    if provider == 'claude':
+        parts = []
+        for item in (payload or {}).get('content', []) or []:
+            if isinstance(item, dict) and item.get('type') == 'text' and item.get('text'):
+                parts.append(str(item.get('text')))
+        return '\n'.join(parts)
+
     return ((payload or {}).get('message') or {}).get('content', '')
+
+
+def _analysis_to_anthropic_messages(messages: list[dict]) -> tuple[str | None, list[dict]]:
+    system_parts = []
+    converted = []
+
+    for message in messages:
+        role = str((message or {}).get('role') or 'user')
+        content = message.get('content', '')
+        text = content if isinstance(content, str) else str(content or '')
+        if role == 'system':
+            if text:
+                system_parts.append(text)
+            continue
+        if role not in {'user', 'assistant'}:
+            continue
+        converted.append({'role': role, 'content': text})
+
+    system_text = '\n\n'.join(part for part in system_parts if part) or None
+    return system_text, converted
 
 
 def _analysis_chat_request(provider: str, host: str, api_key: str | None, model: str, messages: list[dict], options: dict | None = None, ssl_verify: bool = True) -> dict:
     headers = {
         'Content-Type': 'application/json',
-        **_build_llm_http_headers(api_key),
+        **_build_llm_http_headers(provider, api_key),
     }
     options = options or {}
 
-    if provider == 'litellm':
+    if provider in {'litellm', 'openai'}:
         payload = {
             'model': model,
             'messages': messages,
@@ -178,10 +237,31 @@ def _analysis_chat_request(provider: str, host: str, api_key: str | None, model:
         response.raise_for_status()
         return response.json() or {}
 
+    if provider == 'claude':
+        system_text, anthropic_messages = _analysis_to_anthropic_messages(messages)
+        payload = {
+            'model': model,
+            'messages': anthropic_messages,
+            'max_tokens': int(options.get('max_tokens') or 4096),
+        }
+        if system_text:
+            payload['system'] = system_text
+        if 'temperature' in options:
+            payload['temperature'] = options['temperature']
+        response = requests.post(
+            f"{host.rstrip('/')}/v1/messages",
+            headers=headers,
+            json=payload,
+            timeout=120,
+            verify=ssl_verify,
+        )
+        response.raise_for_status()
+        return response.json() or {}
+
     import ollama
     client = ollama.Client(
         host=host,
-        headers=_build_llm_http_headers(api_key),
+        headers=_build_llm_http_headers(provider, api_key),
         verify=ssl_verify,
     )
     return client.chat(
@@ -813,9 +893,9 @@ def get_models():
 
     try:
         response = requests.get(
-            f"{ollama_url.rstrip('/')}{'/v1/models' if provider == 'litellm' else '/api/tags'}",
+            f"{ollama_url.rstrip('/')}{_provider_models_endpoint(provider)}",
             timeout=5,
-            headers=_build_llm_http_headers(api_key),
+            headers=_build_llm_http_headers(provider, api_key),
             verify=ssl_verify,
         )
         response.raise_for_status()
@@ -823,19 +903,20 @@ def get_models():
         return jsonify({'success': True, 'models': models, 'provider': provider})
     except requests.exceptions.HTTPError as e:
         response = getattr(e, 'response', None)
-        if response is not None and response.status_code == 401 and provider == 'litellm':
+        if response is not None and response.status_code == 401 and provider in {'litellm', 'openai', 'claude'}:
             has_key = bool(api_key)
-            detail = 'Check that the LiteLLM API key is present and valid.' if has_key else 'Enter a LiteLLM API key and try again.'
+            provider_label = _provider_display_name(provider)
+            detail = f'Check that the {provider_label} API key is present and valid.' if has_key else f'Enter a {provider_label} API key and try again.'
             return jsonify({
                 'success': False,
-                'error': f'LiteLLM rejected the model request with 401 Unauthorized. {detail}'
+                'error': f'{provider_label} rejected the model request with 401 Unauthorized. {detail}'
             }), 400
         status = response.status_code if response is not None else None
-        provider_label = 'LiteLLM' if provider == 'litellm' else 'Ollama'
+        provider_label = _provider_display_name(provider)
         detail = f' {provider_label} returned HTTP {status}.' if status else ''
         return jsonify({'success': False, 'error': f'Failed to fetch models from {provider_label}.{detail}'}), 400
     except requests.exceptions.RequestException as e:
-        provider_label = 'LiteLLM' if provider == 'litellm' else 'Ollama'
+        provider_label = _provider_display_name(provider)
         return jsonify({'success': False, 'error': f'Could not reach the selected {provider_label} endpoint.'}), 400
 
 

@@ -109,10 +109,12 @@
                                         <select id="provider-select">
                                             <option value="ollama_direct" selected>Ollama (direct)</option>
                                             <option value="litellm">LiteLLM</option>
+                                            <option value="openai">OpenAI</option>
+                                            <option value="claude">Claude</option>
                                         </select>
                                         <i class="ph ph-caret-down icon-right"></i>
                                     </div>
-                                    <span class="input-hint">Use direct Ollama for a local instance. Choose LiteLLM when routing through a LiteLLM proxy.</span>
+                                    <span class="input-hint" id="provider-help-text">Use direct Ollama for a local instance, LiteLLM for a proxy, OpenAI for GPT models, or Claude for Anthropic-hosted models.</span>
                                 </div>
 
                                 <div class="input-group">
@@ -128,6 +130,7 @@
                                         <input type="url" id="ollama-url" value="http://localhost:11434" required
                                             placeholder="http://localhost:11434">
                                     </div>
+                                    <span class="input-hint" id="provider-url-help-text">Enter the base URL for the selected provider endpoint.</span>
                                 </div>
 
                                 <div class="input-group">
@@ -140,10 +143,10 @@
                                 </div>
 
                                 <div class="input-group" id="api-key-group">
-                                    <label for="api-key">API Key <span class="input-optional">(optional)</span></label>
+                                    <label for="api-key">API Key</label>
                                     <div class="input-with-icon">
                                         <i class="ph ph-key"></i>
-                                        <input type="password" id="api-key" placeholder="Bearer API key for authenticated Ollama-compatible endpoints" autocomplete="off" spellcheck="false">
+                                        <input type="password" id="api-key" placeholder="Provider API key for authenticated model discovery and chat requests" autocomplete="off" spellcheck="false">
                                         <button type="button" class="input-visibility-toggle" data-target-input="api-key" aria-label="Show API key" aria-pressed="false">
                                             <i class="ph ph-eye"></i>
                                         </button>
@@ -151,7 +154,7 @@
                                     <div class="input-group-actions">
                                         <button type="button" id="clear-saved-key-btn" class="btn btn-secondary btn-inline">Clear Saved Key</button>
                                     </div>
-                                    <span class="input-hint">Used only for outbound LLM requests and model discovery. It is not written to session logs.</span>
+                                    <span class="input-hint" id="provider-api-key-help-text">Used only for outbound model discovery and LLM requests. It is not written to session logs.</span>
                                 </div>
 
                                 <button type="button" id="fetch-models-btn" class="btn btn-secondary">
@@ -821,10 +824,12 @@
                                 <select id="analysis-provider-select">
                                     <option value="ollama_direct" selected>Ollama (direct)</option>
                                     <option value="litellm">LiteLLM</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="claude">Claude</option>
                                 </select>
                                 <i class="ph ph-caret-down icon-right"></i>
                             </div>
-                            <span class="input-hint">Choose the provider used for this analysis job.</span>
+                            <span class="input-hint" id="analysis-provider-help-text">Choose the provider used for this analysis job.</span>
                         </div>
                         <div class="input-group">
                             <label for="analysis-ollama-url">Instance URL</label>
@@ -832,6 +837,7 @@
                                 <i class="ph ph-plugs-connected"></i>
                                 <input type="url" id="analysis-ollama-url" placeholder="http://localhost:11434">
                             </div>
+                            <span class="input-hint" id="analysis-provider-url-help-text">Enter the base URL for the selected provider endpoint.</span>
                         </div>
                         <div class="input-group">
                             <label class="checkbox-container" for="analysis-ssl-verify-toggle">
@@ -842,15 +848,15 @@
                             </label>
                         </div>
                         <div class="input-group" id="analysis-api-key-group">
-                            <label for="analysis-api-key">API Key <span class="input-optional">(optional)</span></label>
+                            <label for="analysis-api-key">API Key</label>
                             <div class="input-with-icon">
                                 <i class="ph ph-key"></i>
-                                <input type="password" id="analysis-api-key" placeholder="Bearer API key for this analysis request" autocomplete="off" spellcheck="false">
+                                <input type="password" id="analysis-api-key" placeholder="Provider API key for this analysis request" autocomplete="off" spellcheck="false">
                                 <button type="button" class="input-visibility-toggle" data-target-input="analysis-api-key" aria-label="Show API key" aria-pressed="false">
                                     <i class="ph ph-eye"></i>
                                 </button>
                             </div>
-                            <span class="input-hint">Sent only with model discovery and analysis requests. It is not saved into analysis job records.</span>
+                            <span class="input-hint" id="analysis-provider-api-key-help-text">Sent only with model discovery and analysis requests. It is not saved into analysis job records.</span>
                         </div>
                         <div class="input-group">
                             <label for="analysis-model-select">Model</label>

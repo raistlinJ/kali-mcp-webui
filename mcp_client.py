@@ -123,6 +123,30 @@ def _mcp_tool_to_ollama_minimal(tool) -> dict:
     }
 
 
+def _mcp_tool_to_anthropic(tool) -> dict:
+    return {
+        "name": tool.name,
+        "description": _sanitize_tool_schema_value(tool.description or f"Run {tool.name}"),
+        "input_schema": _sanitize_tool_schema_value(tool.inputSchema) if tool.inputSchema else {
+            "type": "object",
+            "properties": {},
+        },
+    }
+
+
+def _mcp_tool_to_anthropic_minimal(tool) -> dict:
+    return {
+        "name": tool.name,
+        "description": f"Run {tool.name}",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "args": {"type": "string"},
+            },
+        },
+    }
+
+
 def _is_xml_schema_error(exc: Exception) -> bool:
     message = str(exc or "")
     return "XML syntax error" in message and "status code: 500" in message
@@ -168,7 +192,41 @@ def _normalize_provider_name(provider: str | None) -> str:
     normalized = str(provider or "").strip().lower()
     if normalized in {"litellm", "lite-llm", "lite_llm"}:
         return "litellm"
+    if normalized in {"openai", "open-ai"}:
+        return "openai"
+    if normalized in {"claude", "anthropic"}:
+        return "claude"
     return "ollama_direct"
+
+
+def _provider_display_name(provider: str | None) -> str:
+    normalized = _normalize_provider_name(provider)
+    if normalized == "litellm":
+        return "LiteLLM"
+    if normalized == "openai":
+        return "OpenAI"
+    if normalized == "claude":
+        return "Claude"
+    return "Ollama"
+
+
+def _provider_headers(provider: str | None, api_key: str | None) -> dict:
+    normalized = _normalize_provider_name(provider)
+    headers = {}
+
+    if normalized == "claude":
+        headers["anthropic-version"] = "2023-06-01"
+        if api_key:
+            headers["x-api-key"] = api_key
+        return headers
+
+    if not api_key:
+        return headers
+
+    headers["Authorization"] = f"Bearer {api_key}"
+    if normalized == "litellm":
+        headers["x-api-key"] = api_key
+    return headers
 
 
 def _tool_call_identifier(tool_call) -> str | None:
@@ -432,6 +490,126 @@ class _LiteLLMClient:
         return {
             "message": {
                 "content": _message_text_content(message),
+                "tool_calls": tool_calls or None,
+            },
+            "raw": raw,
+        }
+
+
+def _to_anthropic_messages(messages: list[dict]) -> tuple[str | None, list[dict]]:
+    system_parts = []
+    converted = []
+
+    for message in messages:
+        role = str(message.get("role", "user"))
+        content = message.get("content", "")
+        text_content = content if isinstance(content, str) else _message_text_content({"content": content})
+
+        if role == "system":
+            if text_content:
+                system_parts.append(text_content)
+            continue
+
+        if role == "assistant":
+            blocks = []
+            if text_content:
+                blocks.append({"type": "text", "text": text_content})
+            for index, tool_call in enumerate(message.get("tool_calls", []) or [], start=1):
+                tool_name, tool_args = _extract_tool_info(tool_call)
+                tool_call_id = _tool_call_identifier(tool_call) or f"call_{index}"
+                blocks.append({
+                    "type": "tool_use",
+                    "id": tool_call_id,
+                    "name": tool_name,
+                    "input": tool_args,
+                })
+            converted.append({"role": "assistant", "content": blocks or text_content or ""})
+            continue
+
+        if role == "tool":
+            tool_result_block = {
+                "type": "tool_result",
+                "tool_use_id": message.get("tool_call_id") or "tool_result_1",
+                "content": text_content or "",
+            }
+            if converted and converted[-1].get("role") == "user" and isinstance(converted[-1].get("content"), list):
+                converted[-1]["content"].append(tool_result_block)
+            else:
+                converted.append({"role": "user", "content": [tool_result_block]})
+            continue
+
+        converted.append({"role": "user", "content": text_content or ""})
+
+    system_text = "\n\n".join(part for part in system_parts if part) or None
+    return system_text, converted
+
+
+class _AnthropicClient:
+    def __init__(self, host: str, headers: dict | None = None, timeout: int = 90, verify: bool = True):
+        self.host = host.rstrip("/")
+        self.headers = {"Content-Type": "application/json", **(headers or {})}
+        self.timeout = timeout
+        self.verify = verify
+
+    def show(self, model: str) -> dict:
+        response = requests.get(
+            f"{self.host}/v1/models",
+            headers=self.headers,
+            timeout=min(self.timeout, 20),
+            verify=self.verify,
+        )
+        response.raise_for_status()
+        payload = response.json() or {}
+        for item in payload.get("data", []):
+            if isinstance(item, dict) and item.get("id") == model:
+                return item
+        return payload
+
+    def chat(self, model: str, messages: list[dict], tools=None, options=None) -> dict:
+        options = options or {}
+        system_text, anthropic_messages = _to_anthropic_messages(messages)
+        payload = {
+            "model": model,
+            "messages": anthropic_messages,
+            "max_tokens": int(options.get("max_tokens") or 4096),
+        }
+        if system_text:
+            payload["system"] = system_text
+        if tools:
+            payload["tools"] = tools
+        temperature = options.get("temperature")
+        if temperature is not None:
+            payload["temperature"] = temperature
+
+        response = requests.post(
+            f"{self.host}/v1/messages",
+            headers=self.headers,
+            json=payload,
+            timeout=self.timeout,
+            verify=self.verify,
+        )
+        response.raise_for_status()
+        raw = response.json() or {}
+        text_parts = []
+        tool_calls = []
+        for block in raw.get("content", []) or []:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text" and block.get("text"):
+                text_parts.append(str(block.get("text")))
+            if block.get("type") == "tool_use":
+                tool_calls.append({
+                    "id": block.get("id") or f"call_{len(tool_calls) + 1}",
+                    "type": "function",
+                    "function": {
+                        "name": block.get("name"),
+                        "arguments": block.get("input") if isinstance(block.get("input"), dict) else {},
+                    },
+                })
+
+        return {
+            "message": {
+                "content": "\n".join(text_parts),
                 "tool_calls": tool_calls or None,
             },
             "raw": raw,
@@ -983,6 +1161,8 @@ class MCPSession:
         self.tool_names: list[str] = []
         self._ollama_tools: list[dict] = []
         self._ollama_tools_minimal: list[dict] = []
+        self._anthropic_tools: list[dict] = []
+        self._anthropic_tools_minimal: list[dict] = []
         self._model_max_ctx: int = context_window
 
         # Internals
@@ -996,12 +1176,8 @@ class MCPSession:
         self._pending_dangerous_tool_approval = None
 
     def _client_headers(self) -> dict | None:
-        if not self.api_key:
-            return None
-        return {
-            "Authorization": f"Bearer {self.api_key}",
-            "x-api-key": self.api_key,
-        }
+        headers = _provider_headers(self.llm_provider, self.api_key)
+        return headers or None
 
     async def _retry_empty_reply_after_tools(self, prompt: str, tool_results: list[dict]) -> str | None:
         _emit(self.event_callback, "status", {
@@ -1045,7 +1221,7 @@ class MCPSession:
 
     async def _repair_litellm_tool_reply(self, prompt: str, malformed_content: str) -> dict | None:
         _emit(self.event_callback, "status", {
-            "message": "LiteLLM returned a malformed tool-planning reply; retrying once with stricter tool-calling instructions …"
+            "message": f"{_provider_display_name(self.llm_provider)} returned a malformed tool-planning reply; retrying once with stricter tool-calling instructions …"
         })
 
         repair_messages = [
@@ -1074,12 +1250,16 @@ class MCPSession:
                 self._client.chat,
                 model=self.model,
                 messages=repair_messages,
-                tools=self._ollama_tools_minimal if self._ollama_tools_minimal else (self._ollama_tools if self._ollama_tools else None),
+                tools=(
+                    self._anthropic_tools_minimal if _normalize_provider_name(self.llm_provider) == "claude" else self._ollama_tools_minimal
+                ) or (
+                    self._anthropic_tools if _normalize_provider_name(self.llm_provider) == "claude" else self._ollama_tools
+                ) or None,
                 options={"num_ctx": self.context_window},
             )
         except Exception as exc:
             _emit(self.event_callback, "status", {
-                "message": f"LiteLLM malformed-reply retry failed ({exc})."
+                "message": f"{_provider_display_name(self.llm_provider)} malformed-reply retry failed ({exc})."
             })
             return None
 
@@ -1094,7 +1274,7 @@ class MCPSession:
             })
 
         _emit(self.event_callback, "status", {
-            "message": "LiteLLM did not return usable native tool calls; attempting JSON tool-plan recovery …"
+            "message": f"{_provider_display_name(self.llm_provider)} did not return usable native tool calls; attempting JSON tool-plan recovery …"
         })
 
         try:
@@ -1125,7 +1305,7 @@ class MCPSession:
             )
         except Exception as exc:
             _emit(self.event_callback, "status", {
-                "message": f"LiteLLM JSON tool-plan recovery failed ({exc})."
+                "message": f"{_provider_display_name(self.llm_provider)} JSON tool-plan recovery failed ({exc})."
             })
             return None
 
@@ -1305,8 +1485,15 @@ class MCPSession:
         )
 
         # Configure model client
-        if _normalize_provider_name(self.llm_provider) == "litellm":
+        provider_name = _normalize_provider_name(self.llm_provider)
+        if provider_name in {"litellm", "openai"}:
             self._client = _LiteLLMClient(
+                host=self.ollama_url,
+                headers=self._client_headers() or {},
+                verify=self.ssl_verify,
+            )
+        elif provider_name == "claude":
+            self._client = _AnthropicClient(
                 host=self.ollama_url,
                 headers=self._client_headers() or {},
                 verify=self.ssl_verify,
@@ -1359,6 +1546,8 @@ class MCPSession:
         mcp_tools = tools_result.tools
         self._ollama_tools = [_mcp_tool_to_ollama(t) for t in mcp_tools]
         self._ollama_tools_minimal = [_mcp_tool_to_ollama_minimal(t) for t in mcp_tools]
+        self._anthropic_tools = [_mcp_tool_to_anthropic(t) for t in mcp_tools]
+        self._anthropic_tools_minimal = [_mcp_tool_to_anthropic_minimal(t) for t in mcp_tools]
         self.tool_names = [t.name for t in mcp_tools]
 
         if self._logger:
@@ -1412,6 +1601,7 @@ class MCPSession:
         self._logger.log_prompt(prompt)
         self.messages.append({"role": "user", "content": prompt})
         turn_tool_results: list[dict] = []
+        provider_name = _normalize_provider_name(self.llm_provider)
 
         max_iterations = self.max_turns
         for iteration in range(max_iterations):
@@ -1442,7 +1632,7 @@ class MCPSession:
                     self._client.chat,
                     model=self.model,
                     messages=self.messages,
-                    tools=self._ollama_tools if self._ollama_tools else None,
+                    tools=(self._anthropic_tools if provider_name == "claude" else self._ollama_tools) or None,
                     options={"num_ctx": self.context_window},
                 )
             except Exception as exc:
@@ -1458,9 +1648,9 @@ class MCPSession:
                         options={"num_ctx": self.context_window},
                     )
                 elif (
-                    _normalize_provider_name(self.llm_provider) == "litellm"
-                    and self._ollama_tools
-                    and self._ollama_tools_minimal
+                    provider_name in {"litellm", "openai", "claude"}
+                    and ((self._anthropic_tools if provider_name == "claude" else self._ollama_tools))
+                    and ((self._anthropic_tools_minimal if provider_name == "claude" else self._ollama_tools_minimal))
                     and _is_litellm_retryable_tool_error(exc)
                 ):
                     if self._logger:
@@ -1475,13 +1665,13 @@ class MCPSession:
                                 pass
 
                     _emit(self.event_callback, "status", {
-                        "message": "LiteLLM rejected the initial tool request; retrying with simplified tool metadata …"
+                        "message": f"{_provider_display_name(self.llm_provider)} rejected the initial tool request; retrying with simplified tool metadata …"
                     })
                     response = await asyncio.to_thread(
                         self._client.chat,
                         model=self.model,
                         messages=self.messages,
-                        tools=self._ollama_tools_minimal,
+                        tools=(self._anthropic_tools_minimal if provider_name == "claude" else self._ollama_tools_minimal),
                         options={"num_ctx": self.context_window, "tool_choice": False},
                     )
                 else:
@@ -1493,7 +1683,7 @@ class MCPSession:
             tool_calls = original_msg.get("tool_calls", getattr(original_msg, "tool_calls", None))
 
             if (
-                _normalize_provider_name(self.llm_provider) == "litellm"
+                provider_name in {"litellm", "openai", "claude"}
                 and self.tool_names
                 and not turn_tool_results
                 and not tool_calls
@@ -1589,7 +1779,7 @@ class MCPSession:
 
                 detail = "Model returned an empty reply with no tool calls."
                 if self.tool_names:
-                    provider_label = "LiteLLM" if _normalize_provider_name(self.llm_provider) == "litellm" else "Ollama"
+                    provider_label = _provider_display_name(self.llm_provider)
                     detail += f" This usually indicates the selected model is not reliably using tools through {provider_label} for this prompt."
                 else:
                     detail += " No tools are configured for this session."
