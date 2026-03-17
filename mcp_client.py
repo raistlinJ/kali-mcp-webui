@@ -206,6 +206,23 @@ def _message_tool_calls(message) -> list:
     return []
 
 
+def _looks_like_malformed_tool_planning(text: str) -> bool:
+    normalized = str(text or "").strip().lower()
+    if not normalized:
+        return True
+
+    if "the user wants to" in normalized:
+        return True
+
+    if ("{" in normalized or "}" in normalized) and any(token in normalized for token in ('"args"', '"name"', '"function"', '"scan ')):
+        return True
+
+    if len(normalized) < 320 and any(token in normalized for token in ("tool call", "function_call", "arguments", "assistant to=functions")):
+        return True
+
+    return False
+
+
 def _to_openai_messages(messages: list[dict]) -> list[dict]:
     converted = []
     for message in messages:
@@ -924,6 +941,46 @@ class MCPSession:
 
         return None
 
+    async def _repair_litellm_tool_reply(self, prompt: str, malformed_content: str) -> dict | None:
+        _emit(self.event_callback, "status", {
+            "message": "LiteLLM returned a malformed tool-planning reply; retrying once with stricter tool-calling instructions …"
+        })
+
+        repair_messages = [
+            *self.messages,
+            {
+                "role": "system",
+                "content": (
+                    "You are in tool-calling mode. If a tool is needed, reply with tool_calls only and no explanatory prose. "
+                    "Do not describe the intended tool call in natural language. Do not emit partial JSON. "
+                    "If no tool is needed, reply with a short direct answer."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Your previous reply was malformed and could not be executed. "
+                    "Re-answer the original user request now using a valid tool call if needed.\n\n"
+                    f"Original request:\n{prompt}\n\n"
+                    f"Malformed reply:\n{malformed_content}"
+                ),
+            },
+        ]
+
+        try:
+            return await asyncio.to_thread(
+                self._client.chat,
+                model=self.model,
+                messages=repair_messages,
+                tools=self._ollama_tools_minimal if self._ollama_tools_minimal else (self._ollama_tools if self._ollama_tools else None),
+                options={"num_ctx": self.context_window},
+            )
+        except Exception as exc:
+            _emit(self.event_callback, "status", {
+                "message": f"LiteLLM malformed-reply retry failed ({exc})."
+            })
+            return None
+
     async def _prompt_post_tool_reply_decision(self, prompt: str, tool_results: list[dict], cancel_event: asyncio.Event | None) -> str:
         loop = asyncio.get_running_loop()
         decision_future = loop.create_future()
@@ -1238,6 +1295,29 @@ class MCPSession:
             original_msg = response.get("message", response)
             content = original_msg.get("content", getattr(original_msg, "content", "")) or ""
             tool_calls = original_msg.get("tool_calls", getattr(original_msg, "tool_calls", None))
+
+            if (
+                _normalize_provider_name(self.llm_provider) == "litellm"
+                and self.tool_names
+                and not turn_tool_results
+                and not tool_calls
+                and _looks_like_malformed_tool_planning(content)
+            ):
+                if self._logger and isinstance(response, dict) and response.get("raw") is not None:
+                    try:
+                        self._logger.log_artifact(
+                            f"litellm_malformed_turn_{iteration + 1}.txt",
+                            json.dumps(response.get("raw"), indent=2, ensure_ascii=True),
+                        )
+                    except Exception:
+                        pass
+
+                repaired_response = await self._repair_litellm_tool_reply(prompt, content)
+                if repaired_response:
+                    response = repaired_response
+                    original_msg = response.get("message", response)
+                    content = original_msg.get("content", getattr(original_msg, "content", "")) or ""
+                    tool_calls = original_msg.get("tool_calls", getattr(original_msg, "tool_calls", None))
 
             # The Ollama PyPI client returns a `Message` object. We must convert it
             # cleanly back to a dict with primitive values so it can be fed back in.
