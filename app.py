@@ -62,7 +62,10 @@ def _normalize_ssl_verify(value) -> bool:
 def _build_llm_http_headers(api_key: str | None) -> dict:
     if not api_key:
         return {}
-    return {'Authorization': f'Bearer {api_key}'}
+    return {
+        'Authorization': f'Bearer {api_key}',
+        'x-api-key': api_key,
+    }
 
 
 def _extract_provider_models(provider: str, payload: dict) -> list[str]:
@@ -765,6 +768,16 @@ def get_models():
         response.raise_for_status()
         models = _extract_provider_models(provider, response.json() or {})
         return jsonify({'success': True, 'models': models, 'provider': provider})
+    except requests.exceptions.HTTPError as e:
+        response = getattr(e, 'response', None)
+        if response is not None and response.status_code == 401 and provider == 'litellm':
+            has_key = bool(api_key)
+            detail = 'Check that the LiteLLM API key is present and valid.' if has_key else 'Enter a LiteLLM API key and try again.'
+            return jsonify({
+                'success': False,
+                'error': f'LiteLLM rejected the model request with 401 Unauthorized. {detail}'
+            }), 400
+        return jsonify({'success': False, 'error': str(e)}), 400
     except requests.exceptions.RequestException as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 

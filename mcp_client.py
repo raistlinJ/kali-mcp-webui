@@ -160,17 +160,24 @@ def _message_text_content(message) -> str:
     if isinstance(content, str):
         return content
     if content is None:
-        return ""
+        content = []
     if isinstance(content, list):
         parts = []
         for item in content:
             if isinstance(item, dict):
-                text = item.get("text")
+                text = item.get("text") or item.get("content") or item.get("output_text") or item.get("value")
                 if text:
                     parts.append(str(text))
             elif item is not None:
                 parts.append(str(item))
-        return "\n".join(part for part in parts if part)
+        if parts:
+            return "\n".join(part for part in parts if part)
+
+    if hasattr(message, "get"):
+        for key in ("output_text", "reasoning_content", "refusal"):
+            value = message.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
     return str(content)
 
 
@@ -179,9 +186,23 @@ def _message_tool_calls(message) -> list:
         tool_calls = message.get("tool_calls")
         if tool_calls:
             return list(tool_calls)
+        function_call = message.get("function_call")
+        if function_call:
+            return [{
+                "id": message.get("tool_call_id") or "call_1",
+                "type": "function",
+                "function": function_call,
+            }]
     tool_calls = getattr(message, "tool_calls", None)
     if tool_calls:
         return list(tool_calls)
+    function_call = getattr(message, "function_call", None)
+    if function_call:
+        return [{
+            "id": getattr(message, "tool_call_id", None) or "call_1",
+            "type": "function",
+            "function": function_call,
+        }]
     return []
 
 
@@ -250,6 +271,7 @@ class _LiteLLMClient:
         }
         if tools:
             payload["tools"] = tools
+            payload["tool_choice"] = "auto"
 
         options = options or {}
         temperature = options.get("temperature")
@@ -269,7 +291,7 @@ class _LiteLLMClient:
         choice = choices[0] if choices else {}
         message = choice.get("message") or {}
         tool_calls = []
-        for tool_call in message.get("tool_calls") or []:
+        for index, tool_call in enumerate(_message_tool_calls(message), start=1):
             if not isinstance(tool_call, dict):
                 continue
             function = tool_call.get("function") or {}
@@ -280,7 +302,7 @@ class _LiteLLMClient:
                 except Exception:
                     arguments = {"args": arguments}
             tool_calls.append({
-                "id": tool_call.get("id"),
+                "id": tool_call.get("id") or f"call_{index}",
                 "type": tool_call.get("type", "function"),
                 "function": {
                     "name": function.get("name"),
@@ -857,7 +879,10 @@ class MCPSession:
     def _client_headers(self) -> dict | None:
         if not self.api_key:
             return None
-        return {"Authorization": f"Bearer {self.api_key}"}
+        return {
+            "Authorization": f"Bearer {self.api_key}",
+            "x-api-key": self.api_key,
+        }
 
     async def _retry_empty_reply_after_tools(self, prompt: str, tool_results: list[dict]) -> str | None:
         _emit(self.event_callback, "status", {
