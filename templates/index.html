@@ -130,6 +130,15 @@
                                     </div>
                                 </div>
 
+                                <div class="input-group">
+                                    <label class="checkbox-container" for="ssl-verify-toggle">
+                                        <input type="checkbox" id="ssl-verify-toggle" checked>
+                                        <span>
+                                            Require SSL Certificate Verification
+                                        </span>
+                                    </label>
+                                </div>
+
                                 <div class="input-group" id="api-key-group">
                                     <label for="api-key">API Key <span class="input-optional">(optional)</span></label>
                                     <div class="input-with-icon">
@@ -823,6 +832,14 @@
                                 <i class="ph ph-plugs-connected"></i>
                                 <input type="url" id="analysis-ollama-url" placeholder="http://localhost:11434">
                             </div>
+                        </div>
+                        <div class="input-group">
+                            <label class="checkbox-container" for="analysis-ssl-verify-toggle">
+                                <input type="checkbox" id="analysis-ssl-verify-toggle" checked>
+                                <span>
+                                    Require SSL Certificate Verification
+                                </span>
+                            </label>
                         </div>
                         <div class="input-group" id="analysis-api-key-group">
                             <label for="analysis-api-key">API Key <span class="input-optional">(optional)</span></label>

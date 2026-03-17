@@ -51,6 +51,14 @@ def _normalize_llm_provider(value) -> str:
     return 'ollama_direct'
 
 
+def _normalize_ssl_verify(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return True
+    return str(value).strip().lower() not in {'0', 'false', 'no', 'off'}
+
+
 def _build_llm_http_headers(api_key: str | None) -> dict:
     if not api_key:
         return {}
@@ -90,7 +98,7 @@ def _analysis_extract_response_text(provider: str, payload: dict) -> str:
     return ((payload or {}).get('message') or {}).get('content', '')
 
 
-def _analysis_chat_request(provider: str, host: str, api_key: str | None, model: str, messages: list[dict], options: dict | None = None) -> dict:
+def _analysis_chat_request(provider: str, host: str, api_key: str | None, model: str, messages: list[dict], options: dict | None = None, ssl_verify: bool = True) -> dict:
     headers = {
         'Content-Type': 'application/json',
         **_build_llm_http_headers(api_key),
@@ -109,6 +117,7 @@ def _analysis_chat_request(provider: str, host: str, api_key: str | None, model:
             headers=headers,
             json=payload,
             timeout=120,
+            verify=ssl_verify,
         )
         response.raise_for_status()
         return response.json() or {}
@@ -117,6 +126,7 @@ def _analysis_chat_request(provider: str, host: str, api_key: str | None, model:
     client = ollama.Client(
         host=host,
         headers=_build_llm_http_headers(api_key),
+        verify=ssl_verify,
     )
     return client.chat(
         model=model,
@@ -487,7 +497,7 @@ def _format_analysis_sections(sections: list[str]) -> str:
     return "\n".join(f"{index}. {section}" for index, section in enumerate(sections, start=1))
 
 
-def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, api_key_override=None, llm_provider_override=None):
+def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, api_key_override=None, llm_provider_override=None, ssl_verify_override=None):
     session_dir = os.path.join(RUNS_DIR, run_id)
     transcript_path = os.path.join(session_dir, "transcript.md")
     if not os.path.isfile(transcript_path):
@@ -577,6 +587,7 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
     ollama_url = 'http://localhost:11434'
     model = 'llama3'
     llm_provider = 'ollama_direct'
+    ssl_verify = True
 
     meta_path = os.path.join(session_dir, "metadata.json")
     available_tools = []
@@ -587,6 +598,7 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
                 ollama_url = meta.get('ollama_url', ollama_url)
                 model = meta.get('model', model)
                 llm_provider = _normalize_llm_provider(meta.get('llm_provider'))
+                ssl_verify = _normalize_ssl_verify(meta.get('ssl_verify', True))
                 available_tools = meta.get('available_tools', []) or []
         except Exception:
             pass
@@ -600,6 +612,8 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         model = model_override
     if llm_provider_override:
         llm_provider = _normalize_llm_provider(llm_provider_override)
+    if ssl_verify_override is not None:
+        ssl_verify = _normalize_ssl_verify(ssl_verify_override)
     api_key = _normalize_optional_api_key(api_key_override)
 
     normalized_outputs = _normalize_analysis_outputs(analysis_outputs)
@@ -715,6 +729,7 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         "evidence_digest": evidence_digest,
         "ollama_url": ollama_url,
         "llm_provider": llm_provider,
+        "ssl_verify": ssl_verify,
         "llm_auth_enabled": bool(api_key),
         "model": model,
         "system_prompt": system_prompt,
@@ -738,12 +753,14 @@ def get_models():
     ollama_url = data.get('url', 'http://localhost:11434')
     provider = _normalize_llm_provider(data.get('provider'))
     api_key = _extract_optional_api_key(data)
+    ssl_verify = _normalize_ssl_verify(data.get('ssl_verify'))
 
     try:
         response = requests.get(
             f"{ollama_url.rstrip('/')}{'/v1/models' if provider == 'litellm' else '/api/tags'}",
             timeout=5,
             headers=_build_llm_http_headers(api_key),
+            verify=ssl_verify,
         )
         response.raise_for_status()
         models = _extract_provider_models(provider, response.json() or {})
@@ -770,6 +787,7 @@ def session_start():
     ollama_url = data.get('url', 'http://localhost:11434')
     llm_provider = _normalize_llm_provider(data.get('provider'))
     api_key = _extract_optional_api_key(data)
+    ssl_verify = _normalize_ssl_verify(data.get('ssl_verify'))
     model = data.get('model')
     server_command = data.get('server_command')
     tools_config = data.get('tools_config')
@@ -828,6 +846,7 @@ def session_start():
             ollama_url=ollama_url,
             llm_provider=llm_provider,
             api_key=api_key,
+            ssl_verify=ssl_verify,
             model=model,
             server_command=server_command,
             run_id=run_id,
@@ -894,6 +913,7 @@ def session_start():
             'llm_provider': llm_provider,
             'message': f'Service started with {len(start_result["tools"])} tool(s).',
             'llm_auth_enabled': bool(api_key),
+            'ssl_verify': ssl_verify,
         })
     else:
         # TIMEOUT or ERROR: 
@@ -1264,6 +1284,7 @@ def analyze_session(run_id):
     raw_provider = data.get("provider")
     llm_provider_override = _normalize_llm_provider(raw_provider) if raw_provider is not None else None
     api_key_override = _extract_optional_api_key(data)
+    ssl_verify_override = _normalize_ssl_verify(data.get("ssl_verify")) if "ssl_verify" in data else None
     model_override = (data.get("model") or "").strip() or None
     job_id = f"job_{int(time.time())}_{run_id}"
 
@@ -1278,6 +1299,7 @@ def analyze_session(run_id):
         "analysis_outputs": analysis_outputs,
         "ollama_url": ollama_url_override,
         "llm_provider": llm_provider_override,
+        "ssl_verify": ssl_verify_override,
         "llm_auth_enabled": bool(api_key_override),
         "model": model_override,
         "start_time": start_time,
@@ -1304,6 +1326,7 @@ def analyze_session(run_id):
                 ollama_url_override=ollama_url_override,
                 api_key_override=api_key_override,
                 llm_provider_override=llm_provider_override,
+                ssl_verify_override=ssl_verify_override,
                 model_override=model_override,
                 analysis_outputs=analysis_outputs,
                 progress_callback=lambda detail: _update_analysis_job_state(run_id, job_id, status_detail=detail),
@@ -1340,7 +1363,7 @@ def analyze_session(run_id):
     threading.Thread(target=_job_wrapper, daemon=True).start()
     return jsonify({"success": True, "job_id": job_id})
 
-def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, api_key_override=None, llm_provider_override=None, progress_callback=None):
+def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, api_key_override=None, llm_provider_override=None, ssl_verify_override=None, progress_callback=None):
     """Internal helper to do the actual provider-specific LLM work."""
 
     def _progress(detail: str):
@@ -1359,6 +1382,7 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         analysis_outputs,
         api_key_override,
         llm_provider_override,
+        ssl_verify_override,
     )
     _progress("Connecting to model provider and preparing analysis request")
     chat_options = {
@@ -1376,6 +1400,7 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
             {"role": "user", "content": request_data["user_prompt"]}
         ],
         chat_options,
+        request_data.get("ssl_verify", True),
     )
     completion_path = "initial"
     _progress("Processing model response")
@@ -1413,6 +1438,7 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
                 {"role": "user", "content": rewrite_prompt},
             ],
             chat_options,
+            request_data.get("ssl_verify", True),
         )
         completion_path = "rewrite"
         rewrite_safe_resp = _to_json_safe(rewrite_resp)
@@ -1445,6 +1471,7 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
                 {"role": "user", "content": fallback_prompt},
             ],
             chat_options,
+            request_data.get("ssl_verify", True),
         )
         completion_path = "fallback"
         fallback_safe_resp = _to_json_safe(fallback_resp)

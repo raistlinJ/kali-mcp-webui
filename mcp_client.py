@@ -223,16 +223,18 @@ def _to_openai_messages(messages: list[dict]) -> list[dict]:
 
 
 class _LiteLLMClient:
-    def __init__(self, host: str, headers: dict | None = None, timeout: int = 90):
+    def __init__(self, host: str, headers: dict | None = None, timeout: int = 90, verify: bool = True):
         self.host = host.rstrip("/")
         self.headers = {"Content-Type": "application/json", **(headers or {})}
         self.timeout = timeout
+        self.verify = verify
 
     def show(self, model: str) -> dict:
         response = requests.get(
             f"{self.host}/v1/models",
             headers=self.headers,
             timeout=min(self.timeout, 20),
+            verify=self.verify,
         )
         response.raise_for_status()
         payload = response.json() or {}
@@ -259,6 +261,7 @@ class _LiteLLMClient:
             headers=self.headers,
             json=payload,
             timeout=self.timeout,
+            verify=self.verify,
         )
         response.raise_for_status()
         raw = response.json() or {}
@@ -805,6 +808,7 @@ class MCPSession:
         llm_provider: str = "ollama_direct",
         api_key: str | None = None,
         api_token: str | None = None,
+        ssl_verify: bool = True,
         model: str,
         server_command: str,
         run_id: str | None = None,
@@ -816,6 +820,7 @@ class MCPSession:
         self.ollama_url = ollama_url
         self.llm_provider = str(llm_provider or "ollama_direct").strip() or "ollama_direct"
         self.api_key = str(api_key or api_token or "").strip() or None
+        self.ssl_verify = bool(ssl_verify)
         self.model = model
         self.server_command = server_command
         self.context_window = context_window
@@ -1023,6 +1028,7 @@ class MCPSession:
                 "model": self.model,
                 "ollama_url": self.ollama_url,
                 "llm_provider": self.llm_provider,
+                "ssl_verify": self.ssl_verify,
                 "llm_auth_enabled": bool(self.api_key),
                 "context_window": self.context_window,
                 "max_turns": self.max_turns,
@@ -1054,11 +1060,13 @@ class MCPSession:
             self._client = _LiteLLMClient(
                 host=self.ollama_url,
                 headers=self._client_headers() or {},
+                verify=self.ssl_verify,
             )
         else:
             self._client = _ollama_lib.Client(
                 host=self.ollama_url,
                 headers=self._client_headers(),
+                verify=self.ssl_verify,
             )
 
         # Discover model's actual context length

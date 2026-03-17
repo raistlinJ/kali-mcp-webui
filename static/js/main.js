@@ -28,8 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelSelect = document.getElementById('model-select');
     const providerSelect = document.getElementById('provider-select');
     const ollamaUrlInput = document.getElementById('ollama-url');
+    const sslVerifyToggle = document.getElementById('ssl-verify-toggle');
     const apiKeyGroup = document.getElementById('api-key-group');
     const apiKeyInput = document.getElementById('api-key');
+    const analysisSslVerifyToggle = document.getElementById('analysis-ssl-verify-toggle');
     const analysisApiKeyInput = document.getElementById('analysis-api-key');
     const maxTurnsInput = document.getElementById('max-turns');
     const policyTargetsInput = document.getElementById('policy-targets');
@@ -572,7 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------------
     // Fetch Models
     // ---------------------------------------------------------------
-    async function fetchModelsIntoSelect({ url, provider = PROVIDERS.OLLAMA_DIRECT, apiKey = '', button, errorLabel, selectElement, progressTitleText, successMessage, onSuccess, onFailure }) {
+    async function fetchModelsIntoSelect({ url, provider = PROVIDERS.OLLAMA_DIRECT, apiKey = '', sslVerify = true, button, errorLabel, selectElement, progressTitleText, successMessage, onSuccess, onFailure }) {
         if (!url) {
             showAlert('Please enter an instance URL');
             return false;
@@ -592,7 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/models', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, provider, api_key: apiKey })
+                body: JSON.stringify({ url, provider, api_key: apiKey, ssl_verify: sslVerify })
             });
             const data = await response.json();
 
@@ -640,10 +642,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = ollamaUrlInput.value.trim();
         const provider = normalizeProvider(providerSelect?.value);
         const apiKey = providerUsesApiKey(provider) ? (apiKeyInput?.value.trim() || '') : '';
+        const sslVerify = Boolean(sslVerifyToggle?.checked ?? true);
         await fetchModelsIntoSelect({
             url,
             provider,
             apiKey,
+            sslVerify,
             button: fetchBtn,
             errorLabel: ollamaFetchError,
             selectElement: modelSelect,
@@ -666,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
         suggestedUrl = '',
         suggestedProvider = PROVIDERS.OLLAMA_DIRECT,
         suggestedApiKey = '',
+        suggestedSslVerify = true,
         suggestedModel = '',
         title = 'Analysis Configuration',
         description = 'Choose which provider, instance, and model should be used for this analysis job.',
@@ -686,6 +691,9 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisProviderSelect.value = normalizeProvider(suggestedProvider);
         analysisOllamaUrlInput.value = suggestedUrl || ollamaUrlInput.value.trim() || 'http://localhost:11434';
         analysisApiKeyInput.value = suggestedApiKey || apiKeyInput?.value.trim() || '';
+        if (analysisSslVerifyToggle) {
+            analysisSslVerifyToggle.checked = suggestedSslVerify;
+        }
         analysisFetchError.style.display = 'none';
         analysisFetchError.innerText = '';
         analysisSpanGroup.style.display = includeSpan ? 'flex' : 'none';
@@ -710,12 +718,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = analysisOllamaUrlInput.value.trim();
         const provider = normalizeProvider(analysisProviderSelect?.value);
         const apiKey = providerUsesApiKey(provider) ? (analysisApiKeyInput?.value.trim() || '') : '';
+        const sslVerify = Boolean(analysisSslVerifyToggle?.checked ?? true);
         const currentSelectedModel = analysisModelSelect.value;
 
         await fetchModelsIntoSelect({
             url,
             provider,
             apiKey,
+            sslVerify,
             button: analysisFetchBtn,
             errorLabel: analysisFetchError,
             selectElement: analysisModelSelect,
@@ -733,6 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const ollamaUrl = analysisOllamaUrlInput.value.trim();
         const provider = normalizeProvider(analysisProviderSelect?.value);
         const apiKey = providerUsesApiKey(provider) ? (analysisApiKeyInput?.value.trim() || '') : '';
+        const sslVerify = Boolean(analysisSslVerifyToggle?.checked ?? true);
         const model = analysisModelSelect.value;
         const span = _analysisConfigOptions?.includeSpan
             ? analysisSpanSelect.value
@@ -750,7 +761,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        closeAnalysisConfigModal({ ollama_url: ollamaUrl, provider, api_key: apiKey, model, span, analysis_outputs });
+        closeAnalysisConfigModal({ ollama_url: ollamaUrl, provider, api_key: apiKey, ssl_verify: sslVerify, model, span, analysis_outputs });
     });
 
     cancelAnalysisConfigBtn.addEventListener('click', () => closeAnalysisConfigModal(null));
@@ -1119,6 +1130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = ollamaUrlInput.value.trim();
         const provider = normalizeProvider(providerSelect?.value);
         const apiKey = providerUsesApiKey(provider) ? (apiKeyInput?.value.trim() || '') : '';
+        const sslVerify = Boolean(sslVerifyToggle?.checked ?? true);
         const model = modelSelect.value;
         const cmdType = kaliCommandType.value;
         const contextWindow = parseInt(document.getElementById('context-window').value, 10);
@@ -1167,7 +1179,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, provider, api_key: apiKey, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, max_turns: maxTurns, network_policy: networkPolicy })
+                body: JSON.stringify({ url, provider, api_key: apiKey, ssl_verify: sslVerify, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, max_turns: maxTurns, network_policy: networkPolicy })
             });
             const data = await response.json();
 
@@ -1403,6 +1415,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 suggestedUrl: ollamaUrlInput.value.trim(),
                 suggestedProvider: normalizeProvider(providerSelect?.value),
                 suggestedApiKey: apiKeyInput?.value.trim() || '',
+                suggestedSslVerify: Boolean(sslVerifyToggle?.checked ?? true),
                 suggestedModel: modelSelect.value,
                 title: 'Analyze Live Logs',
                 description: 'Choose a log window plus the Ollama instance and model for this background analysis job.',
@@ -1868,6 +1881,7 @@ document.addEventListener('DOMContentLoaded', () => {
             suggestedUrl: ollamaUrlInput.value.trim(),
             suggestedProvider: normalizeProvider(_sessionsById[_browseRunId]?.llm_provider || providerSelect?.value),
             suggestedApiKey: apiKeyInput?.value.trim() || '',
+            suggestedSslVerify: Boolean(_sessionsById[_browseRunId]?.ssl_verify ?? sslVerifyToggle?.checked ?? true),
             suggestedModel: modelSelect.value,
             title: 'Analyze Session',
             description: 'Choose which Ollama instance and model should be used for this session analysis job.',
