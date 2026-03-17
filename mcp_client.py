@@ -26,6 +26,7 @@ import ipaddress
 import json
 import os
 import re
+import requests
 import shlex
 import time
 import traceback
@@ -125,6 +126,172 @@ def _mcp_tool_to_ollama_minimal(tool) -> dict:
 def _is_xml_schema_error(exc: Exception) -> bool:
     message = str(exc or "")
     return "XML syntax error" in message and "status code: 500" in message
+
+
+def _normalize_provider_name(provider: str | None) -> str:
+    normalized = str(provider or "").strip().lower()
+    if normalized in {"litellm", "lite-llm", "lite_llm"}:
+        return "litellm"
+    return "ollama_direct"
+
+
+def _tool_call_identifier(tool_call) -> str | None:
+    if hasattr(tool_call, "get"):
+        value = tool_call.get("id")
+        if value:
+            return str(value)
+    value = getattr(tool_call, "id", None)
+    if value:
+        return str(value)
+    return None
+
+
+def _json_argument_string(arguments) -> str:
+    if isinstance(arguments, str):
+        return arguments
+    try:
+        return json.dumps(arguments or {}, ensure_ascii=True)
+    except Exception:
+        return "{}"
+
+
+def _message_text_content(message) -> str:
+    content = message.get("content", "") if hasattr(message, "get") else getattr(message, "content", "")
+    if isinstance(content, str):
+        return content
+    if content is None:
+        return ""
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get("text")
+                if text:
+                    parts.append(str(text))
+            elif item is not None:
+                parts.append(str(item))
+        return "\n".join(part for part in parts if part)
+    return str(content)
+
+
+def _message_tool_calls(message) -> list:
+    if hasattr(message, "get"):
+        tool_calls = message.get("tool_calls")
+        if tool_calls:
+            return list(tool_calls)
+    tool_calls = getattr(message, "tool_calls", None)
+    if tool_calls:
+        return list(tool_calls)
+    return []
+
+
+def _to_openai_messages(messages: list[dict]) -> list[dict]:
+    converted = []
+    for message in messages:
+        role = message.get("role", "user")
+        content = message.get("content", "")
+        payload = {
+            "role": role,
+            "content": content if isinstance(content, str) else _message_text_content({"content": content}),
+        }
+
+        if role == "assistant" and message.get("tool_calls"):
+            payload["content"] = payload["content"] or None
+            payload["tool_calls"] = []
+            for index, tool_call in enumerate(message.get("tool_calls", []), start=1):
+                tool_name, tool_args = _extract_tool_info(tool_call)
+                tool_call_id = _tool_call_identifier(tool_call) or f"call_{index}"
+                payload["tool_calls"].append({
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {
+                        "name": tool_name,
+                        "arguments": _json_argument_string(tool_args),
+                    },
+                })
+
+        if role == "tool":
+            tool_call_id = message.get("tool_call_id")
+            if tool_call_id:
+                payload["tool_call_id"] = tool_call_id
+            tool_name = message.get("name")
+            if tool_name:
+                payload["name"] = tool_name
+
+        converted.append(payload)
+    return converted
+
+
+class _LiteLLMClient:
+    def __init__(self, host: str, headers: dict | None = None, timeout: int = 90):
+        self.host = host.rstrip("/")
+        self.headers = {"Content-Type": "application/json", **(headers or {})}
+        self.timeout = timeout
+
+    def show(self, model: str) -> dict:
+        response = requests.get(
+            f"{self.host}/v1/models",
+            headers=self.headers,
+            timeout=min(self.timeout, 20),
+        )
+        response.raise_for_status()
+        payload = response.json() or {}
+        for item in payload.get("data", []):
+            if isinstance(item, dict) and item.get("id") == model:
+                return item
+        return payload
+
+    def chat(self, model: str, messages: list[dict], tools=None, options=None) -> dict:
+        payload = {
+            "model": model,
+            "messages": _to_openai_messages(messages),
+        }
+        if tools:
+            payload["tools"] = tools
+
+        options = options or {}
+        temperature = options.get("temperature")
+        if temperature is not None:
+            payload["temperature"] = temperature
+
+        response = requests.post(
+            f"{self.host}/v1/chat/completions",
+            headers=self.headers,
+            json=payload,
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        raw = response.json() or {}
+        choices = raw.get("choices") or []
+        choice = choices[0] if choices else {}
+        message = choice.get("message") or {}
+        tool_calls = []
+        for tool_call in message.get("tool_calls") or []:
+            if not isinstance(tool_call, dict):
+                continue
+            function = tool_call.get("function") or {}
+            arguments = function.get("arguments") or {}
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments)
+                except Exception:
+                    arguments = {"args": arguments}
+            tool_calls.append({
+                "id": tool_call.get("id"),
+                "type": tool_call.get("type", "function"),
+                "function": {
+                    "name": function.get("name"),
+                    "arguments": arguments if isinstance(arguments, dict) else {},
+                },
+            })
+
+        return {
+            "message": {
+                "content": _message_text_content(message),
+                "tool_calls": tool_calls or None,
+            },
+            "raw": raw,
+        }
 
 
 def _normalize_network_policy(policy) -> dict:
@@ -504,6 +671,12 @@ def _extract_tool_info(tc) -> tuple[str, dict]:
     args = getattr(func, "arguments", None)
     if args is None and hasattr(func, "get"):
         args = func.get("arguments", {})
+
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except Exception:
+            args = {"args": args}
         
     if not isinstance(args, dict):
         try:
@@ -629,6 +802,8 @@ class MCPSession:
         self,
         *,
         ollama_url: str,
+        llm_provider: str = "ollama_direct",
+        api_key: str | None = None,
         api_token: str | None = None,
         model: str,
         server_command: str,
@@ -639,7 +814,8 @@ class MCPSession:
         network_policy: dict | None = None,
     ):
         self.ollama_url = ollama_url
-        self.api_token = str(api_token or "").strip() or None
+        self.llm_provider = str(llm_provider or "ollama_direct").strip() or "ollama_direct"
+        self.api_key = str(api_key or api_token or "").strip() or None
         self.model = model
         self.server_command = server_command
         self.context_window = context_window
@@ -674,9 +850,9 @@ class MCPSession:
         self._pending_dangerous_tool_approval = None
 
     def _client_headers(self) -> dict | None:
-        if not self.api_token:
+        if not self.api_key:
             return None
-        return {"Authorization": f"Bearer {self.api_token}"}
+        return {"Authorization": f"Bearer {self.api_key}"}
 
     async def _retry_empty_reply_after_tools(self, prompt: str, tool_results: list[dict]) -> str | None:
         _emit(self.event_callback, "status", {
@@ -836,7 +1012,7 @@ class MCPSession:
         Launch the MCP server, connect, and discover tools.
         Returns a list of available tool names.
         """
-        if not _HAVE_OLLAMA:
+        if _normalize_provider_name(self.llm_provider) == "ollama_direct" and not _HAVE_OLLAMA:
             _emit(self.event_callback, "error", {"message": "ollama Python library is not installed."})
             raise RuntimeError("ollama library not installed")
 
@@ -846,7 +1022,8 @@ class MCPSession:
                 "server_type": "agent",
                 "model": self.model,
                 "ollama_url": self.ollama_url,
-                "llm_auth_enabled": bool(self.api_token),
+                "llm_provider": self.llm_provider,
+                "llm_auth_enabled": bool(self.api_key),
                 "context_window": self.context_window,
                 "max_turns": self.max_turns,
                 "network_policy": self.network_policy,
@@ -872,11 +1049,17 @@ class MCPSession:
             },
         )
 
-        # Configure ollama client
-        self._client = _ollama_lib.Client(
-            host=self.ollama_url,
-            headers=self._client_headers(),
-        )
+        # Configure model client
+        if _normalize_provider_name(self.llm_provider) == "litellm":
+            self._client = _LiteLLMClient(
+                host=self.ollama_url,
+                headers=self._client_headers() or {},
+            )
+        else:
+            self._client = _ollama_lib.Client(
+                host=self.ollama_url,
+                headers=self._client_headers(),
+            )
 
         # Discover model's actual context length
         try:
@@ -1031,7 +1214,9 @@ class MCPSession:
                 clean_tcs = []
                 for tc in tool_calls:
                     tname, targs = _extract_tool_info(tc)
+                    tool_call_id = _tool_call_identifier(tc)
                     clean_tcs.append({
+                        "id": tool_call_id,
                         "function": {
                             "name": tname,
                             "arguments": targs
@@ -1110,6 +1295,7 @@ class MCPSession:
                     return
 
                 tool_name, tool_args = _extract_tool_info(tc)
+                tool_call_id = _tool_call_identifier(tc)
 
                 policy_allowed, policy_message = _evaluate_network_policy(self.network_policy, tool_args)
                 if not policy_allowed:
@@ -1125,6 +1311,7 @@ class MCPSession:
                         "role": "tool",
                         "content": err_msg,
                         "name": tool_name,
+                        "tool_call_id": tool_call_id,
                     })
                     _emit(self.event_callback, "status", {"message": err_msg})
                     continue
@@ -1144,6 +1331,7 @@ class MCPSession:
                             "role": "tool",
                             "content": denial_msg,
                             "name": tool_name,
+                            "tool_call_id": tool_call_id,
                         })
                         turn_tool_results.append({
                             "tool": tool_name,
@@ -1188,6 +1376,7 @@ class MCPSession:
                         "role": "tool",
                         "content": context_result,
                         "name": tool_name,
+                        "tool_call_id": tool_call_id,
                     })
                     turn_tool_results.append({
                         "tool": tool_name,
@@ -1210,6 +1399,8 @@ class MCPSession:
                     self.messages.append({
                         "role": "tool",
                         "content": err_msg,
+                        "name": tool_name,
+                        "tool_call_id": tool_call_id,
                     })
                     turn_tool_results.append({
                         "tool": tool_name,

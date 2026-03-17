@@ -33,15 +33,96 @@ _analysis_lock = threading.Lock()
 ANALYSIS_JOBS_DIRNAME = "analysis_jobs"
 
 
-def _normalize_optional_token(value) -> str | None:
-    token = str(value or '').strip()
-    return token or None
+def _normalize_optional_api_key(value) -> str | None:
+    api_key = str(value or '').strip()
+    return api_key or None
 
 
-def _build_llm_http_headers(api_token: str | None) -> dict:
-    if not api_token:
+def _extract_optional_api_key(data) -> str | None:
+    if not isinstance(data, dict):
+        return None
+    return _normalize_optional_api_key(data.get('api_key') or data.get('api_token'))
+
+
+def _normalize_llm_provider(value) -> str:
+    normalized = str(value or '').strip().lower()
+    if normalized in {'litellm', 'lite-llm', 'lite_llm'}:
+        return 'litellm'
+    return 'ollama_direct'
+
+
+def _build_llm_http_headers(api_key: str | None) -> dict:
+    if not api_key:
         return {}
-    return {'Authorization': f'Bearer {api_token}'}
+    return {'Authorization': f'Bearer {api_key}'}
+
+
+def _extract_provider_models(provider: str, payload: dict) -> list[str]:
+    if provider == 'litellm':
+        return [
+            str(model.get('id'))
+            for model in payload.get('data', [])
+            if isinstance(model, dict) and model.get('id')
+        ]
+
+    return [
+        str(model.get('name'))
+        for model in payload.get('models', [])
+        if isinstance(model, dict) and model.get('name')
+    ]
+
+
+def _analysis_extract_response_text(provider: str, payload: dict) -> str:
+    if provider == 'litellm':
+        choice = ((payload or {}).get('choices') or [{}])[0]
+        message = choice.get('message') or {}
+        content = message.get('content')
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, dict) and item.get('text'):
+                    parts.append(str(item.get('text')))
+            return '\n'.join(parts)
+        return str(content or '')
+
+    return ((payload or {}).get('message') or {}).get('content', '')
+
+
+def _analysis_chat_request(provider: str, host: str, api_key: str | None, model: str, messages: list[dict], options: dict | None = None) -> dict:
+    headers = {
+        'Content-Type': 'application/json',
+        **_build_llm_http_headers(api_key),
+    }
+    options = options or {}
+
+    if provider == 'litellm':
+        payload = {
+            'model': model,
+            'messages': messages,
+        }
+        if 'temperature' in options:
+            payload['temperature'] = options['temperature']
+        response = requests.post(
+            f"{host.rstrip('/')}/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=120,
+        )
+        response.raise_for_status()
+        return response.json() or {}
+
+    import ollama
+    client = ollama.Client(
+        host=host,
+        headers=_build_llm_http_headers(api_key),
+    )
+    return client.chat(
+        model=model,
+        messages=messages,
+        options=options,
+    )
 
 
 def _make_run_id(server_type: str) -> str:
@@ -121,6 +202,7 @@ def _write_analysis_job_record(run_id: str, job_id: str, record: dict):
         f.write(f"- Started: {safe_record.get('start_time', 'unknown')}\n")
         f.write(f"- Completed: {safe_record.get('end_time') or 'in-progress'}\n")
         f.write(f"- Ollama URL: {safe_record.get('ollama_url') or 'unknown'}\n")
+        f.write(f"- Provider: {safe_record.get('llm_provider') or 'unknown'}\n")
         f.write(f"- Model: {safe_record.get('model') or 'unknown'}\n\n")
 
         if safe_record.get('error'):
@@ -405,7 +487,7 @@ def _format_analysis_sections(sections: list[str]) -> str:
     return "\n".join(f"{index}. {section}" for index, section in enumerate(sections, start=1))
 
 
-def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, api_token_override=None):
+def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, api_key_override=None, llm_provider_override=None):
     session_dir = os.path.join(RUNS_DIR, run_id)
     transcript_path = os.path.join(session_dir, "transcript.md")
     if not os.path.isfile(transcript_path):
@@ -494,6 +576,7 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
 
     ollama_url = 'http://localhost:11434'
     model = 'llama3'
+    llm_provider = 'ollama_direct'
 
     meta_path = os.path.join(session_dir, "metadata.json")
     available_tools = []
@@ -503,6 +586,7 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
                 meta = json.load(f)
                 ollama_url = meta.get('ollama_url', ollama_url)
                 model = meta.get('model', model)
+                llm_provider = _normalize_llm_provider(meta.get('llm_provider'))
                 available_tools = meta.get('available_tools', []) or []
         except Exception:
             pass
@@ -514,7 +598,9 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         ollama_url = ollama_url_override
     if model_override:
         model = model_override
-    api_token = _normalize_optional_token(api_token_override)
+    if llm_provider_override:
+        llm_provider = _normalize_llm_provider(llm_provider_override)
+    api_key = _normalize_optional_api_key(api_key_override)
 
     normalized_outputs = _normalize_analysis_outputs(analysis_outputs)
     required_sections = _analysis_required_sections(span_req, normalized_outputs)
@@ -628,11 +714,12 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         "meaningful_evidence": meaningful_evidence,
         "evidence_digest": evidence_digest,
         "ollama_url": ollama_url,
-        "llm_auth_enabled": bool(api_token),
+        "llm_provider": llm_provider,
+        "llm_auth_enabled": bool(api_key),
         "model": model,
         "system_prompt": system_prompt,
         "user_prompt": user_prompt,
-        "api_token": api_token,
+        "api_key": api_key,
     }
 
 
@@ -649,17 +736,18 @@ def index():
 def get_models():
     data = request.json or {}
     ollama_url = data.get('url', 'http://localhost:11434')
-    api_token = _normalize_optional_token(data.get('api_token'))
+    provider = _normalize_llm_provider(data.get('provider'))
+    api_key = _extract_optional_api_key(data)
 
     try:
         response = requests.get(
-            f"{ollama_url}/api/tags",
+            f"{ollama_url.rstrip('/')}{'/v1/models' if provider == 'litellm' else '/api/tags'}",
             timeout=5,
-            headers=_build_llm_http_headers(api_token),
+            headers=_build_llm_http_headers(api_key),
         )
         response.raise_for_status()
-        models = [model['name'] for model in response.json().get('models', [])]
-        return jsonify({'success': True, 'models': models})
+        models = _extract_provider_models(provider, response.json() or {})
+        return jsonify({'success': True, 'models': models, 'provider': provider})
     except requests.exceptions.RequestException as e:
         return jsonify({'success': False, 'error': str(e)}), 400
 
@@ -680,7 +768,8 @@ def session_start():
 
     data = request.json or {}
     ollama_url = data.get('url', 'http://localhost:11434')
-    api_token = _normalize_optional_token(data.get('api_token'))
+    llm_provider = _normalize_llm_provider(data.get('provider'))
+    api_key = _extract_optional_api_key(data)
     model = data.get('model')
     server_command = data.get('server_command')
     tools_config = data.get('tools_config')
@@ -737,7 +826,8 @@ def session_start():
 
         session = mcp_client.MCPSession(
             ollama_url=ollama_url,
-            api_token=api_token,
+            llm_provider=llm_provider,
+            api_key=api_key,
             model=model,
             server_command=server_command,
             run_id=run_id,
@@ -801,8 +891,9 @@ def session_start():
             'success': True,
             'run_id': run_id,
             'tools': start_result["tools"],
-            'llm_auth_enabled': bool(api_token),
+            'llm_provider': llm_provider,
             'message': f'Service started with {len(start_result["tools"])} tool(s).',
+            'llm_auth_enabled': bool(api_key),
         })
     else:
         # TIMEOUT or ERROR: 
@@ -1170,7 +1261,9 @@ def analyze_session(run_id):
     span_req = data.get("span", "Entire Session")
     analysis_outputs = _normalize_analysis_outputs(data.get("analysis_outputs"))
     ollama_url_override = (data.get("ollama_url") or "").strip() or None
-    api_token_override = _normalize_optional_token(data.get("api_token"))
+    raw_provider = data.get("provider")
+    llm_provider_override = _normalize_llm_provider(raw_provider) if raw_provider is not None else None
+    api_key_override = _extract_optional_api_key(data)
     model_override = (data.get("model") or "").strip() or None
     job_id = f"job_{int(time.time())}_{run_id}"
 
@@ -1184,7 +1277,8 @@ def analyze_session(run_id):
         "span": span_req,
         "analysis_outputs": analysis_outputs,
         "ollama_url": ollama_url_override,
-        "llm_auth_enabled": bool(api_token_override),
+        "llm_provider": llm_provider_override,
+        "llm_auth_enabled": bool(api_key_override),
         "model": model_override,
         "start_time": start_time,
         "last_update_time": start_time,
@@ -1208,7 +1302,8 @@ def analyze_session(run_id):
                 run_id,
                 span_req,
                 ollama_url_override=ollama_url_override,
-                api_token_override=api_token_override,
+                api_key_override=api_key_override,
+                llm_provider_override=llm_provider_override,
                 model_override=model_override,
                 analysis_outputs=analysis_outputs,
                 progress_callback=lambda detail: _update_analysis_job_state(run_id, job_id, status_detail=detail),
@@ -1245,9 +1340,8 @@ def analyze_session(run_id):
     threading.Thread(target=_job_wrapper, daemon=True).start()
     return jsonify({"success": True, "job_id": job_id})
 
-def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, api_token_override=None, progress_callback=None):
-    """Internal helper to do the actual Ollama work."""
-    import ollama
+def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, api_key_override=None, llm_provider_override=None, progress_callback=None):
+    """Internal helper to do the actual provider-specific LLM work."""
 
     def _progress(detail: str):
         if progress_callback:
@@ -1263,32 +1357,32 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         ollama_url_override,
         model_override,
         analysis_outputs,
-        api_token_override,
+        api_key_override,
+        llm_provider_override,
     )
-    _progress("Connecting to Ollama and preparing analysis request")
-    client = ollama.Client(
-        host=request_data["ollama_url"],
-        headers=_build_llm_http_headers(request_data.get("api_token")),
-    )
+    _progress("Connecting to model provider and preparing analysis request")
     chat_options = {
         "temperature": 0.1,
     }
 
     _progress(f"Waiting for model response from {request_data['model']}")
-    resp = client.chat(
-        model=request_data["model"],
-        messages=[
+    resp = _analysis_chat_request(
+        request_data["llm_provider"],
+        request_data["ollama_url"],
+        request_data.get("api_key"),
+        request_data["model"],
+        [
             {"role": "system", "content": request_data["system_prompt"]},
             {"role": "user", "content": request_data["user_prompt"]}
         ],
-        options=chat_options,
+        chat_options,
     )
     completion_path = "initial"
     _progress("Processing model response")
     safe_resp = _to_json_safe(resp)
     response_text = "No analysis returned."
     if isinstance(safe_resp, dict):
-        response_text = safe_resp.get("message", {}).get("content", response_text)
+        response_text = _analysis_extract_response_text(request_data["llm_provider"], safe_resp) or response_text
 
     if not _analysis_response_is_valid(response_text, span_req, request_data.get("analysis_outputs"), request_data.get("meaningful_evidence", False)):
         _progress("Model returned a non-analysis answer; requesting a structured rewrite")
@@ -1307,20 +1401,23 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
             "Previous invalid answer:\n"
             f"{response_text}"
         )
-        rewrite_resp = client.chat(
-            model=request_data["model"],
-            messages=[
+        rewrite_resp = _analysis_chat_request(
+            request_data["llm_provider"],
+            request_data["ollama_url"],
+            request_data.get("api_key"),
+            request_data["model"],
+            [
                 {"role": "system", "content": request_data["system_prompt"]},
                 {"role": "user", "content": request_data["user_prompt"]},
                 {"role": "assistant", "content": response_text},
                 {"role": "user", "content": rewrite_prompt},
             ],
-            options=chat_options,
+            chat_options,
         )
         completion_path = "rewrite"
         rewrite_safe_resp = _to_json_safe(rewrite_resp)
         if isinstance(rewrite_safe_resp, dict):
-            response_text = rewrite_safe_resp.get("message", {}).get("content", response_text)
+            response_text = _analysis_extract_response_text(request_data["llm_provider"], rewrite_safe_resp) or response_text
             safe_resp = rewrite_safe_resp
 
     if not _analysis_response_is_valid(response_text, span_req, request_data.get("analysis_outputs"), request_data.get("meaningful_evidence", False)):
@@ -1337,23 +1434,26 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
             f"Evidence digest:\n{request_data['evidence_digest']}\n\n"
             f"Template to fill:\n{request_data['output_template']}"
         )
-        fallback_resp = client.chat(
-            model=request_data["model"],
-            messages=[
+        fallback_resp = _analysis_chat_request(
+            request_data["llm_provider"],
+            request_data["ollama_url"],
+            request_data.get("api_key"),
+            request_data["model"],
+            [
                 {"role": "system", "content": request_data["system_prompt"]},
                 {"role": "user", "content": request_data["user_prompt"]},
                 {"role": "user", "content": fallback_prompt},
             ],
-            options=chat_options,
+            chat_options,
         )
         completion_path = "fallback"
         fallback_safe_resp = _to_json_safe(fallback_resp)
         if isinstance(fallback_safe_resp, dict):
-            response_text = fallback_safe_resp.get("message", {}).get("content", response_text)
+            response_text = _analysis_extract_response_text(request_data["llm_provider"], fallback_safe_resp) or response_text
             safe_resp = fallback_safe_resp
 
     _progress("Finalizing analysis result")
-    safe_request_data = {k: v for k, v in request_data.items() if k != "api_token"}
+    safe_request_data = {k: v for k, v in request_data.items() if k != "api_key"}
     return {
         **safe_request_data,
         "completion_path": completion_path,

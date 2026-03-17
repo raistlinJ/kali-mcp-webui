@@ -6,7 +6,7 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 
 ## Core Capabilities
 
-*   **Fully Localized Execution**: Runs entirely on your local machine or trusted VM. Optional bearer-token auth is supported for authenticated Ollama-compatible endpoints, but credentials stay local and are not written into run logs.
+*   **Fully Localized Execution**: Runs entirely on your local machine or trusted VM. Optional API key auth is supported for authenticated Ollama-compatible endpoints, but credentials stay local and are not written into run logs.
 *   **Agentic Tool Execution**: The LLM autonomously triggers local Kali Linux utilities (e.g., `nmap`, `gobuster`, `ping`) via the MCP server and integrates the raw output directly into its reasoning loop.
 *   **Synchronous Subprocess Blocking**: Prevents LLM hallucinations by forcing the agent to wait for long-running processes to complete in the foreground.
 *   **Comprehensive Audit Trails**: Generates structured JSON tool execution logs and beautiful, human-readable Markdown transcripts for every session.
@@ -27,7 +27,7 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 
 *   **OS**: Kali Linux (recommended) or any Debian-based distribution with standard security tools installed.
 *   **Python**: 3.10+
-*   **LLM Provider**: [Ollama](https://ollama.com/) or another Ollama-compatible endpoint. If your endpoint is behind a proxy such as LiteLLM and requires bearer auth, provide the token in the UI.
+*   **LLM Provider**: [Ollama](https://ollama.com/) or another Ollama-compatible endpoint. If your endpoint is behind a proxy such as LiteLLM and requires bearer auth, provide the API key in the UI.
 *   **Model**: A capable tool-calling model pulled into Ollama (e.g., `ollama run llama3` or `llama3.1`).
 *   **Python Dependencies**:
     *   `Flask`
@@ -72,7 +72,7 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 
 3.  **Configure and Start the Engine**
     *   Navigate to the **Configuration** tab in the WebUI.
-    *   If needed, enter an optional **API Token** for authenticated endpoints.
+    *   If needed, enter an optional **API Key** for authenticated endpoints.
     *   Click **Fetch Models** to populate the dropdown with your available models.
     *   Select your model (e.g., `llama3`).
     *   Allocate your desired Context Window (Default: 8K).

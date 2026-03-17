@@ -99,8 +99,21 @@
                             <div class="form-section">
                                 <h2 class="section-title">
                                     <i class="ph ph-plugs-connected"></i>
-                                    Ollama Instance
+                                    LLM Provider
                                 </h2>
+
+                                <div class="input-group">
+                                    <label for="provider-select">Provider</label>
+                                    <div class="select-wrapper">
+                                        <i class="ph ph-stack icon-left"></i>
+                                        <select id="provider-select">
+                                            <option value="ollama_direct" selected>Ollama (direct)</option>
+                                            <option value="litellm">LiteLLM</option>
+                                        </select>
+                                        <i class="ph ph-caret-down icon-right"></i>
+                                    </div>
+                                    <span class="input-hint">Use direct Ollama for a local instance. Choose LiteLLM when routing through a LiteLLM proxy.</span>
+                                </div>
 
                                 <div class="input-group">
                                     <label for="ollama-url">Instance URL</label>
@@ -117,17 +130,17 @@
                                     </div>
                                 </div>
 
-                                <div class="input-group">
-                                    <label for="api-token">API Token <span class="input-optional">(optional)</span></label>
+                                <div class="input-group" id="api-key-group">
+                                    <label for="api-key">API Key <span class="input-optional">(optional)</span></label>
                                     <div class="input-with-icon">
                                         <i class="ph ph-key"></i>
-                                        <input type="password" id="api-token" placeholder="Bearer token for authenticated Ollama-compatible endpoints" autocomplete="off" spellcheck="false">
-                                        <button type="button" class="input-visibility-toggle" data-target-input="api-token" aria-label="Show API token" aria-pressed="false">
+                                        <input type="password" id="api-key" placeholder="Bearer API key for authenticated Ollama-compatible endpoints" autocomplete="off" spellcheck="false">
+                                        <button type="button" class="input-visibility-toggle" data-target-input="api-key" aria-label="Show API key" aria-pressed="false">
                                             <i class="ph ph-eye"></i>
                                         </button>
                                     </div>
                                     <div class="input-group-actions">
-                                        <button type="button" id="clear-saved-token-btn" class="btn btn-secondary btn-inline">Clear Saved Token</button>
+                                        <button type="button" id="clear-saved-key-btn" class="btn btn-secondary btn-inline">Clear Saved Key</button>
                                     </div>
                                     <span class="input-hint">Used only for outbound LLM requests and model discovery. It is not written to session logs.</span>
                                 </div>
@@ -793,18 +806,30 @@
                             </div>
                         </div>
                         <div class="input-group">
-                            <label for="analysis-ollama-url">Ollama URL</label>
+                            <label for="analysis-provider-select">Provider</label>
+                            <div class="select-wrapper">
+                                <i class="ph ph-stack icon-left"></i>
+                                <select id="analysis-provider-select">
+                                    <option value="ollama_direct" selected>Ollama (direct)</option>
+                                    <option value="litellm">LiteLLM</option>
+                                </select>
+                                <i class="ph ph-caret-down icon-right"></i>
+                            </div>
+                            <span class="input-hint">Choose the provider used for this analysis job.</span>
+                        </div>
+                        <div class="input-group">
+                            <label for="analysis-ollama-url">Instance URL</label>
                             <div class="input-with-icon">
                                 <i class="ph ph-plugs-connected"></i>
                                 <input type="url" id="analysis-ollama-url" placeholder="http://localhost:11434">
                             </div>
                         </div>
-                        <div class="input-group">
-                            <label for="analysis-api-token">API Token <span class="input-optional">(optional)</span></label>
+                        <div class="input-group" id="analysis-api-key-group">
+                            <label for="analysis-api-key">API Key <span class="input-optional">(optional)</span></label>
                             <div class="input-with-icon">
                                 <i class="ph ph-key"></i>
-                                <input type="password" id="analysis-api-token" placeholder="Bearer token for this analysis request" autocomplete="off" spellcheck="false">
-                                <button type="button" class="input-visibility-toggle" data-target-input="analysis-api-token" aria-label="Show API token" aria-pressed="false">
+                                <input type="password" id="analysis-api-key" placeholder="Bearer API key for this analysis request" autocomplete="off" spellcheck="false">
+                                <button type="button" class="input-visibility-toggle" data-target-input="analysis-api-key" aria-label="Show API key" aria-pressed="false">
                                     <i class="ph ph-eye"></i>
                                 </button>
                             </div>
