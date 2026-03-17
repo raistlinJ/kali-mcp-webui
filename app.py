@@ -33,6 +33,17 @@ _analysis_lock = threading.Lock()
 ANALYSIS_JOBS_DIRNAME = "analysis_jobs"
 
 
+def _normalize_optional_token(value) -> str | None:
+    token = str(value or '').strip()
+    return token or None
+
+
+def _build_llm_http_headers(api_token: str | None) -> dict:
+    if not api_token:
+        return {}
+    return {'Authorization': f'Bearer {api_token}'}
+
+
 def _make_run_id(server_type: str) -> str:
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     return f"{ts}_{server_type}"
@@ -394,7 +405,7 @@ def _format_analysis_sections(sections: list[str]) -> str:
     return "\n".join(f"{index}. {section}" for index, section in enumerate(sections, start=1))
 
 
-def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None):
+def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, api_token_override=None):
     session_dir = os.path.join(RUNS_DIR, run_id)
     transcript_path = os.path.join(session_dir, "transcript.md")
     if not os.path.isfile(transcript_path):
@@ -503,6 +514,7 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         ollama_url = ollama_url_override
     if model_override:
         model = model_override
+    api_token = _normalize_optional_token(api_token_override)
 
     normalized_outputs = _normalize_analysis_outputs(analysis_outputs)
     required_sections = _analysis_required_sections(span_req, normalized_outputs)
@@ -616,9 +628,11 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         "meaningful_evidence": meaningful_evidence,
         "evidence_digest": evidence_digest,
         "ollama_url": ollama_url,
+        "llm_auth_enabled": bool(api_token),
         "model": model,
         "system_prompt": system_prompt,
         "user_prompt": user_prompt,
+        "api_token": api_token,
     }
 
 
@@ -633,11 +647,16 @@ def index():
 
 @app.route('/api/models', methods=['POST'])
 def get_models():
-    data = request.json
+    data = request.json or {}
     ollama_url = data.get('url', 'http://localhost:11434')
+    api_token = _normalize_optional_token(data.get('api_token'))
 
     try:
-        response = requests.get(f"{ollama_url}/api/tags", timeout=5)
+        response = requests.get(
+            f"{ollama_url}/api/tags",
+            timeout=5,
+            headers=_build_llm_http_headers(api_token),
+        )
         response.raise_for_status()
         models = [model['name'] for model in response.json().get('models', [])]
         return jsonify({'success': True, 'models': models})
@@ -659,8 +678,9 @@ def session_start():
                 'error': 'A session is already running. Stop it first.',
             }), 409
 
-    data = request.json
+    data = request.json or {}
     ollama_url = data.get('url', 'http://localhost:11434')
+    api_token = _normalize_optional_token(data.get('api_token'))
     model = data.get('model')
     server_command = data.get('server_command')
     tools_config = data.get('tools_config')
@@ -717,6 +737,7 @@ def session_start():
 
         session = mcp_client.MCPSession(
             ollama_url=ollama_url,
+            api_token=api_token,
             model=model,
             server_command=server_command,
             run_id=run_id,
@@ -780,6 +801,7 @@ def session_start():
             'success': True,
             'run_id': run_id,
             'tools': start_result["tools"],
+            'llm_auth_enabled': bool(api_token),
             'message': f'Service started with {len(start_result["tools"])} tool(s).',
         })
     else:
@@ -1148,6 +1170,7 @@ def analyze_session(run_id):
     span_req = data.get("span", "Entire Session")
     analysis_outputs = _normalize_analysis_outputs(data.get("analysis_outputs"))
     ollama_url_override = (data.get("ollama_url") or "").strip() or None
+    api_token_override = _normalize_optional_token(data.get("api_token"))
     model_override = (data.get("model") or "").strip() or None
     job_id = f"job_{int(time.time())}_{run_id}"
 
@@ -1161,6 +1184,7 @@ def analyze_session(run_id):
         "span": span_req,
         "analysis_outputs": analysis_outputs,
         "ollama_url": ollama_url_override,
+        "llm_auth_enabled": bool(api_token_override),
         "model": model_override,
         "start_time": start_time,
         "last_update_time": start_time,
@@ -1184,6 +1208,7 @@ def analyze_session(run_id):
                 run_id,
                 span_req,
                 ollama_url_override=ollama_url_override,
+                api_token_override=api_token_override,
                 model_override=model_override,
                 analysis_outputs=analysis_outputs,
                 progress_callback=lambda detail: _update_analysis_job_state(run_id, job_id, status_detail=detail),
@@ -1220,7 +1245,7 @@ def analyze_session(run_id):
     threading.Thread(target=_job_wrapper, daemon=True).start()
     return jsonify({"success": True, "job_id": job_id})
 
-def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, progress_callback=None):
+def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_override=None, analysis_outputs=None, api_token_override=None, progress_callback=None):
     """Internal helper to do the actual Ollama work."""
     import ollama
 
@@ -1232,9 +1257,19 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
                 pass
 
     _progress("Loading transcript, annotations, and tool-call history")
-    request_data = _prepare_llm_analysis(run_id, span_req, ollama_url_override, model_override, analysis_outputs)
+    request_data = _prepare_llm_analysis(
+        run_id,
+        span_req,
+        ollama_url_override,
+        model_override,
+        analysis_outputs,
+        api_token_override,
+    )
     _progress("Connecting to Ollama and preparing analysis request")
-    client = ollama.Client(host=request_data["ollama_url"])
+    client = ollama.Client(
+        host=request_data["ollama_url"],
+        headers=_build_llm_http_headers(request_data.get("api_token")),
+    )
     chat_options = {
         "temperature": 0.1,
     }
@@ -1318,8 +1353,9 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
             safe_resp = fallback_safe_resp
 
     _progress("Finalizing analysis result")
+    safe_request_data = {k: v for k, v in request_data.items() if k != "api_token"}
     return {
-        **request_data,
+        **safe_request_data,
         "completion_path": completion_path,
         "response": response_text,
         "raw_response": safe_resp,

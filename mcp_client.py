@@ -629,6 +629,7 @@ class MCPSession:
         self,
         *,
         ollama_url: str,
+        api_token: str | None = None,
         model: str,
         server_command: str,
         run_id: str | None = None,
@@ -638,6 +639,7 @@ class MCPSession:
         network_policy: dict | None = None,
     ):
         self.ollama_url = ollama_url
+        self.api_token = str(api_token or "").strip() or None
         self.model = model
         self.server_command = server_command
         self.context_window = context_window
@@ -670,6 +672,11 @@ class MCPSession:
         self._chat_lock = asyncio.Lock()
         self._pending_post_tool_reply = None
         self._pending_dangerous_tool_approval = None
+
+    def _client_headers(self) -> dict | None:
+        if not self.api_token:
+            return None
+        return {"Authorization": f"Bearer {self.api_token}"}
 
     async def _retry_empty_reply_after_tools(self, prompt: str, tool_results: list[dict]) -> str | None:
         _emit(self.event_callback, "status", {
@@ -839,6 +846,7 @@ class MCPSession:
                 "server_type": "agent",
                 "model": self.model,
                 "ollama_url": self.ollama_url,
+                "llm_auth_enabled": bool(self.api_token),
                 "context_window": self.context_window,
                 "max_turns": self.max_turns,
                 "network_policy": self.network_policy,
@@ -865,7 +873,10 @@ class MCPSession:
         )
 
         # Configure ollama client
-        self._client = _ollama_lib.Client(host=self.ollama_url)
+        self._client = _ollama_lib.Client(
+            host=self.ollama_url,
+            headers=self._client_headers(),
+        )
 
         # Discover model's actual context length
         try:

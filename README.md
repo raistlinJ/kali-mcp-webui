@@ -6,7 +6,7 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 
 ## Core Capabilities
 
-*   **Fully Localized Execution**: Runs entirely on your local machine or trusted VM. No API keys, no cloud data leaks.
+*   **Fully Localized Execution**: Runs entirely on your local machine or trusted VM. Optional bearer-token auth is supported for authenticated Ollama-compatible endpoints, but credentials stay local and are not written into run logs.
 *   **Agentic Tool Execution**: The LLM autonomously triggers local Kali Linux utilities (e.g., `nmap`, `gobuster`, `ping`) via the MCP server and integrates the raw output directly into its reasoning loop.
 *   **Synchronous Subprocess Blocking**: Prevents LLM hallucinations by forcing the agent to wait for long-running processes to complete in the foreground.
 *   **Comprehensive Audit Trails**: Generates structured JSON tool execution logs and beautiful, human-readable Markdown transcripts for every session.
@@ -20,14 +20,14 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 *   **Frontend**: A responsive Vanilla HTML/JS/CSS WebUI with a persistent chat console, real-time token tracking, dynamic tool execution indicators, and a session browser.
 *   **Middleware Orchestrator**: A Python Flask server (`app.py`) that handles RESTful routing and streams real-time interaction events to the frontend via Server-Sent Events (SSE).
 *   **MCP Client Engine**: `mcp_client.py` acts as the intelligent broker, managing the context window, parsing LLM payloads, and mapping them to standard I/O subprocess executions.
-*   **LLM Backend**: Powered by the Python `ollama` library, driving conversational endpoints against a local model (e.g., `llama3`).
+*   **LLM Backend**: Powered by the Python `ollama` library, driving conversational endpoints against a local or proxied Ollama-compatible model endpoint (e.g., `llama3`).
 *   **MCP Server (Kali)**: A localized script (`mcp_kali.py`) that securely wraps standard Kali utilities and exposes them as callable functions to the Client Engine.
 
 ## Requirements
 
 *   **OS**: Kali Linux (recommended) or any Debian-based distribution with standard security tools installed.
 *   **Python**: 3.10+
-*   **LLM Provider**: [Ollama](https://ollama.com/) running locally.
+*   **LLM Provider**: [Ollama](https://ollama.com/) or another Ollama-compatible endpoint. If your endpoint is behind a proxy such as LiteLLM and requires bearer auth, provide the token in the UI.
 *   **Model**: A capable tool-calling model pulled into Ollama (e.g., `ollama run llama3` or `llama3.1`).
 *   **Python Dependencies**:
     *   `Flask`
@@ -55,7 +55,7 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
     ```
 
 4.  **Ensure Ollama is Running**
-    *   Start the Ollama service on your machine.
+    *   Start the Ollama service on your machine, or point the UI at an authenticated Ollama-compatible proxy.
     *   Ensure you have downloaded your preferred model: `ollama pull llama3`
 
 ## Running the Application
@@ -72,7 +72,8 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 
 3.  **Configure and Start the Engine**
     *   Navigate to the **Configuration** tab in the WebUI.
-    *   Click **Fetch Models** to populate the dropdown with your local Ollama models.
+    *   If needed, enter an optional **API Token** for authenticated endpoints.
+    *   Click **Fetch Models** to populate the dropdown with your available models.
     *   Select your model (e.g., `llama3`).
     *   Allocate your desired Context Window (Default: 8K).
     *   Click **Start Service**. The dot indicator should turn green.

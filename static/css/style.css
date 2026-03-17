@@ -617,6 +617,7 @@ body {
 
 input[type="url"],
 input[type="text"],
+input[type="password"],
 select {
     width: 100%;
     background: var(--input-bg);
@@ -632,6 +633,7 @@ select {
 
 input[type="url"]:focus,
 input[type="text"]:focus,
+input[type="password"]:focus,
 select:focus {
     border-color: var(--accent-primary);
     box-shadow: 0 0 0 3px var(--accent-secondary);
@@ -639,8 +641,57 @@ select:focus {
 
 input[type="url"]:focus+i,
 input[type="text"]:focus+i,
+input[type="password"]:focus+i,
 select:focus+i.icon-left {
     color: var(--accent-primary);
+}
+
+.input-with-icon input[type="password"] {
+    padding-right: 3rem;
+}
+
+.input-visibility-toggle {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.input-visibility-toggle:hover,
+.input-visibility-toggle:focus-visible {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+    outline: none;
+}
+
+.input-visibility-toggle i {
+    position: static;
+    transform: none;
+    pointer-events: none;
+    font-size: 1rem;
+}
+
+.input-group-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+}
+
+.btn-inline {
+    width: auto;
+    padding: 0.45rem 0.8rem;
+    font-size: 0.82rem;
 }
 
 select:disabled {

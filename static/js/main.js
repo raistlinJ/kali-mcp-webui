@@ -20,9 +20,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmAnalysisConfigBtn = document.getElementById('confirm-analysis-config-btn');
     const cancelAnalysisConfigBtn = document.getElementById('cancel-analysis-config-btn');
     const closeAnalysisConfigBtn = document.getElementById('close-analysis-config-btn');
+    const clearSavedTokenBtn = document.getElementById('clear-saved-token-btn');
+    const tokenVisibilityToggles = document.querySelectorAll('.input-visibility-toggle');
     const startBtn = document.getElementById('start-service-btn');
     const modelSelect = document.getElementById('model-select');
     const ollamaUrlInput = document.getElementById('ollama-url');
+    const apiTokenInput = document.getElementById('api-token');
+    const analysisApiTokenInput = document.getElementById('analysis-api-token');
     const maxTurnsInput = document.getElementById('max-turns');
     const policyTargetsInput = document.getElementById('policy-targets');
     const policyEntryHint = document.getElementById('policy-entry-hint');
@@ -102,6 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _awaitingDangerousToolApproval = false;
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
+    const API_TOKEN_SESSION_STORAGE_KEY = 'runtime:llm-api-token';
     let _analysisConfigResolver = null;
     let _analysisConfigOptions = null;
     const DEFAULT_ANALYSIS_OUTPUTS = ['tooling_assets', 'progress_analysis'];
@@ -353,6 +358,95 @@ document.addEventListener('DOMContentLoaded', () => {
         return lines.length ? lines : defaultValue;
     }
 
+    function saveApiTokenToSessionStorage() {
+        if (!apiTokenInput) {
+            return;
+        }
+
+        try {
+            const token = apiTokenInput.value.trim();
+            if (token) {
+                sessionStorage.setItem(API_TOKEN_SESSION_STORAGE_KEY, token);
+            } else {
+                sessionStorage.removeItem(API_TOKEN_SESSION_STORAGE_KEY);
+            }
+        } catch (err) {
+            console.warn('Failed to persist API token in session storage:', err);
+        }
+    }
+
+    function restoreApiTokenFromSessionStorage() {
+        if (!apiTokenInput) {
+            return;
+        }
+
+        try {
+            const token = sessionStorage.getItem(API_TOKEN_SESSION_STORAGE_KEY);
+            if (token) {
+                apiTokenInput.value = token;
+            }
+        } catch (err) {
+            console.warn('Failed to restore API token from session storage:', err);
+        }
+    }
+
+    function updateClearSavedTokenButton() {
+        if (!clearSavedTokenBtn || !apiTokenInput) {
+            return;
+        }
+
+        clearSavedTokenBtn.disabled = !apiTokenInput.value.trim();
+    }
+
+    function setTokenVisibility(toggleButton, input, isVisible) {
+        if (!toggleButton || !input) {
+            return;
+        }
+
+        input.type = isVisible ? 'text' : 'password';
+        toggleButton.setAttribute('aria-pressed', String(isVisible));
+        toggleButton.setAttribute('aria-label', isVisible ? 'Hide API token' : 'Show API token');
+        toggleButton.innerHTML = `<i class="ph ${isVisible ? 'ph-eye-slash' : 'ph-eye'}"></i>`;
+    }
+
+    apiTokenInput?.addEventListener('input', () => {
+        saveApiTokenToSessionStorage();
+        updateClearSavedTokenButton();
+    });
+    restoreApiTokenFromSessionStorage();
+    updateClearSavedTokenButton();
+
+    tokenVisibilityToggles.forEach(toggleButton => {
+        const targetId = toggleButton.getAttribute('data-target-input');
+        const input = targetId ? document.getElementById(targetId) : null;
+        if (!(input instanceof HTMLInputElement)) {
+            return;
+        }
+
+        setTokenVisibility(toggleButton, input, false);
+        toggleButton.addEventListener('click', () => {
+            const isVisible = input.type !== 'password';
+            setTokenVisibility(toggleButton, input, !isVisible);
+        });
+    });
+
+    clearSavedTokenBtn?.addEventListener('click', () => {
+        if (!apiTokenInput) {
+            return;
+        }
+
+        apiTokenInput.value = '';
+        saveApiTokenToSessionStorage();
+        updateClearSavedTokenButton();
+
+        const runtimeToggle = document.querySelector('[data-target-input="api-token"]');
+        if (runtimeToggle instanceof HTMLButtonElement) {
+            setTokenVisibility(runtimeToggle, apiTokenInput, false);
+        }
+
+        showAlert('Saved API token cleared from this browser session.', 'success');
+    });
+
     function getSelectedPolicyEntryType() {
         const selected = Array.from(policyEntryTypeInputs).find(input => input.checked);
         return selected?.value === 'disallow' ? 'disallow' : 'allow';
@@ -401,7 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------------
     // Fetch Models
     // ---------------------------------------------------------------
-    async function fetchModelsIntoSelect({ url, button, errorLabel, selectElement, progressTitleText, successMessage, onSuccess, onFailure }) {
+    async function fetchModelsIntoSelect({ url, apiToken = '', button, errorLabel, selectElement, progressTitleText, successMessage, onSuccess, onFailure }) {
         if (!url) {
             showAlert('Please enter an Ollama Instance URL');
             return false;
@@ -421,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/models', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url })
+                body: JSON.stringify({ url, api_token: apiToken })
             });
             const data = await response.json();
 
@@ -467,8 +561,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchBtn.addEventListener('click', async () => {
         const url = ollamaUrlInput.value.trim();
+        const apiToken = apiTokenInput?.value.trim() || '';
         await fetchModelsIntoSelect({
             url,
+            apiToken,
             button: fetchBtn,
             errorLabel: ollamaFetchError,
             selectElement: modelSelect,
@@ -489,6 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function openAnalysisConfigModal({
         suggestedUrl = '',
+        suggestedApiToken = '',
         suggestedModel = '',
         title = 'Analysis Configuration',
         description = 'Choose which Ollama instance and model should be used for this analysis job.',
@@ -507,6 +604,7 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisConfigDescription.textContent = description;
         confirmAnalysisConfigBtn.textContent = confirmLabel;
         analysisOllamaUrlInput.value = suggestedUrl || ollamaUrlInput.value.trim() || 'http://localhost:11434';
+        analysisApiTokenInput.value = suggestedApiToken || apiTokenInput?.value.trim() || '';
         analysisFetchError.style.display = 'none';
         analysisFetchError.innerText = '';
         analysisSpanGroup.style.display = includeSpan ? 'flex' : 'none';
@@ -528,10 +626,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     analysisFetchBtn.addEventListener('click', async () => {
         const url = analysisOllamaUrlInput.value.trim();
+        const apiToken = analysisApiTokenInput?.value.trim() || '';
         const currentSelectedModel = analysisModelSelect.value;
 
         await fetchModelsIntoSelect({
             url,
+            apiToken,
             button: analysisFetchBtn,
             errorLabel: analysisFetchError,
             selectElement: analysisModelSelect,
@@ -547,6 +647,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     confirmAnalysisConfigBtn.addEventListener('click', () => {
         const ollamaUrl = analysisOllamaUrlInput.value.trim();
+        const apiToken = analysisApiTokenInput?.value.trim() || '';
         const model = analysisModelSelect.value;
         const span = _analysisConfigOptions?.includeSpan
             ? analysisSpanSelect.value
@@ -564,7 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        closeAnalysisConfigModal({ ollama_url: ollamaUrl, model, span, analysis_outputs });
+        closeAnalysisConfigModal({ ollama_url: ollamaUrl, api_token: apiToken, model, span, analysis_outputs });
     });
 
     cancelAnalysisConfigBtn.addEventListener('click', () => closeAnalysisConfigModal(null));
@@ -682,10 +783,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const startTime = session.start_time ? new Date(session.start_time).toLocaleString() : '—';
         const model = session.model || '—';
         const ollamaUrl = session.ollama_url || '—';
+        const apiAuthEnabled = Boolean(session.llm_auth_enabled);
         const toolCount = session.available_tool_count || availableTools.length || 0;
         const toolSummary = toolCount ? `${toolCount} tool(s)` : 'No tool inventory saved';
         const hasDangerousShell = availableTools.includes('shell_dangerous');
         const dangerousShellSummary = hasDangerousShell ? 'Enabled: user approval required before execution' : 'Not enabled';
+        const apiAuthSummary = apiAuthEnabled ? 'Enabled' : 'Not configured';
 
         sessionSummaryPanel.innerHTML = `
             <div class="session-summary-grid">
@@ -704,6 +807,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="session-summary-item">
                     <span class="session-summary-label">Ollama URL</span>
                     <span class="session-summary-value">${escapeHtml(ollamaUrl)}</span>
+                </div>
+                <div class="session-summary-item">
+                    <span class="session-summary-label">LLM API Auth</span>
+                    <span class="session-summary-value">${escapeHtml(apiAuthSummary)}</span>
                 </div>
                 <div class="session-summary-item">
                     <span class="session-summary-label">Tool Inventory</span>
@@ -920,6 +1027,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const url = ollamaUrlInput.value.trim();
+    const apiToken = apiTokenInput?.value.trim() || '';
         const model = modelSelect.value;
         const cmdType = kaliCommandType.value;
         const contextWindow = parseInt(document.getElementById('context-window').value, 10);
@@ -968,7 +1076,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, max_turns: maxTurns, network_policy: networkPolicy })
+                body: JSON.stringify({ url, api_token: apiToken, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, max_turns: maxTurns, network_policy: networkPolicy })
             });
             const data = await response.json();
 
@@ -978,6 +1086,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 _sessionsById[data.run_id] = {
                     run_id: data.run_id,
                     network_policy: data.network_policy || networkPolicy,
+                    llm_auth_enabled: Boolean(apiToken),
                     available_tools: Array.isArray(data.tools) ? data.tools : [],
                     available_tool_count: Array.isArray(data.tools) ? data.tools.length : 0,
                     ...(data.metadata || {}),
@@ -1200,6 +1309,7 @@ document.addEventListener('DOMContentLoaded', () => {
             annotationMenu.classList.remove('show');
             openAnalysisConfigModal({
                 suggestedUrl: ollamaUrlInput.value.trim(),
+                suggestedApiToken: apiTokenInput?.value.trim() || '',
                 suggestedModel: modelSelect.value,
                 title: 'Analyze Live Logs',
                 description: 'Choose a log window plus the Ollama instance and model for this background analysis job.',
@@ -1663,6 +1773,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const analysisConfig = await openAnalysisConfigModal({
             suggestedUrl: ollamaUrlInput.value.trim(),
+            suggestedApiToken: apiTokenInput?.value.trim() || '',
             suggestedModel: modelSelect.value,
             title: 'Analyze Session',
             description: 'Choose which Ollama instance and model should be used for this session analysis job.',
