@@ -242,6 +242,71 @@ def _message_tool_calls(message) -> list:
     return []
 
 
+def _extract_json_object(text: str) -> dict | None:
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+
+    candidates = [raw]
+    fenced = re.findall(r"```(?:json)?\s*(.*?)```", raw, flags=re.IGNORECASE | re.DOTALL)
+    candidates.extend(item.strip() for item in fenced if item.strip())
+
+    for candidate in list(candidates):
+        start = candidate.find("{")
+        end = candidate.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            candidates.append(candidate[start:end + 1])
+
+    for candidate in candidates:
+        try:
+            payload = json.loads(candidate)
+        except Exception:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return None
+
+
+def _normalize_litellm_tool_plan(payload: dict, tool_names: list[str]) -> dict | None:
+    if not isinstance(payload, dict):
+        return None
+
+    respond = payload.get("respond") or payload.get("response") or payload.get("reply") or payload.get("content")
+    if isinstance(respond, str) and respond.strip() and not payload.get("tool") and not payload.get("name") and not payload.get("function"):
+        return {"content": respond.strip(), "tool_calls": None}
+
+    function = payload.get("function")
+    if isinstance(function, dict):
+        name = function.get("name")
+        arguments = function.get("arguments")
+    else:
+        name = payload.get("tool") or payload.get("name")
+        arguments = payload.get("arguments", payload.get("args", {}))
+
+    if not isinstance(name, str) or name not in set(tool_names or []):
+        return None
+
+    if isinstance(arguments, str):
+        try:
+            arguments = json.loads(arguments)
+        except Exception:
+            arguments = {"args": arguments}
+    if not isinstance(arguments, dict):
+        arguments = {}
+
+    return {
+        "content": "",
+        "tool_calls": [{
+            "id": "litellm_manual_plan_1",
+            "type": "function",
+            "function": {
+                "name": name,
+                "arguments": arguments,
+            },
+        }],
+    }
+
+
 def _looks_like_malformed_tool_planning(text: str) -> bool:
     normalized = str(text or "").strip().lower()
     if not normalized:
@@ -1018,6 +1083,71 @@ class MCPSession:
             })
             return None
 
+    async def _recover_litellm_tool_plan(self, prompt: str, malformed_content: str) -> dict | None:
+        tool_catalog = []
+        for tool in self._ollama_tools_minimal or self._ollama_tools:
+            function = (tool or {}).get("function") or {}
+            tool_catalog.append({
+                "name": function.get("name"),
+                "description": function.get("description"),
+                "parameters": function.get("parameters"),
+            })
+
+        _emit(self.event_callback, "status", {
+            "message": "LiteLLM did not return usable native tool calls; attempting JSON tool-plan recovery …"
+        })
+
+        try:
+            response = await asyncio.to_thread(
+                self._client.chat,
+                model=self.model,
+                messages=[
+                    *self.messages,
+                    {
+                        "role": "system",
+                        "content": (
+                            "Choose the next action for the agent. Output JSON only. "
+                            "If a tool is needed, output exactly {\"tool\": \"<tool_name>\", \"arguments\": {...}}. "
+                            "If no tool is needed, output exactly {\"respond\": \"<short answer>\"}. "
+                            "Do not include markdown, commentary, or any extra text."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Original user request:\n{prompt}\n\n"
+                            f"Available tools:\n{json.dumps(tool_catalog, ensure_ascii=True)}\n\n"
+                            f"Previous malformed reply:\n{malformed_content or '(empty)'}"
+                        ),
+                    },
+                ],
+                options={"num_ctx": self.context_window, "tool_choice": False},
+            )
+        except Exception as exc:
+            _emit(self.event_callback, "status", {
+                "message": f"LiteLLM JSON tool-plan recovery failed ({exc})."
+            })
+            return None
+
+        message = response.get("message", response)
+        content = message.get("content", getattr(message, "content", "")) or ""
+        payload = _extract_json_object(content)
+        normalized = _normalize_litellm_tool_plan(payload or {}, self.tool_names)
+
+        if self._logger and isinstance(response, dict) and response.get("raw") is not None:
+            try:
+                self._logger.log_artifact(
+                    "litellm_json_tool_plan_raw.txt",
+                    json.dumps(response.get("raw"), indent=2, ensure_ascii=True),
+                )
+            except Exception:
+                pass
+
+        if not normalized:
+            return None
+
+        return {"message": normalized, "raw": response.get("raw") if isinstance(response, dict) else None}
+
     async def _prompt_post_tool_reply_decision(self, prompt: str, tool_results: list[dict], cancel_event: asyncio.Event | None) -> str:
         loop = asyncio.get_running_loop()
         decision_future = loop.create_future()
@@ -1271,9 +1401,11 @@ class MCPSession:
             try:
                 await self._run_agent_loop(prompt, cancel_event)
             except Exception as e:
-                err_msg = f"Crash in agent loop: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
-                _emit(self.event_callback, "error", {"message": err_msg})
-                print(err_msg)
+                _emit(self.event_callback, "error", {
+                    "message": "The session hit an internal runtime error. Check server logs for details."
+                })
+                print(f"Crash in agent loop: {type(e).__name__}: {e}")
+                traceback.print_exc()
 
     async def _run_agent_loop(self, prompt: str, cancel_event: asyncio.Event | None):
         """Core agent loop for a single chat turn."""
@@ -1383,6 +1515,14 @@ class MCPSession:
                     content = original_msg.get("content", getattr(original_msg, "content", "")) or ""
                     tool_calls = original_msg.get("tool_calls", getattr(original_msg, "tool_calls", None))
 
+                if not tool_calls and _looks_like_malformed_tool_planning(content):
+                    recovered_response = await self._recover_litellm_tool_plan(prompt, content)
+                    if recovered_response:
+                        response = recovered_response
+                        original_msg = response.get("message", response)
+                        content = original_msg.get("content", getattr(original_msg, "content", "")) or ""
+                        tool_calls = original_msg.get("tool_calls", getattr(original_msg, "tool_calls", None))
+
             # The Ollama PyPI client returns a `Message` object. We must convert it
             # cleanly back to a dict with primitive values so it can be fed back in.
             assistant_message = {"role": "assistant", "content": content}
@@ -1449,7 +1589,8 @@ class MCPSession:
 
                 detail = "Model returned an empty reply with no tool calls."
                 if self.tool_names:
-                    detail += " This usually indicates the selected model is not reliably using tools with Ollama for this prompt."
+                    provider_label = "LiteLLM" if _normalize_provider_name(self.llm_provider) == "litellm" else "Ollama"
+                    detail += f" This usually indicates the selected model is not reliably using tools through {provider_label} for this prompt."
                 else:
                     detail += " No tools are configured for this session."
                 _emit(self.event_callback, "error", {"message": detail})
@@ -1565,7 +1706,7 @@ class MCPSession:
 
                 except Exception as exc:
                     duration_ms = int((time.time() - t0) * 1000)
-                    err_msg = f"Tool error: {exc}"
+                    err_msg = "Tool execution failed before a result was returned."
                     self._logger.log_tool_call(
                         name=tool_name,
                         args=tool_args,

@@ -4,6 +4,7 @@ import zipfile
 import requests
 import os
 import json
+import re
 import threading
 import asyncio
 import queue
@@ -31,6 +32,58 @@ _session_lock = threading.Lock()
 _analysis_jobs = {} # job_id -> {status, result, error, run_id, start_time}
 _analysis_lock = threading.Lock()
 ANALYSIS_JOBS_DIRNAME = "analysis_jobs"
+_INTERNAL_ARTIFACT_PREFIXES = (
+    "litellm_http_error_turn_",
+    "litellm_malformed_turn_",
+    "litellm_json_tool_plan_raw",
+)
+
+
+def _redact_sensitive_text(value) -> str:
+    text = str(value or "")
+    if not text:
+        return ""
+
+    redactions = [
+        (r'Bearer\s+[A-Za-z0-9._\-]+', 'Bearer [redacted]'),
+        (r'(?i)(x-api-key\s*[:=]\s*)([^\s,;]+)', r'\1[redacted]'),
+        (r'(?i)(api[_-]?key\s*[:=]\s*["\']?)([^"\'\s,}]+)', r'\1[redacted]'),
+        (r'(?i)(api[_-]?token\s*[:=]\s*["\']?)([^"\'\s,}]+)', r'\1[redacted]'),
+        (r'https?://[^\s\]\)\"\']+', '[redacted-url]'),
+        (r'(/Users|/home|/root)/[^\s\]\)\"\']+', '[redacted-path]'),
+    ]
+
+    for pattern, replacement in redactions:
+        text = re.sub(pattern, replacement, text)
+
+    return text
+
+
+def _safe_client_error(message, fallback='Request failed.') -> str:
+    sanitized = _redact_sensitive_text(message).strip()
+    if not sanitized:
+        return fallback
+
+    if any(marker in sanitized for marker in ('Traceback', 'File "', 'requests.exceptions.', 'httpx.', 'urllib3.', '\n')):
+        return fallback
+
+    if len(sanitized) > 240:
+        return fallback
+
+    return sanitized
+
+
+def _internal_artifact_filename(filename: str) -> bool:
+    return any(str(filename).startswith(prefix) for prefix in _INTERNAL_ARTIFACT_PREFIXES)
+
+
+def _public_analysis_job_record(record: dict) -> dict:
+    public_record = dict(record or {})
+    public_record.pop('raw_response', None)
+    public_record.pop('api_key', None)
+    if public_record.get('error'):
+        public_record['error'] = _safe_client_error(public_record.get('error'), 'Analysis failed.')
+    return public_record
 
 
 def _normalize_optional_api_key(value) -> str | None:
@@ -777,9 +830,13 @@ def get_models():
                 'success': False,
                 'error': f'LiteLLM rejected the model request with 401 Unauthorized. {detail}'
             }), 400
-        return jsonify({'success': False, 'error': str(e)}), 400
+        status = response.status_code if response is not None else None
+        provider_label = 'LiteLLM' if provider == 'litellm' else 'Ollama'
+        detail = f' {provider_label} returned HTTP {status}.' if status else ''
+        return jsonify({'success': False, 'error': f'Failed to fetch models from {provider_label}.{detail}'}), 400
     except requests.exceptions.RequestException as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
+        provider_label = 'LiteLLM' if provider == 'litellm' else 'Ollama'
+        return jsonify({'success': False, 'error': f'Could not reach the selected {provider_label} endpoint.'}), 400
 
 
 # -----------------------------------------------------------------------
@@ -878,7 +935,8 @@ def session_start():
                 start_result["success"] = True
                 start_result["tools"] = tools
             except Exception as exc:
-                start_result["error"] = str(exc)
+                app.logger.exception("Session start failed")
+                start_result["error"] = _safe_client_error(exc, 'Failed to start session.')
                 with _session_lock:
                     _session_state["status"] = "idle"
             finally:
@@ -942,7 +1000,7 @@ def session_start():
 
         return jsonify({
             'success': False,
-            'error': error_msg,
+            'error': _safe_client_error(error_msg, 'Failed to start session.'),
         }), 500
 
 
@@ -1086,7 +1144,8 @@ def session_annotate(run_id):
             
         return jsonify({"success": True})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        app.logger.exception("Annotation write failed")
+        return jsonify({"success": False, "error": 'Failed to save annotation.'}), 500
 
 @app.route('/api/session/stop', methods=['POST'])
 def session_stop():
@@ -1217,7 +1276,8 @@ def session_targeted_stop(run_id):
                     json.dump(meta, f, indent=2)
                 return jsonify({'success': True, 'message': f'Session {run_id} marked as completed.'})
         except Exception as e:
-            return jsonify({'success': False, 'error': f"Failed to update metadata: {str(e)}"}), 500
+            app.logger.exception("Failed to update session metadata for %s", run_id)
+            return jsonify({'success': False, 'error': 'Failed to update session metadata.'}), 500
 
     return jsonify({'success': True, 'message': 'Session already finalized or could not be found.'})
 
@@ -1267,6 +1327,8 @@ def download_session_archive(run_id):
     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
         for root, dirs, files in os.walk(session_dir):
             for file in files:
+                if os.path.basename(root) == 'artifacts' and _internal_artifact_filename(file):
+                    continue
                 file_path = os.path.join(root, file)
                 # Compute the relative path so the zip structure is clean (e.g., transcript.md, artifacts/...)
                 arcname = os.path.relpath(file_path, session_dir)
@@ -1367,7 +1429,7 @@ def analyze_session(run_id):
                 "status_detail": "Failed",
                 "completion_path": "failed",
                 "end_time": datetime.now().isoformat(),
-                "error": str(e),
+                "error": _safe_client_error(e, 'Analysis failed.'),
             }
             with _analysis_lock:
                 _analysis_jobs[job_id] = failed_record
@@ -1498,7 +1560,6 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         **safe_request_data,
         "completion_path": completion_path,
         "response": response_text,
-        "raw_response": safe_resp,
     }
 
 @app.route('/api/analysis/jobs', methods=['GET'])
@@ -1506,7 +1567,7 @@ def list_analysis_jobs():
     """Return all background analysis jobs."""
     with _analysis_lock:
         sorted_jobs = sorted(
-            [_to_json_safe({"job_id": k, **v}) for k, v in _analysis_jobs.items()],
+            [_public_analysis_job_record(_to_json_safe({"job_id": k, **v})) for k, v in _analysis_jobs.items()],
             key=lambda x: x["start_time"],
             reverse=True
         )
@@ -1528,19 +1589,21 @@ def get_analysis_job(job_id):
     if not record:
         abort(404, description="Analysis job not found.")
 
-    return jsonify(_to_json_safe(record))
+    return jsonify(_public_analysis_job_record(_to_json_safe(record)))
 
 
 @app.route('/api/analysis/jobs/<job_id>/download', methods=['GET'])
 def download_analysis_job(job_id):
     """Download the full persisted analysis job record as JSON."""
     _validate_filename(job_id)
-    record_path = _find_analysis_job_path(job_id)
-    if not record_path:
+    record = _load_analysis_job_record(job_id)
+    if not record:
         abort(404, description="Analysis job not found.")
 
+    payload = io.BytesIO(json.dumps(_public_analysis_job_record(_to_json_safe(record)), indent=2).encode('utf-8'))
+    payload.seek(0)
     return send_file(
-        record_path,
+        payload,
         as_attachment=True,
         download_name=f"{job_id}.json",
         mimetype='application/json'
@@ -1581,7 +1644,7 @@ def list_artifacts(run_id):
     art_dir = os.path.join(RUNS_DIR, run_id, "artifacts")
     if not os.path.isdir(art_dir):
         return jsonify({'artifacts': []})
-    return jsonify({'artifacts': sorted(os.listdir(art_dir))})
+    return jsonify({'artifacts': sorted(fname for fname in os.listdir(art_dir) if not _internal_artifact_filename(fname))})
 
 
 @app.route('/api/sessions/<run_id>/artifacts/<filename>', methods=['GET'])
@@ -1589,6 +1652,8 @@ def get_artifact(run_id, filename):
     """Return the raw content of a specific artifact file."""
     _validate_run_id(run_id)
     _validate_filename(filename)
+    if _internal_artifact_filename(filename):
+        abort(404)
     path = os.path.join(RUNS_DIR, run_id, "artifacts", filename)
     if not os.path.isfile(path):
         abort(404)
@@ -1611,4 +1676,5 @@ def _validate_filename(filename: str):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5055, debug=True)
+    debug_enabled = str(os.environ.get('FLASK_DEBUG', '')).strip().lower() in {'1', 'true', 'yes', 'on'}
+    app.run(host='0.0.0.0', port=5055, debug=debug_enabled)
