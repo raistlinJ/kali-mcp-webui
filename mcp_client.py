@@ -128,6 +128,42 @@ def _is_xml_schema_error(exc: Exception) -> bool:
     return "XML syntax error" in message and "status code: 500" in message
 
 
+def _http_error_status_code(exc: Exception) -> int | None:
+    response = getattr(exc, "response", None)
+    return getattr(response, "status_code", None)
+
+
+def _http_error_response_text(exc: Exception) -> str:
+    response = getattr(exc, "response", None)
+    if response is None:
+        return ""
+    try:
+        return str(response.text or "")
+    except Exception:
+        return ""
+
+
+def _is_litellm_retryable_tool_error(exc: Exception) -> bool:
+    status_code = _http_error_status_code(exc)
+    if status_code not in {400, 422, 500, 502, 503, 504}:
+        return False
+
+    response_text = _http_error_response_text(exc).lower()
+    if not response_text and status_code >= 500:
+        return True
+
+    retry_markers = (
+        "tool",
+        "function",
+        "schema",
+        "json",
+        "invalid parameter",
+        "bad request",
+        "unsupported",
+    )
+    return any(marker in response_text for marker in retry_markers)
+
+
 def _normalize_provider_name(provider: str | None) -> str:
     normalized = str(provider or "").strip().lower()
     if normalized in {"litellm", "lite-llm", "lite_llm"}:
@@ -288,12 +324,13 @@ class _LiteLLMClient:
         }
         if tools:
             payload["tools"] = tools
-            payload["tool_choice"] = "auto"
 
         options = options or {}
         temperature = options.get("temperature")
         if temperature is not None:
             payload["temperature"] = temperature
+        if tools and options.get("tool_choice", True) is not False:
+            payload["tool_choice"] = "auto"
 
         response = requests.post(
             f"{self.host}/v1/chat/completions",
@@ -1287,6 +1324,33 @@ class MCPSession:
                         messages=self.messages,
                         tools=self._ollama_tools_minimal,
                         options={"num_ctx": self.context_window},
+                    )
+                elif (
+                    _normalize_provider_name(self.llm_provider) == "litellm"
+                    and self._ollama_tools
+                    and self._ollama_tools_minimal
+                    and _is_litellm_retryable_tool_error(exc)
+                ):
+                    if self._logger:
+                        error_body = _http_error_response_text(exc).strip()
+                        if error_body:
+                            try:
+                                self._logger.log_artifact(
+                                    f"litellm_http_error_turn_{iteration + 1}.txt",
+                                    error_body,
+                                )
+                            except Exception:
+                                pass
+
+                    _emit(self.event_callback, "status", {
+                        "message": "LiteLLM rejected the initial tool request; retrying with simplified tool metadata …"
+                    })
+                    response = await asyncio.to_thread(
+                        self._client.chat,
+                        model=self.model,
+                        messages=self.messages,
+                        tools=self._ollama_tools_minimal,
+                        options={"num_ctx": self.context_window, "tool_choice": False},
                     )
                 else:
                     raise
