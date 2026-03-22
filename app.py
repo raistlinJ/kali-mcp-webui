@@ -13,6 +13,14 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+# Tool Watcher — background agent that spots MCP tool opportunities in logs
+try:
+    from tool_watcher import ToolWatcher
+    _tool_watcher = ToolWatcher()
+except Exception as _watcher_import_err:
+    print(f"[app] ToolWatcher unavailable: {_watcher_import_err}", flush=True)
+    _tool_watcher = None
+
 # Path to runs/ directory (co-located with app.py)
 RUNS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs")
 
@@ -27,6 +35,12 @@ _session_state = {
     "status": "idle",       # idle | starting | running | stopping | stopped
     "run_id": None,
     "cancel_event": None,   # asyncio.Event for cancelling a chat turn
+    # LLM config for the active session (used by watcher API for same-LLM detection)
+    "ollama_url": "",
+    "model": "",
+    "llm_provider": "",
+    "api_key": None,
+    "ssl_verify": True,
 }
 _session_lock = threading.Lock()
 _analysis_jobs = {} # job_id -> {status, result, error, run_id, start_time}
@@ -153,19 +167,33 @@ def _build_llm_http_headers(provider: str, api_key: str | None) -> dict:
     return headers
 
 
-def _extract_provider_models(provider: str, payload: dict) -> list[str]:
+def _extract_provider_models(provider: str, payload: dict) -> list[dict]:
     if provider in {'litellm', 'openai', 'claude'}:
         return [
-            str(model.get('id'))
+            {"id": str(model.get('id')), "label": f"{model.get('id')} (Unknown)"}
             for model in payload.get('data', [])
             if isinstance(model, dict) and model.get('id')
         ]
 
-    return [
-        str(model.get('name'))
-        for model in payload.get('models', [])
-        if isinstance(model, dict) and model.get('name')
-    ]
+    models = []
+    for model in payload.get('models', []):
+        if not isinstance(model, dict) or not model.get('name'):
+            continue
+            
+        m_name = str(model.get('name'))
+        m_family = model.get('details', {}).get('family', '').lower()
+        
+        # Determine arch mapping
+        if m_family in {"mamba", "falcon-mamba", "zamba"}:
+            arch = "SSM"
+        elif m_family in {"jamba", "samba"}:
+            arch = "Hybrid"
+        else:
+            arch = "Unknown"
+            
+        models.append({"id": m_name, "label": f"{m_name} ({arch})"})
+        
+    return models
 
 
 def _analysis_extract_response_text(provider: str, payload: dict) -> str:
@@ -992,6 +1020,11 @@ def session_start():
             _session_state["queue"] = event_queue
             _session_state["status"] = "starting"
             _session_state["run_id"] = run_id
+            _session_state["ollama_url"] = ollama_url
+            _session_state["model"] = model
+            _session_state["llm_provider"] = llm_provider
+            _session_state["api_key"] = api_key
+            _session_state["ssl_verify"] = ssl_verify
 
         session = mcp_client.MCPSession(
             ollama_url=ollama_url,
@@ -1231,6 +1264,12 @@ def session_annotate(run_id):
 @app.route('/api/session/stop', methods=['POST'])
 def session_stop():
     """Stop the running session."""
+    # Stop the tool watcher before tearing down the session
+    if _tool_watcher:
+        try:
+            _tool_watcher.stop()
+        except Exception:
+            pass
     with _session_lock:
         status = _session_state["status"]
         loop = _session_state["loop"]
@@ -1284,6 +1323,107 @@ def session_status():
             'run_id': run_id,
             'metadata': _load_run_metadata(run_id),
         })
+
+
+@app.route('/api/watcher/start', methods=['POST'])
+def watcher_start():
+    """Start the tool watcher, optionally with a custom LLM config."""
+    if not _tool_watcher:
+        return jsonify({'success': False, 'error': 'ToolWatcher not available.'}), 503
+
+    with _session_lock:
+        status = _session_state.get('status')
+        run_id = _session_state.get('run_id')
+        event_queue = _session_state.get('queue')
+        session_url = _session_state.get('ollama_url', '')
+        session_model = _session_state.get('model', '')
+        session_provider = _session_state.get('llm_provider', 'ollama_direct')
+        session_api_key = _session_state.get('api_key') or None
+        session_ssl = _session_state.get('ssl_verify', True)
+
+    if status != 'running' or not run_id or not event_queue:
+        return jsonify({'success': False, 'error': 'No active session to watch.'}), 409
+
+    data = request.json or {}
+    watcher_url = (data.get('url') or session_url).strip()
+    watcher_model = (data.get('model') or session_model).strip()
+    watcher_provider = (data.get('provider') or session_provider).strip()
+    watcher_api_key = data.get('api_key') or session_api_key or None
+    watcher_ssl = bool(data.get('ssl_verify', session_ssl))
+
+    # Watch mode config
+    watch_mode = str(data.get('watch_mode', 'continuous'))  # 'continuous' | 'timer'
+    poll_interval = max(5, int(data.get('poll_interval', 10)))
+    min_new_lines = max(1, int(data.get('min_new_lines', 3)))
+    timer_interval = max(10, int(data.get('timer_interval', 60)))
+    timer_span = str(data.get('timer_span', 'all'))  # 'all'|'last_N_lines:N'|'last_N_min:M'
+    max_context_chars = int(data.get('max_context_chars', 4000))
+
+    if not watcher_model:
+        return jsonify({'success': False, 'error': 'No model specified.'}), 400
+
+    # Detect whether the watcher is using the same LLM as the session
+    using_session_llm = (
+        watcher_url.rstrip('/') == session_url.rstrip('/') and
+        watcher_model == session_model
+    )
+
+    try:
+        _tool_watcher.start(
+            run_id=run_id,
+            session_meta={
+                'ollama_url': watcher_url,
+                'model': watcher_model,
+                'llm_provider': watcher_provider,
+                'api_key': watcher_api_key,
+                'ssl_verify': watcher_ssl,
+                'watch_mode': watch_mode,
+                'poll_interval': poll_interval,
+                'min_new_lines': min_new_lines,
+                'timer_interval': timer_interval,
+                'timer_span': timer_span,
+                'max_context_chars': max_context_chars,
+            },
+            event_queue=event_queue,
+        )
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+    return jsonify({
+        'success': True,
+        'run_id': run_id,
+        'model': watcher_model,
+        'url': watcher_url,
+        'using_session_llm': using_session_llm,
+        'watch_mode': watch_mode,
+    })
+
+
+@app.route('/api/watcher/stop', methods=['POST'])
+def watcher_stop():
+    """Stop the tool watcher."""
+    if not _tool_watcher:
+        return jsonify({'success': False, 'error': 'ToolWatcher not available.'}), 503
+    try:
+        _tool_watcher.stop()
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 500
+    return jsonify({'success': True})
+
+
+@app.route('/api/watcher/status', methods=['GET'])
+def watcher_status():
+    """Return current watcher status."""
+    if not _tool_watcher:
+        return jsonify({'running': False, 'available': False})
+    is_running = bool(_tool_watcher._thread and _tool_watcher._thread.is_alive())
+    return jsonify({
+        'running': is_running,
+        'available': True,
+        'watching_mode': _tool_watcher.watching_mode,
+        'watchdog_available': _tool_watcher.watchdog_available
+    })
+
 
 
 @app.route('/api/session/stream')

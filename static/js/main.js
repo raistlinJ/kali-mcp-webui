@@ -725,8 +725,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             data.models.forEach(model => {
                 const option = document.createElement('option');
-                option.value = model;
-                option.textContent = model;
+                option.value = typeof model === 'string' ? model : model.id;
+                option.textContent = typeof model === 'string' ? model : model.label;
                 selectElement.appendChild(option);
             });
 
@@ -1347,6 +1347,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 openSseStream();
                 showAlert('Service started! Use the Prompt console to chat.', 'success');
+                // Clear stale watcher suggestions from any previous session
+                if (typeof window.watcherClearSuggestions === 'function') {
+                    window.watcherClearSuggestions();
+                }
+                // Expose session LLM meta to watcher tab for same-LLM detection
+                if (typeof window.watcherSetSessionMeta === 'function') {
+                    window.watcherSetSessionMeta({
+                        url: ollamaUrlInput.value.trim(),
+                        model: modelSelect.value,
+                        provider: providerSelect?.value || 'ollama_direct',
+                        api_key: apiKeyInput?.value?.trim() || '',
+                        ssl_verify: Boolean(sslVerifyToggle?.checked ?? true),
+                    });
+                }
                 setTimeout(() => chatPromptInput.focus(), 500);
             } else {
                 throw new Error(data.error || 'Failed to start session');
@@ -1685,6 +1699,11 @@ document.addEventListener('DOMContentLoaded', () => {
         navChatBtn.disabled = true; 
 
         loadSessions(); // Refresh history
+
+        // Notify the watcher tab that the session stopped
+        if (typeof window.watcherHandleSessionStopped === 'function') {
+            window.watcherHandleSessionStopped();
+        }
     }
 
     // ---------------------------------------------------------------
@@ -1734,6 +1753,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendLog(`<span class="log-label">❌ Error</span>\n<pre class="log-pre log-error-text">${escapeHtml(event.message)}</pre>`, 'log-error');
                 updateStatus('error', 'Error'); setChatReady(); break;
             case 'done': appendLog(`<span class="log-label">⏹️ Done</span>`, 'log-done'); break;
+            case 'tool_suggestion':
+                if (typeof window.watcherAddSuggestion === 'function') {
+                    window.watcherAddSuggestion(event);
+                }
+                break;
+            case 'watcher_note_start':
+                if (typeof window.watcherNoteStart === 'function') window.watcherNoteStart(event);
+                break;
+            case 'watcher_note_token':
+                if (typeof window.watcherNoteToken === 'function') window.watcherNoteToken(event);
+                break;
+            case 'watcher_note_complete':
+                if (typeof window.watcherNoteComplete === 'function') window.watcherNoteComplete(event);
+                break;
+            case 'watcher_analysis_note':
+                if (typeof window.watcherAddAnalysisNote === 'function') window.watcherAddAnalysisNote(event);
+                break;
         }
     }
 
