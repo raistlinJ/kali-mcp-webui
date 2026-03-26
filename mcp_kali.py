@@ -81,6 +81,10 @@ _HOSTNAME_RE = re.compile(r'^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,
 _MSF_RUN_DEFAULT_TIMEOUT = 90
 _MSF_RUN_DEFAULT_WFS_DELAY = 10
 _MAX_SHELL_SEQUENCE_COMMANDS = 3
+_TIMEOUT_CONTROL_DIRNAME = "control"
+_TIMEOUT_REQUEST_FILENAME = "tool_timeout_request.json"
+_TIMEOUT_RESPONSE_FILENAME = "tool_timeout_response.json"
+_TIMEOUT_DECISION_POLL_SECONDS = 0.25
 
 try:
     _NETWORK_POLICY = json.loads(os.environ.get("MCP_NETWORK_POLICY", ""))
@@ -237,6 +241,155 @@ def _parse_shell_sequence(raw_args: str) -> tuple[list[str] | None, str | None]:
     return commands, None
 
 
+def _run_dir_for_current_session() -> str | None:
+    run_id = os.environ.get("MCP_CURRENT_RUN_ID")
+    if not run_id:
+        return None
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs", run_id)
+
+
+def _timeout_control_dir() -> str | None:
+    run_dir = _run_dir_for_current_session()
+    if not run_dir:
+        return None
+    return os.path.join(run_dir, _TIMEOUT_CONTROL_DIRNAME)
+
+
+def _timeout_request_path() -> str | None:
+    control_dir = _timeout_control_dir()
+    if not control_dir:
+        return None
+    return os.path.join(control_dir, _TIMEOUT_REQUEST_FILENAME)
+
+
+def _timeout_response_path() -> str | None:
+    control_dir = _timeout_control_dir()
+    if not control_dir:
+        return None
+    return os.path.join(control_dir, _TIMEOUT_RESPONSE_FILENAME)
+
+
+def _clear_timeout_control_files():
+    for path in (_timeout_request_path(), _timeout_response_path()):
+        if path and os.path.exists(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+
+def _write_timeout_request(tool_name: str, arguments: dict, cmd: list[str], timeout_seconds: int, checkpoint_index: int) -> str | None:
+    request_path = _timeout_request_path()
+    response_path = _timeout_response_path()
+    if not request_path or not response_path:
+        return None
+
+    os.makedirs(os.path.dirname(request_path), exist_ok=True)
+    if os.path.exists(response_path):
+        try:
+            os.remove(response_path)
+        except OSError:
+            pass
+
+    request_id = f"{int(time.time() * 1000)}-{checkpoint_index}"
+    payload = {
+        "request_id": request_id,
+        "tool": tool_name,
+        "args": arguments,
+        "command": shlex.join(cmd),
+        "timeout_seconds": int(timeout_seconds),
+        "checkpoint_index": int(checkpoint_index),
+        "timestamp": time.time(),
+    }
+    with open(request_path, "w") as f:
+        json.dump(payload, f, indent=2)
+    return request_id
+
+
+def _await_timeout_decision(proc: subprocess.Popen, tool_name: str, arguments: dict, cmd: list[str], timeout_seconds: int, checkpoint_index: int) -> str:
+    request_id = _write_timeout_request(tool_name, arguments, cmd, timeout_seconds, checkpoint_index)
+    if not request_id:
+        return "kill"
+
+    response_path = _timeout_response_path()
+    request_path = _timeout_request_path()
+
+    try:
+        while True:
+            if proc.poll() is not None:
+                return "finished"
+
+            if response_path and os.path.exists(response_path):
+                try:
+                    with open(response_path) as f:
+                        response = json.load(f)
+                except Exception:
+                    response = None
+
+                if isinstance(response, dict) and response.get("request_id") == request_id:
+                    action = str(response.get("action") or "").strip().lower()
+                    if action in {"wait", "kill"}:
+                        return action
+
+            time.sleep(_TIMEOUT_DECISION_POLL_SECONDS)
+    finally:
+        for path in (request_path, response_path):
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
+
+def _run_subprocess_with_timeout_prompt(cmd: list[str], timeout_seconds: int, tool_name: str, arguments: dict) -> dict:
+    run_dir = _run_dir_for_current_session()
+    t0 = time.time()
+
+    if not run_dir:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+        return {
+            "stdout": result.stdout or "",
+            "stderr": result.stderr or "",
+            "returncode": result.returncode,
+            "duration_ms": int((time.time() - t0) * 1000),
+            "timed_out_kill": False,
+            "checkpoint_index": 0,
+        }
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    checkpoint_index = 0
+    _clear_timeout_control_files()
+
+    while True:
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout_seconds)
+            return {
+                "stdout": stdout or "",
+                "stderr": stderr or "",
+                "returncode": proc.returncode,
+                "duration_ms": int((time.time() - t0) * 1000),
+                "timed_out_kill": False,
+                "checkpoint_index": checkpoint_index,
+            }
+        except subprocess.TimeoutExpired:
+            checkpoint_index += 1
+            action = _await_timeout_decision(proc, tool_name, arguments, cmd, timeout_seconds, checkpoint_index)
+            if action == "wait":
+                continue
+
+            if action != "finished" and proc.poll() is None:
+                proc.kill()
+            stdout, stderr = proc.communicate()
+            return {
+                "stdout": stdout or "",
+                "stderr": stderr or "",
+                "returncode": -1,
+                "duration_ms": int((time.time() - t0) * 1000),
+                "timed_out_kill": action == "kill",
+                "checkpoint_index": checkpoint_index,
+            }
+
+
 def _build_shell_command(name: str, arguments: dict) -> tuple[list[str] | None, str | None]:
     user_args = (arguments.get("args", "") or "").strip()
     if not user_args:
@@ -288,7 +441,7 @@ def _run_shell_sequence(arguments: dict, timeout_seconds: int) -> tuple[str, int
             break
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+            execution = _run_subprocess_with_timeout_prompt(cmd, timeout_seconds, "shell_sequence", {"args": command})
         except subprocess.TimeoutExpired:
             output_chunks.append(
                 f"Step {index}: {command}\nExecution error: Command timed out after {int(timeout_seconds)} seconds"
@@ -296,15 +449,31 @@ def _run_shell_sequence(arguments: dict, timeout_seconds: int) -> tuple[str, int
             overall_exit_code = -1
             break
 
-        step_output = _strip_ansi(result.stdout or "")
-        step_stderr = _strip_ansi(result.stderr or "")
+        if execution.get("timed_out_kill"):
+            elapsed_seconds = max(int(execution.get("duration_ms", 0) / 1000), int(timeout_seconds))
+            step_output = (
+                f"Execution stopped after {elapsed_seconds} seconds because the user chose kill "
+                f"at timeout checkpoint {execution.get('checkpoint_index', 1)}."
+            )
+            partial_stdout = _strip_ansi(execution.get("stdout") or "")
+            partial_stderr = _strip_ansi(execution.get("stderr") or "")
+            if partial_stdout:
+                step_output += f"\n\nPartial STDOUT:\n{partial_stdout}"
+            if partial_stderr:
+                step_output += f"\n\nPartial STDERR:\n{partial_stderr}"
+            output_chunks.append(f"Step {index}: {command}\n{step_output}")
+            overall_exit_code = -1
+            break
+
+        step_output = _strip_ansi(execution.get("stdout") or "")
+        step_stderr = _strip_ansi(execution.get("stderr") or "")
         if step_stderr:
             step_output += f"\nSTDERR:\n{step_stderr}"
         step_output = step_output or "Command executed successfully (no output)"
         output_chunks.append(f"Step {index}: {command}\n{step_output}")
 
-        if result.returncode != 0:
-            overall_exit_code = result.returncode
+        if execution.get("returncode") != 0:
+            overall_exit_code = int(execution.get("returncode") or 0)
             break
 
     duration_ms = int((time.time() - t0) * 1000)
@@ -556,12 +725,22 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     try:
         t0 = time.time()
         timeout_seconds = int(tool_config.get("timeout_seconds", 300) or 300)
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
-        duration_ms = int((time.time() - t0) * 1000)
+        execution = _run_subprocess_with_timeout_prompt(cmd, timeout_seconds, name, arguments)
+        duration_ms = int(execution.get("duration_ms") or int((time.time() - t0) * 1000))
 
-        output = _strip_ansi(result.stdout or "")
-        stderr = _strip_ansi(result.stderr or "")
-        if stderr:
+        output = _strip_ansi(execution.get("stdout") or "")
+        stderr = _strip_ansi(execution.get("stderr") or "")
+        if execution.get("timed_out_kill"):
+            elapsed_seconds = max(int(duration_ms / 1000), int(timeout_seconds))
+            output = (
+                f"Execution stopped after {elapsed_seconds} seconds because the user chose kill "
+                f"at timeout checkpoint {execution.get('checkpoint_index', 1)} instead of waiting longer."
+            )
+            if execution.get("stdout"):
+                output += f"\n\nPartial STDOUT:\n{_strip_ansi(execution.get('stdout') or '')}"
+            if stderr:
+                output += f"\n\nPartial STDERR:\n{stderr}"
+        elif stderr:
             output += f"\nSTDERR:\n{stderr}"
 
         # Log the tool call
@@ -570,7 +749,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             args=arguments,
             result=output or "Command executed successfully (no output)",
             duration_ms=duration_ms,
-            exit_code=result.returncode,
+            exit_code=int(execution.get("returncode") or 0),
             stderr=stderr,
         )
 

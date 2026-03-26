@@ -75,6 +75,9 @@ _SUMMARISE_SYSTEM_PROMPT = (
 _URL_RE = re.compile(r'https?://[^\s]+', re.IGNORECASE)
 _CIDR_OR_IP_RE = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?\b')
 _HOSTNAME_RE = re.compile(r'^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\.?$', re.IGNORECASE)
+_TIMEOUT_CONTROL_DIRNAME = "control"
+_TIMEOUT_REQUEST_FILENAME = "tool_timeout_request.json"
+_TIMEOUT_RESPONSE_FILENAME = "tool_timeout_response.json"
 
 
 # ---------------------------------------------------------------------------
@@ -1103,6 +1106,30 @@ def _emit_chat_cancelled(event_callback):
     _emit(event_callback, "chat_done", {"message": "Prompt cancelled. Ready for next prompt."})
 
 
+def _tool_timeout_control_dir(run_id: str) -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs", run_id, _TIMEOUT_CONTROL_DIRNAME)
+
+
+def _tool_timeout_request_path(run_id: str) -> str:
+    return os.path.join(_tool_timeout_control_dir(run_id), _TIMEOUT_REQUEST_FILENAME)
+
+
+def _tool_timeout_response_path(run_id: str) -> str:
+    return os.path.join(_tool_timeout_control_dir(run_id), _TIMEOUT_RESPONSE_FILENAME)
+
+
+def _load_tool_timeout_request(run_id: str) -> dict | None:
+    path = _tool_timeout_request_path(run_id)
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path) as f:
+            payload = json.load(f)
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
 # ---------------------------------------------------------------------------
 # MCPSession — persistent connection with chat loop
 # ---------------------------------------------------------------------------
@@ -1174,6 +1201,7 @@ class MCPSession:
         self._chat_lock = asyncio.Lock()
         self._pending_post_tool_reply = None
         self._pending_dangerous_tool_approval = None
+        self._pending_tool_timeout_decision = None
 
     def _client_headers(self) -> dict | None:
         headers = _provider_headers(self.llm_provider, self.api_key)
@@ -1439,6 +1467,77 @@ class MCPSession:
                 future.set_result(action)
 
         loop.call_soon_threadsafe(_resolve)
+        return True
+
+    async def _watch_tool_timeout_requests(self, active_tool_name: str, active_tool_args: dict, call_task: asyncio.Task):
+        seen_request_id = None
+
+        try:
+            while not call_task.done():
+                request = _load_tool_timeout_request(self.run_id)
+                request_id = str((request or {}).get("request_id") or "")
+                if request and request_id and request_id != seen_request_id:
+                    seen_request_id = request_id
+                    checkpoint_index = int(request.get("checkpoint_index") or 1)
+                    timeout_seconds = int(request.get("timeout_seconds") or 0)
+                    tool_name = str(request.get("tool") or active_tool_name)
+                    command = str(request.get("command") or (active_tool_args or {}).get("args") or "")
+                    self._pending_tool_timeout_decision = dict(request)
+
+                    _emit(self.event_callback, "status", {
+                        "message": f"{tool_name} reached timeout checkpoint {checkpoint_index} after {timeout_seconds} seconds. Waiting for user decision: wait or kill."
+                    })
+                    _emit(self.event_callback, "tool_timeout_decision", {
+                        "tool": tool_name,
+                        "args": request.get("args") or active_tool_args,
+                        "command": command,
+                        "timeout_seconds": timeout_seconds,
+                        "checkpoint_index": checkpoint_index,
+                        "message": (
+                            f"{tool_name} has been running for {timeout_seconds * checkpoint_index} seconds. "
+                            "Wait keeps the process running until the next timeout checkpoint. Kill terminates it and returns any partial output."
+                        ),
+                        "options": ["wait", "kill"],
+                    })
+
+                await asyncio.sleep(0.25)
+        finally:
+            self._pending_tool_timeout_decision = None
+
+    def resolve_tool_timeout_decision(self, action: str) -> bool:
+        if action not in {"wait", "kill"}:
+            return False
+
+        pending = self._pending_tool_timeout_decision
+        if not pending:
+            return False
+
+        request_id = str(pending.get("request_id") or "")
+        if not request_id:
+            return False
+
+        response_path = _tool_timeout_response_path(self.run_id)
+        os.makedirs(os.path.dirname(response_path), exist_ok=True)
+        with open(response_path, "w") as f:
+            json.dump({
+                "request_id": request_id,
+                "action": action,
+                "timestamp": time.time(),
+            }, f, indent=2)
+
+        if self._logger:
+            tool_name = str(pending.get("tool") or "tool")
+            command_text = str(pending.get("command") or "")
+            self._logger.log_human_decision(
+                (
+                    f"Chose to wait for {tool_name} after timeout checkpoint: {command_text}"
+                    if action == "wait"
+                    else f"Chose to kill {tool_name} after timeout checkpoint: {command_text}"
+                ),
+                category="tool_timeout_decision",
+            )
+
+        self._pending_tool_timeout_decision = None
         return True
 
     async def start(self) -> list[str]:
@@ -1858,7 +1957,18 @@ class MCPSession:
 
                 t0 = time.time()
                 try:
-                    result = await self._session.call_tool(tool_name, tool_args)
+                    tool_call_task = asyncio.create_task(self._session.call_tool(tool_name, tool_args))
+                    timeout_monitor_task = asyncio.create_task(
+                        self._watch_tool_timeout_requests(tool_name, tool_args, tool_call_task)
+                    )
+                    try:
+                        result = await tool_call_task
+                    finally:
+                        timeout_monitor_task.cancel()
+                        try:
+                            await timeout_monitor_task
+                        except asyncio.CancelledError:
+                            pass
                     duration_ms = int((time.time() - t0) * 1000)
 
                     result_text = ""

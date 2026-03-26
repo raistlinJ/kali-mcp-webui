@@ -85,6 +85,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const dangerousToolCommand = document.getElementById('dangerous-tool-command');
     const approveDangerousToolBtn = document.getElementById('approve-dangerous-tool-btn');
     const cancelDangerousToolBtn = document.getElementById('cancel-dangerous-tool-btn');
+    const toolTimeoutModalOverlay = document.getElementById('tool-timeout-modal-overlay');
+    const toolTimeoutMessage = document.getElementById('tool-timeout-message');
+    const toolTimeoutCommand = document.getElementById('tool-timeout-command');
+    const waitToolTimeoutBtn = document.getElementById('wait-tool-timeout-btn');
+    const killToolTimeoutBtn = document.getElementById('kill-tool-timeout-btn');
     
     const annotationAction = document.getElementById('annotation-action');
     const annotationText = document.getElementById('annotation-text');
@@ -116,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _currentRunId = null;
     let _awaitingPostToolReplyDecision = false;
     let _awaitingDangerousToolApproval = false;
+    let _awaitingToolTimeoutDecision = false;
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
     const API_KEY_SESSION_STORAGE_KEY = 'runtime:llm-api-key';
@@ -1192,6 +1198,42 @@ document.addEventListener('DOMContentLoaded', () => {
     approveDangerousToolBtn.addEventListener('click', () => resolveDangerousToolApproval('approve'));
     cancelDangerousToolBtn.addEventListener('click', () => resolveDangerousToolApproval('cancel'));
 
+    function closeToolTimeoutModal() {
+        _awaitingToolTimeoutDecision = false;
+        toolTimeoutModalOverlay.style.display = 'none';
+        waitToolTimeoutBtn.disabled = false;
+        killToolTimeoutBtn.disabled = false;
+    }
+
+    async function resolveToolTimeoutDecision(action) {
+        if (!_serviceRunning || !_awaitingToolTimeoutDecision) return;
+
+        waitToolTimeoutBtn.disabled = true;
+        killToolTimeoutBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/session/tool_timeout_action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action })
+            });
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Could not resolve tool timeout decision.');
+            }
+
+            closeToolTimeoutModal();
+        } catch (error) {
+            waitToolTimeoutBtn.disabled = false;
+            killToolTimeoutBtn.disabled = false;
+            showAlert(error.message, 'error');
+        }
+    }
+
+    waitToolTimeoutBtn.addEventListener('click', () => resolveToolTimeoutDecision('wait'));
+    killToolTimeoutBtn.addEventListener('click', () => resolveToolTimeoutDecision('kill'));
+
     async function stopTargetedSession(runId) {
         try {
             const response = await fetch(`/api/sessions/${runId}/stop`, { method: 'POST' });
@@ -1493,6 +1535,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setChatReady() {
         _chatBusy = false;
         closePostToolReplyModal();
+        closeToolTimeoutModal();
         
         // Restore the send button
         sendPromptBtn.classList.remove('btn-danger', 'btn-secondary');
@@ -1675,6 +1718,7 @@ document.addEventListener('DOMContentLoaded', () => {
         _logInitialCleared = false; // Reset for next run
         updateStatus('success', 'Service Stopped');
         closePostToolReplyModal();
+        closeToolTimeoutModal();
 
         if (stoppedRunId) {
             persistLiveLog(stoppedRunId);
@@ -1745,6 +1789,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 dangerousToolMessage.textContent = event.message || 'The model requested a dangerous shell command.';
                 dangerousToolCommand.textContent = String(event.command || '');
                 dangerousToolModalOverlay.style.display = 'flex';
+                break;
+            case 'tool_timeout_decision':
+                _awaitingToolTimeoutDecision = true;
+                toolTimeoutMessage.textContent = event.message || 'A tool reached its timeout checkpoint.';
+                toolTimeoutCommand.textContent = String(event.command || '');
+                toolTimeoutModalOverlay.style.display = 'flex';
                 break;
             case 'chat_done':
                 appendLog(`<span class="log-label">✅ Turn Complete</span> ${escapeHtml(event.message || 'Ready for next prompt.')}`, 'log-done');

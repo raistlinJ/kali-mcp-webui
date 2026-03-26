@@ -215,7 +215,7 @@ def _detect_model_arch(model_name: str, model_family: str = '') -> str:
 
     ssm_families = {'mamba', 'falcon-mamba', 'zamba'}
     hybrid_families = {'jamba', 'samba'}
-    transformer_families = {'llama', 'qwen', 'gpt-oss', 'gpt_oss', 'gptoss', 'transformer'}
+    transformer_families = {'llama', 'qwen', 'gpt-oss', 'gpt_oss', 'gptoss', 'nemotron', 'transformer'}
 
     if normalized_family in ssm_families:
         return 'SSM'
@@ -228,7 +228,7 @@ def _detect_model_arch(model_name: str, model_family: str = '') -> str:
         return 'SSM'
     if normalized_name.startswith(('jamba', 'samba')):
         return 'Hybrid'
-    if normalized_name.startswith(('gpt-oss', 'qwen', 'llama')):
+    if normalized_name.startswith(('gpt-oss', 'qwen', 'llama', 'nemotron')):
         return 'Transformer'
 
     return 'Unknown'
@@ -1342,6 +1342,32 @@ def session_dangerous_tool_action():
     if not session.resolve_dangerous_tool_approval(action):
         return jsonify({'success': False, 'error': 'No pending dangerous tool approval to resolve.'}), 409
 
+    return jsonify({'success': True, 'message': f'{action.title()} request sent.'})
+
+
+@app.route('/api/session/tool_timeout_action', methods=['POST'])
+def session_tool_timeout_action():
+    """Resolve a paused tool-timeout checkpoint with wait or kill."""
+    with _session_lock:
+        if _session_state["status"] != "running":
+            return jsonify({
+                'success': False,
+                'error': 'No active session.',
+            }), 409
+        session = _session_state["session"]
+
+    data = request.json or {}
+    action = (data.get('action') or '').strip().lower()
+    if action not in {'wait', 'kill'}:
+        return jsonify({'success': False, 'error': 'Action must be wait or kill.'}), 400
+
+    if not session or not hasattr(session, 'resolve_tool_timeout_decision'):
+        return jsonify({'success': False, 'error': 'Session cannot resolve tool timeout decisions.'}), 409
+
+    if not session.resolve_tool_timeout_decision(action):
+        return jsonify({'success': False, 'error': 'No pending tool timeout decision to resolve.'}), 409
+
+    app.logger.info('Tool timeout decision submitted action=%s', action)
     return jsonify({'success': True, 'message': f'{action.title()} request sent.'})
 
 @app.route('/api/sessions/<run_id>/annotate', methods=['POST'])
