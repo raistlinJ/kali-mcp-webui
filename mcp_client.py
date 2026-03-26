@@ -213,6 +213,22 @@ def _provider_display_name(provider: str | None) -> str:
     return "Ollama"
 
 
+def _normalize_provider_base_url(provider: str | None, host: str) -> str:
+    normalized_provider = _normalize_provider_name(provider)
+    normalized_host = str(host or "").strip().rstrip("/")
+
+    if not normalized_host:
+        return normalized_host
+
+    if normalized_provider == "ollama_direct":
+        return normalized_host
+
+    if normalized_provider in {"openai", "litellm", "claude"} and normalized_host.endswith("/v1"):
+        return normalized_host[:-3]
+
+    return normalized_host
+
+
 def _provider_headers(provider: str | None, api_key: str | None) -> dict:
     normalized = _normalize_provider_name(provider)
     headers = {}
@@ -1163,8 +1179,8 @@ class MCPSession:
         max_turns: int = DEFAULT_MAX_TURNS,
         network_policy: dict | None = None,
     ):
-        self.ollama_url = ollama_url
         self.llm_provider = str(llm_provider or "ollama_direct").strip() or "ollama_direct"
+        self.ollama_url = _normalize_provider_base_url(self.llm_provider, ollama_url)
         self.api_key = str(api_key or api_token or "").strip() or None
         self.ssl_verify = bool(ssl_verify)
         self.model = model

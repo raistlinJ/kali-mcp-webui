@@ -182,6 +182,25 @@ def _provider_models_endpoint(provider: str) -> str:
     return '/v1/models'
 
 
+def _normalize_provider_base_url(provider: str, url: str) -> str:
+    normalized_provider = _normalize_llm_provider(provider)
+    normalized_url = str(url or '').strip().rstrip('/')
+
+    if not normalized_url:
+        return normalized_url
+
+    if normalized_provider == 'ollama_direct':
+        return normalized_url
+
+    if normalized_provider in {'openai', 'litellm'} and normalized_url.endswith('/v1'):
+        return normalized_url[:-3]
+
+    if normalized_provider == 'claude' and normalized_url.endswith('/v1'):
+        return normalized_url[:-3]
+
+    return normalized_url
+
+
 def _normalize_ssl_verify(value) -> bool:
     if isinstance(value, bool):
         return value
@@ -306,6 +325,7 @@ def _analysis_to_anthropic_messages(messages: list[dict]) -> tuple[str | None, l
 
 
 def _analysis_chat_request(provider: str, host: str, api_key: str | None, model: str, messages: list[dict], options: dict | None = None, ssl_verify: bool = True) -> dict:
+    host = _normalize_provider_base_url(provider, host)
     headers = {
         'Content-Type': 'application/json',
         **_build_llm_http_headers(provider, api_key),
@@ -1003,8 +1023,8 @@ def index():
 @app.route('/api/models', methods=['POST'])
 def get_models():
     data = request.json or {}
-    ollama_url = data.get('url', 'http://localhost:11434')
     provider = _normalize_llm_provider(data.get('provider'))
+    ollama_url = _normalize_provider_base_url(provider, data.get('url', 'http://localhost:11434'))
     api_key = _extract_optional_api_key(data)
     ssl_verify = _normalize_ssl_verify(data.get('ssl_verify'))
 
