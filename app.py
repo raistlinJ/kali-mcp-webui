@@ -9,6 +9,8 @@ import threading
 import asyncio
 import queue
 import time
+import sys
+import logging
 from datetime import datetime
 
 app = Flask(__name__)
@@ -53,6 +55,27 @@ _INTERNAL_ARTIFACT_PREFIXES = (
 )
 
 
+def _configure_logging():
+    level_name = str(os.environ.get('MCP_WEBUI_LOG_LEVEL', 'DEBUG')).strip().upper() or 'DEBUG'
+    level = getattr(logging, level_name, logging.DEBUG)
+
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s %(levelname)s %(name)s: %(message)s',
+        stream=sys.stdout,
+        force=True,
+    )
+
+    app.logger.setLevel(level)
+    logging.getLogger('werkzeug').setLevel(logging.INFO if level <= logging.DEBUG else level)
+    logging.getLogger('urllib3').setLevel(logging.DEBUG if level <= logging.DEBUG else logging.INFO)
+
+    app.logger.info('Verbose logging enabled at %s', logging.getLevelName(level))
+
+
+_configure_logging()
+
+
 def _redact_sensitive_text(value) -> str:
     text = str(value or "")
     if not text:
@@ -85,6 +108,25 @@ def _safe_client_error(message, fallback='Request failed.') -> str:
         return fallback
 
     return sanitized
+
+
+def _redacted_payload_snapshot(data) -> dict | str:
+    if not isinstance(data, dict):
+        return _redact_sensitive_text(data)
+
+    snapshot = {}
+    for key, value in data.items():
+        normalized_key = str(key).lower()
+        if normalized_key in {'api_key', 'api_token', 'authorization', 'x-api-key'}:
+            snapshot[key] = '[redacted]'
+            continue
+
+        if isinstance(value, (dict, list, tuple, set)):
+            snapshot[key] = _redact_sensitive_text(json.dumps(_to_json_safe(value)))
+            continue
+
+        snapshot[key] = _redact_sensitive_text(value)
+    return snapshot
 
 
 def _internal_artifact_filename(filename: str) -> bool:
@@ -167,10 +209,38 @@ def _build_llm_http_headers(provider: str, api_key: str | None) -> dict:
     return headers
 
 
+def _detect_model_arch(model_name: str, model_family: str = '') -> str:
+    normalized_name = str(model_name or '').strip().lower()
+    normalized_family = str(model_family or '').strip().lower()
+
+    ssm_families = {'mamba', 'falcon-mamba', 'zamba'}
+    hybrid_families = {'jamba', 'samba'}
+    transformer_families = {'llama', 'qwen', 'gpt-oss', 'gpt_oss', 'gptoss', 'transformer'}
+
+    if normalized_family in ssm_families:
+        return 'SSM'
+    if normalized_family in hybrid_families:
+        return 'Hybrid'
+    if normalized_family in transformer_families:
+        return 'Transformer'
+
+    if normalized_name.startswith(('mamba', 'falcon-mamba', 'zamba')):
+        return 'SSM'
+    if normalized_name.startswith(('jamba', 'samba')):
+        return 'Hybrid'
+    if normalized_name.startswith(('gpt-oss', 'qwen', 'llama')):
+        return 'Transformer'
+
+    return 'Unknown'
+
+
 def _extract_provider_models(provider: str, payload: dict) -> list[dict]:
     if provider in {'litellm', 'openai', 'claude'}:
         return [
-            {"id": str(model.get('id')), "label": f"{model.get('id')} (Unknown)"}
+            {
+                "id": str(model.get('id')),
+                "label": f"{model.get('id')} ({_detect_model_arch(model.get('id'))})"
+            }
             for model in payload.get('data', [])
             if isinstance(model, dict) and model.get('id')
         ]
@@ -182,17 +252,11 @@ def _extract_provider_models(provider: str, payload: dict) -> list[dict]:
             
         m_name = str(model.get('name'))
         m_family = model.get('details', {}).get('family', '').lower()
-        
-        # Determine arch mapping
-        if m_family in {"mamba", "falcon-mamba", "zamba"}:
-            arch = "SSM"
-        elif m_family in {"jamba", "samba"}:
-            arch = "Hybrid"
-        else:
-            arch = "Unknown"
-            
+
+        arch = _detect_model_arch(m_name, m_family)
+
         models.append({"id": m_name, "label": f"{m_name} ({arch})"})
-        
+
     return models
 
 
@@ -906,6 +970,31 @@ def _prepare_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
 # Routes
 # ---------------------------------------------------------------------------
 
+@app.before_request
+def _log_request_start():
+    payload = request.get_json(silent=True)
+    if payload is None and request.form:
+        payload = request.form.to_dict(flat=True)
+    app.logger.debug(
+        'HTTP %s %s from %s payload=%s',
+        request.method,
+        request.path,
+        request.remote_addr,
+        _redacted_payload_snapshot(payload) if payload is not None else '-',
+    )
+
+
+@app.after_request
+def _log_request_end(response):
+    app.logger.debug(
+        'HTTP %s %s -> %s (%s)',
+        request.method,
+        request.path,
+        response.status_code,
+        response.content_type,
+    )
+    return response
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -919,6 +1008,14 @@ def get_models():
     api_key = _extract_optional_api_key(data)
     ssl_verify = _normalize_ssl_verify(data.get('ssl_verify'))
 
+    app.logger.info(
+        'Fetching models provider=%s url=%s ssl_verify=%s auth=%s',
+        provider,
+        _redact_sensitive_text(ollama_url),
+        ssl_verify,
+        bool(api_key),
+    )
+
     try:
         response = requests.get(
             f"{ollama_url.rstrip('/')}{_provider_models_endpoint(provider)}",
@@ -928,6 +1025,7 @@ def get_models():
         )
         response.raise_for_status()
         models = _extract_provider_models(provider, response.json() or {})
+        app.logger.info('Fetched %s models from provider=%s', len(models), provider)
         return jsonify({'success': True, 'models': models, 'provider': provider})
     except requests.exceptions.HTTPError as e:
         response = getattr(e, 'response', None)
@@ -974,6 +1072,23 @@ def session_start():
     max_turns = int(data.get('max_turns', 20))
     network_policy = data.get('network_policy') or {"allow": ["*"], "disallow": []}
 
+    app.logger.info(
+        'Session start requested provider=%s model=%s url=%s ssl_verify=%s context_window=%s max_turns=%s',
+        llm_provider,
+        model,
+        _redact_sensitive_text(ollama_url),
+        ssl_verify,
+        context_window,
+        max_turns,
+    )
+    app.logger.debug(
+        'Session start details server_command=%s tools_enabled=%s network_policy=%s auth=%s',
+        _redact_sensitive_text(server_command),
+        len((tools_config or {}).get('tools', []) or []) if isinstance(tools_config, dict) else 0,
+        _redacted_payload_snapshot(network_policy),
+        bool(api_key),
+    )
+
     if max_turns < 1 or max_turns > 100:
         return jsonify({'success': False, 'error': 'max_turns must be between 1 and 100'}), 400
 
@@ -1012,6 +1127,8 @@ def session_start():
         """Background thread: create event loop, start session, then idle."""
         import mcp_client
 
+        app.logger.debug('Background session loop thread starting for run_id=%s', run_id)
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
@@ -1048,6 +1165,7 @@ def session_start():
                     _session_state["status"] = "running"
                 start_result["success"] = True
                 start_result["tools"] = tools
+                app.logger.info('Session started run_id=%s tools=%s', run_id, len(tools or []))
             except Exception as exc:
                 app.logger.exception("Session start failed")
                 start_result["error"] = _safe_client_error(exc, 'Failed to start session.')
@@ -1066,6 +1184,7 @@ def session_start():
         try:
             loop.run_forever()
         finally:
+            app.logger.debug('Session loop stopping for run_id=%s', run_id)
             # Clean up when loop stops
             async def _cleanup():
                 try:
@@ -1081,6 +1200,7 @@ def session_start():
                 _session_state["status"] = "stopped"
                 _session_state["session"] = None
                 _session_state["loop"] = None
+            app.logger.info('Session stopped run_id=%s', run_id)
 
     thread = threading.Thread(target=run_session_loop, daemon=True)
     with _session_lock:
@@ -1135,6 +1255,9 @@ def session_chat():
     if not prompt:
         return jsonify({'success': False, 'error': 'Empty prompt.'}), 400
 
+    app.logger.info('Chat prompt submitted run_id=%s chars=%s', _session_state.get('run_id'), len(prompt))
+    app.logger.debug('Chat prompt preview=%s', _redact_sensitive_text(prompt[:500]))
+
     # Create a cancel event for this chat turn
     cancel_event = asyncio.Event()
     with _session_lock:
@@ -1165,6 +1288,7 @@ def session_cancel_prompt():
         cancel_event = _session_state.get("cancel_event")
 
     if cancel_event and loop:
+        app.logger.info('Prompt cancel requested run_id=%s', _session_state.get('run_id'))
         loop.call_soon_threadsafe(cancel_event.set)
         return jsonify({'success': True, 'message': 'Cancel signal sent.'})
     else:
@@ -1264,6 +1388,7 @@ def session_annotate(run_id):
 @app.route('/api/session/stop', methods=['POST'])
 def session_stop():
     """Stop the running session."""
+    app.logger.info('Session stop requested')
     # Stop the tool watcher before tearing down the session
     if _tool_watcher:
         try:
@@ -1369,6 +1494,25 @@ def watcher_start():
     )
 
     try:
+        app.logger.info(
+            'Watcher start requested run_id=%s mode=%s provider=%s model=%s url=%s same_llm=%s',
+            run_id,
+            watch_mode,
+            watcher_provider,
+            watcher_model,
+            _redact_sensitive_text(watcher_url),
+            using_session_llm,
+        )
+        app.logger.debug(
+            'Watcher config poll_interval=%s min_new_lines=%s timer_interval=%s timer_span=%s max_context_chars=%s auth=%s ssl_verify=%s',
+            poll_interval,
+            min_new_lines,
+            timer_interval,
+            timer_span,
+            max_context_chars,
+            bool(watcher_api_key),
+            watcher_ssl,
+        )
         _tool_watcher.start(
             run_id=run_id,
             session_meta={
@@ -1405,6 +1549,7 @@ def watcher_stop():
     if not _tool_watcher:
         return jsonify({'success': False, 'error': 'ToolWatcher not available.'}), 503
     try:
+        app.logger.info('Watcher stop requested')
         _tool_watcher.stop()
     except Exception as exc:
         return jsonify({'success': False, 'error': str(exc)}), 500
@@ -1584,6 +1729,19 @@ def analyze_session(run_id):
     model_override = (data.get("model") or "").strip() or None
     job_id = f"job_{int(time.time())}_{run_id}"
 
+    app.logger.info(
+        'Analysis job requested job_id=%s run_id=%s span=%s provider=%s model=%s url=%s outputs=%s ssl_verify=%s auth=%s',
+        job_id,
+        run_id,
+        span_req,
+        llm_provider_override,
+        model_override,
+        _redact_sensitive_text(ollama_url_override or ''),
+        analysis_outputs,
+        ssl_verify_override,
+        bool(api_key_override),
+    )
+
     start_time = datetime.now().isoformat()
     initial_record = {
         "job_id": job_id,
@@ -1641,6 +1799,7 @@ def analyze_session(run_id):
             with _analysis_lock:
                 _analysis_jobs[job_id] = completed_record
             _write_analysis_job_record(run_id, job_id, completed_record)
+            app.logger.info('Analysis job completed job_id=%s completion_path=%s', job_id, details.get('completion_path'))
         except Exception as e:
             app.logger.error(f"Analysis job {job_id} failed: {e}")
             failed_record = {
@@ -1681,6 +1840,17 @@ def _perform_llm_analysis(run_id, span_req, ollama_url_override=None, model_over
         ssl_verify_override,
     )
     _progress("Connecting to model provider and preparing analysis request")
+    app.logger.debug(
+        'Performing analysis run_id=%s span=%s provider=%s model=%s url=%s outputs=%s ssl_verify=%s auth=%s',
+        run_id,
+        span_req,
+        request_data['llm_provider'],
+        request_data['model'],
+        _redact_sensitive_text(request_data['ollama_url']),
+        request_data.get('analysis_outputs'),
+        request_data.get('ssl_verify', True),
+        request_data.get('llm_auth_enabled', False),
+    )
     chat_options = {
         "temperature": 0.1,
     }
@@ -1898,4 +2068,5 @@ def _validate_filename(filename: str):
 
 if __name__ == '__main__':
     debug_enabled = str(os.environ.get('FLASK_DEBUG', '')).strip().lower() in {'1', 'true', 'yes', 'on'}
+    app.logger.info('Starting Flask server host=0.0.0.0 port=5055 debug=%s', debug_enabled)
     app.run(host='0.0.0.0', port=5055, debug=debug_enabled)
