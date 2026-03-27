@@ -124,6 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _awaitingToolTimeoutDecision = false;
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
+    const LAST_SETTINGS_STORAGE_KEY = 'runtime:last-settings:v1';
     const API_KEY_SESSION_STORAGE_KEY = 'runtime:llm-api-key';
     const LEGACY_API_TOKEN_SESSION_STORAGE_KEY = 'runtime:llm-api-token';
     let _analysisConfigResolver = null;
@@ -342,6 +343,129 @@ document.addEventListener('DOMContentLoaded', () => {
         return { tools: selectedTools };
     }
 
+    function persistLastSettings() {
+        try {
+            syncPolicyDraftFromEditor();
+            const selectedModelOption = modelSelect?.selectedOptions?.[0] || null;
+            const toolCheckboxStates = {};
+            toolCheckboxes.forEach(cb => {
+                toolCheckboxStates[cb.value] = Boolean(cb.checked);
+            });
+
+            const payload = {
+                provider: normalizeProvider(providerSelect?.value),
+                url: ollamaUrlInput?.value.trim() || '',
+                sslVerify: Boolean(sslVerifyToggle?.checked ?? true),
+                model: modelSelect?.value || '',
+                modelLabel: selectedModelOption?.textContent || '',
+                contextWindow: document.getElementById('context-window')?.value || '8192',
+                maxTurns: maxTurnsInput?.value || '20',
+                kaliCommandType: kaliCommandType?.value || 'python',
+                policyEntryType: getSelectedPolicyEntryType(),
+                policyDraft: normalizePolicy(_policyDraft),
+                toolCheckboxStates,
+                toolsJson: toolsJsonArea?.value || '',
+                activeConfigSubtab: document.querySelector('.config-subtab-btn.active')?.dataset.configTarget || 'config-runtime-panel',
+                savedAt: Date.now(),
+            };
+
+            localStorage.setItem(LAST_SETTINGS_STORAGE_KEY, JSON.stringify(payload));
+        } catch (err) {
+            console.warn('Failed to persist last-used settings:', err);
+        }
+    }
+
+    function restoreLastSettings() {
+        try {
+            const raw = localStorage.getItem(LAST_SETTINGS_STORAGE_KEY);
+            if (!raw) {
+                return false;
+            }
+
+            const payload = JSON.parse(raw);
+            if (!payload || typeof payload !== 'object') {
+                return false;
+            }
+
+            const restoredProvider = normalizeProvider(payload.provider);
+            if (providerSelect) {
+                providerSelect.value = restoredProvider;
+                providerSelect.dataset.previousProvider = restoredProvider;
+            }
+
+            if (ollamaUrlInput && payload.url) {
+                ollamaUrlInput.value = String(payload.url);
+            }
+
+            if (sslVerifyToggle && typeof payload.sslVerify === 'boolean') {
+                sslVerifyToggle.checked = payload.sslVerify;
+            }
+
+            const contextWindowSelect = document.getElementById('context-window');
+            if (contextWindowSelect && payload.contextWindow) {
+                contextWindowSelect.value = String(payload.contextWindow);
+            }
+
+            if (maxTurnsInput && payload.maxTurns) {
+                maxTurnsInput.value = String(payload.maxTurns);
+            }
+
+            if (kaliCommandType && payload.kaliCommandType) {
+                kaliCommandType.value = payload.kaliCommandType === 'apt' ? 'apt' : 'python';
+                kaliCommandType.dispatchEvent(new Event('change'));
+            }
+
+            const toolCheckboxStates = payload.toolCheckboxStates;
+            if (toolCheckboxStates && typeof toolCheckboxStates === 'object') {
+                toolCheckboxes.forEach(cb => {
+                    if (Object.prototype.hasOwnProperty.call(toolCheckboxStates, cb.value)) {
+                        cb.checked = Boolean(toolCheckboxStates[cb.value]);
+                    }
+                });
+            }
+
+            updateShellSequenceDependency();
+
+            if (toolsJsonArea) {
+                if (typeof payload.toolsJson === 'string' && payload.toolsJson.trim()) {
+                    toolsJsonArea.value = payload.toolsJson;
+                } else {
+                    updateToolsJson();
+                }
+            }
+
+            if (payload.policyDraft && typeof payload.policyDraft === 'object') {
+                _policyDraft = normalizePolicy(payload.policyDraft);
+            }
+
+            const policyEntryType = payload.policyEntryType === 'disallow' ? 'disallow' : 'allow';
+            policyEntryTypeInputs.forEach(input => {
+                input.checked = input.value === policyEntryType;
+            });
+            updatePolicyEntryEditor();
+
+            if (payload.model && modelSelect) {
+                const restoredOption = document.createElement('option');
+                restoredOption.value = String(payload.model);
+                restoredOption.textContent = String(payload.modelLabel || payload.model);
+                restoredOption.selected = true;
+                modelSelect.innerHTML = '';
+                modelSelect.appendChild(restoredOption);
+                modelSelect.disabled = false;
+                startBtn.disabled = false;
+            }
+
+            if (payload.activeConfigSubtab) {
+                switchConfigSubtab(payload.activeConfigSubtab);
+            }
+
+            return true;
+        } catch (err) {
+            console.warn('Failed to restore last-used settings:', err);
+            return false;
+        }
+    }
+
     function updateShellSequenceDependency() {
         if (!shellSequenceCheckbox) {
             return;
@@ -370,8 +494,12 @@ document.addEventListener('DOMContentLoaded', () => {
     shellExtendedCheckbox?.addEventListener('change', () => {
         updateShellSequenceDependency();
         updateToolsJson();
+        persistLastSettings();
     });
-    toolCheckboxes.forEach(cb => cb.addEventListener('change', updateToolsJson));
+    toolCheckboxes.forEach(cb => cb.addEventListener('change', () => {
+        updateToolsJson();
+        persistLastSettings();
+    }));
     updateShellSequenceDependency();
     updateToolsJson();
 
@@ -572,7 +700,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (analysisProviderSelect) {
         analysisProviderSelect.dataset.previousProvider = normalizeProvider(analysisProviderSelect.value);
     }
+    restoreLastSettings();
     updateProviderUi();
+
+    const runtimeSettingElements = [providerSelect, ollamaUrlInput, sslVerifyToggle, modelSelect, maxTurnsInput, kaliCommandType, toolsJsonArea, document.getElementById('context-window')];
+    runtimeSettingElements.forEach(el => {
+        if (!el) {
+            return;
+        }
+        const eventName = el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input';
+        el.addEventListener(eventName, persistLastSettings);
+    });
 
     providerSelect?.addEventListener('change', () => {
         const previousProvider = normalizeProvider(providerSelect?.dataset.previousProvider);
@@ -592,6 +730,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ollamaFetchError.style.display = 'none';
             ollamaFetchError.innerText = '';
         }
+        persistLastSettings();
     });
 
     analysisProviderSelect?.addEventListener('change', () => {
@@ -683,10 +822,14 @@ document.addEventListener('DOMContentLoaded', () => {
         input.addEventListener('change', () => {
             syncPolicyDraftFromEditor();
             updatePolicyEntryEditor();
+            persistLastSettings();
         });
     });
 
-    policyTargetsInput?.addEventListener('input', syncPolicyDraftFromEditor);
+    policyTargetsInput?.addEventListener('input', () => {
+        syncPolicyDraftFromEditor();
+        persistLastSettings();
+    });
     updatePolicyEntryEditor();
 
     // ---------------------------------------------------------------
@@ -761,6 +904,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const provider = normalizeProvider(providerSelect?.value);
         const apiKey = providerUsesApiKey(provider) ? (apiKeyInput?.value.trim() || '') : '';
         const sslVerify = Boolean(sslVerifyToggle?.checked ?? true);
+        const currentSelectedModel = modelSelect.value;
         if (!validateProviderApiKey(provider, apiKey)) {
             return;
         }
@@ -773,7 +917,16 @@ document.addEventListener('DOMContentLoaded', () => {
             errorLabel: ollamaFetchError,
             selectElement: modelSelect,
             progressTitleText: 'Fetching Models',
-            onSuccess: () => { startBtn.disabled = false; },
+            onSuccess: models => {
+                const normalizedModels = Array.isArray(models)
+                    ? models.map(model => typeof model === 'string' ? model : model.id)
+                    : [];
+                if (currentSelectedModel && normalizedModels.includes(currentSelectedModel)) {
+                    modelSelect.value = currentSelectedModel;
+                }
+                startBtn.disabled = false;
+                persistLastSettings();
+            },
             onFailure: () => { startBtn.disabled = true; },
         });
     });

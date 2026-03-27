@@ -234,7 +234,11 @@ def _detect_model_arch(model_name: str, model_family: str = '') -> str:
 
     ssm_families = {'mamba', 'falcon-mamba', 'zamba'}
     hybrid_families = {'jamba', 'samba'}
-    transformer_families = {'llama', 'qwen', 'gpt-oss', 'gpt_oss', 'gptoss', 'nemotron', 'transformer'}
+    transformer_families = {
+        'llama', 'qwen', 'gpt-oss', 'gpt_oss', 'gptoss', 'gpt',
+        'davinci', 'babbage', 'nemotron', 'tts', 'whisper',
+        'text-embedding-ada', 'embedding', 'transformer'
+    }
 
     if normalized_family in ssm_families:
         return 'SSM'
@@ -247,10 +251,63 @@ def _detect_model_arch(model_name: str, model_family: str = '') -> str:
         return 'SSM'
     if normalized_name.startswith(('jamba', 'samba')):
         return 'Hybrid'
-    if normalized_name.startswith(('gpt-oss', 'qwen', 'llama', 'nemotron')):
+    if normalized_name.startswith((
+        'gpt-oss', 'gpt', 'qwen', 'llama', 'nemotron',
+        'davinci', 'babbage', 'tts', 'whisper', 'text-embedding-ada'
+    )):
         return 'Transformer'
 
     return 'Unknown'
+
+
+def _detect_mcp_compatibility(model_name: str, model_family: str = '') -> str:
+    normalized_name = str(model_name or '').strip().lower()
+    normalized_family = str(model_family or '').strip().lower()
+
+    explicitly_incompatible_prefixes = (
+        'tts',
+        'whisper',
+        'text-embedding-ada',
+        'text-embedding',
+        'embedding',
+        'davinci',
+        'babbage',
+    )
+    likely_compatible_prefixes = (
+        'gpt-oss',
+        'gpt',
+        'qwen',
+        'llama',
+        'nemotron',
+        'mamba',
+        'falcon-mamba',
+        'zamba',
+        'jamba',
+        'samba',
+    )
+
+    if normalized_name.startswith(explicitly_incompatible_prefixes):
+        return 'No'
+
+    if normalized_name.startswith(likely_compatible_prefixes):
+        return 'Likely'
+
+    if normalized_family in {'embedding', 'tts', 'transcription', 'speech'}:
+        return 'No'
+
+    if normalized_family in {
+        'llama', 'qwen', 'gpt-oss', 'gpt', 'transformer',
+        'mamba', 'falcon-mamba', 'zamba', 'jamba', 'samba', 'nemotron'
+    }:
+        return 'Likely'
+
+    return 'Unknown'
+
+
+def _format_model_label(model_name: str, model_family: str = '') -> str:
+    arch = _detect_model_arch(model_name, model_family)
+    mcp = _detect_mcp_compatibility(model_name, model_family)
+    return f"{model_name} ({arch}, MCP: {mcp})"
 
 
 def _extract_provider_models(provider: str, payload: dict) -> list[dict]:
@@ -258,7 +315,7 @@ def _extract_provider_models(provider: str, payload: dict) -> list[dict]:
         return [
             {
                 "id": str(model.get('id')),
-                "label": f"{model.get('id')} ({_detect_model_arch(model.get('id'))})"
+                "label": _format_model_label(str(model.get('id')))
             }
             for model in payload.get('data', [])
             if isinstance(model, dict) and model.get('id')
@@ -272,9 +329,7 @@ def _extract_provider_models(provider: str, payload: dict) -> list[dict]:
         m_name = str(model.get('name'))
         m_family = model.get('details', {}).get('family', '').lower()
 
-        arch = _detect_model_arch(m_name, m_family)
-
-        models.append({"id": m_name, "label": f"{m_name} ({arch})"})
+        models.append({"id": m_name, "label": _format_model_label(m_name, m_family)})
 
     return models
 
