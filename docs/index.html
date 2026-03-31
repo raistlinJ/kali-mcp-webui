@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kali MCP WebUI — Privacy-First Agentic Pentesting</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700;900&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ============================================================
+       NAV
+  ============================================================ -->
+  <nav id="navbar">
+    <div class="nav-inner">
+      <a href="#hero" class="nav-logo">
+        <span class="logo-bracket">[</span>KALI-MCP<span class="logo-bracket">]</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#about">About</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#demo">Demo</a></li>
+        <li><a href="#install">Install</a></li>
+        <li><a href="#team">Team</a></li>
+        <li>
+          <a href="https://github.com/raistlinJ/kali-mcp-webui" target="_blank" class="nav-github">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            GitHub
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO
+  ============================================================ -->
+  <section id="hero">
+    <div class="hero-grid-bg"></div>
+    <div class="hero-scan-line"></div>
+    <div class="hero-inner">
+      <div class="hero-badge">
+        <span class="badge-dot"></span>
+        Research Tool &mdash; Submitted to Symposium
+      </div>
+      <h1 class="hero-title">
+        <span class="hero-title-top">KALI&nbsp;MCP</span>
+        <span class="hero-title-bottom">WebUI</span>
+      </h1>
+      <p class="hero-sub">
+        A privacy-preserving, fully localized agentic penetration testing platform.<br/>
+        LLMs meet Kali Linux — without a single byte leaving your perimeter.
+      </p>
+      <div class="hero-cta">
+        <a href="https://github.com/raistlinJ/kali-mcp-webui" target="_blank" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
+          View on GitHub
+        </a>
+        <a href="#demo" class="btn btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Watch Demo
+        </a>
+        <a href="#install" class="btn btn-ghost">Quick Install</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="stat-val">100%</span>
+          <span class="stat-label">Local Execution</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-val">MCP</span>
+          <span class="stat-label">Model Context Protocol</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-val">SSE</span>
+          <span class="stat-label">Real-Time Streaming</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-val">HITL</span>
+          <span class="stat-label">Human-in-the-Loop</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-terminal" aria-hidden="true">
+      <div class="terminal-bar">
+        <span class="t-dot t-red"></span>
+        <span class="t-dot t-yellow"></span>
+        <span class="t-dot t-green"></span>
+        <span class="t-title">kali-mcp-webui &mdash; bash</span>
+      </div>
+      <div class="terminal-body" id="terminalBody">
+        <div class="t-line"><span class="t-prompt">root@kali</span><span class="t-sep">:</span><span class="t-path">~/kali-mcp-webui</span><span class="t-sym">$</span> <span class="t-cmd">python3 app.py</span></div>
+        <div class="t-line t-out"> * Flask server starting on <span class="t-hl">http://localhost:5055</span></div>
+        <div class="t-line t-out"> * MCP server connecting...</div>
+        <div class="t-line t-out"> * Tools discovered: <span class="t-hl">nmap, gobuster, nikto, sqlmap, hydra</span></div>
+        <div class="t-line t-out"> * Session <span class="t-hl">2024-11-12_14-30-01_native</span> started</div>
+        <div class="t-line"><span class="t-prompt">llama3</span><span class="t-sep"> &gt; </span><span class="t-cmd t-user">Run a fast nmap scan against 192.168.1.0/24</span></div>
+        <div class="t-line t-out"> <span class="t-tool">[TOOL]</span> nmap -sV -T4 192.168.1.0/24</div>
+        <div class="t-line t-out t-result"> &nbsp;&nbsp;192.168.1.105: ports <span class="t-hl">22/tcp, 80/tcp, 443/tcp</span> open</div>
+        <div class="t-line t-out t-result"> &nbsp;&nbsp;192.168.1.201: ports <span class="t-hl">3389/tcp, 445/tcp</span> open</div>
+        <div class="t-line t-out"> <span class="t-analysis">[ANALYSIS]</span> Two hosts with exposed services. Recommend web enumeration on .105...</div>
+        <div class="t-cursor">█</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       ABOUT
+  ============================================================ -->
+  <section id="about">
+    <div class="section-inner">
+      <div class="section-label">// 01 — ABOUT</div>
+      <h2 class="section-title">The Problem with Cloud-Based Hacking Tools</h2>
+      <div class="about-grid">
+        <div class="about-text">
+          <p>
+            Modern AI-assisted penetration testing platforms push your most sensitive data — network topologies, 
+            zero-day findings, vulnerability telemetry — to remote cloud APIs. For red teams, this is an 
+            unacceptable trade-off.
+          </p>
+          <p>
+            <strong>Kali MCP WebUI</strong> takes a different path. By orchestrating everything through a local 
+            Ollama-compatible LLM instance and the Model Context Protocol (MCP), the platform bridges natural 
+            language reasoning to native Kali Linux toolchains without a single packet crossing your perimeter.
+          </p>
+          <p>
+            The result: an autonomous agent that can run <code>nmap</code>, <code>gobuster</code>, 
+            <code>nikto</code>, Metasploit, and dozens of other tools — directed by conversational prompts, 
+            bounded by configurable network policies, and logged with forensic-grade transcripts — entirely offline.
+          </p>
+        </div>
+        <div class="about-callouts">
+          <div class="callout">
+            <div class="callout-icon">🔒</div>
+            <div>
+              <strong>Air-Gap Ready</strong>
+              <p>No internet required. No API keys sent to third parties. Optional local auth for internal proxies.</p>
+            </div>
+          </div>
+          <div class="callout">
+            <div class="callout-icon">🤖</div>
+            <div>
+              <strong>Agentic Reasoning</strong>
+              <p>The LLM reads tool output and autonomously decides the next action — closing the loop between reconnaissance and exploitation.</p>
+            </div>
+          </div>
+          <div class="callout">
+            <div class="callout-icon">📋</div>
+            <div>
+              <strong>Audit-Grade Logging</strong>
+              <p>Every tool call, every LLM turn, every annotation is timestamped and archived as structured JSON and Markdown transcripts.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FEATURES
+  ============================================================ -->
+  <section id="features">
+    <div class="section-inner">
+      <div class="section-label">// 02 — FEATURES</div>
+      <h2 class="section-title">Built for Operators. Designed for Researchers.</h2>
+      <div class="features-grid">
+
+        <div class="feature-card fc-highlight">
+          <div class="fc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0H3"/></svg>
+          </div>
+          <h3>Fully Localized Execution</h3>
+          <p>Runs entirely on your machine or trusted VM. Credentials stay local and are never written to run logs. Supports Ollama, LiteLLM proxies, OpenAI-compatible endpoints, and Claude.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="fc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437 1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008Z"/></svg>
+          </div>
+          <h3>Agentic Tool Execution</h3>
+          <p>The LLM autonomously triggers Kali utilities — nmap, gobuster, Metasploit, sqlmap, and more — via MCP and integrates raw output directly into its reasoning loop.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="fc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6"/></svg>
+          </div>
+          <h3>Synchronous Subprocess Blocking</h3>
+          <p>Prevents LLM hallucinations by forcing the agent to wait for long-running processes to complete. The agent sees real output, not speculative completion.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="fc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
+          </div>
+          <h3>Comprehensive Audit Trails</h3>
+          <p>Generates structured JSON tool execution logs and human-readable Markdown transcripts for every session, downloadable as ZIP archives.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="fc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/></svg>
+          </div>
+          <h3>Human-in-the-Loop Annotations</h3>
+          <p>Analysts insert timestamped notes mid-engagement to guide the agent or flag areas of interest. Annotations feed into live span analysis and post-mortem reviews.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="fc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941"/></svg>
+          </div>
+          <h3>Live Span Analysis</h3>
+          <p>Analyze the last N minutes of a live engagement with one-shot LLM inference to generate rapid pivoting strategies or identify execution bottlenecks in real-time.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="fc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+          </div>
+          <h3>Post-Mortem Session Analysis</h3>
+          <p>Feed completed session transcripts back into the LLM to auto-generate narrative success summaries, highlight critical vulnerabilities, and pinpoint methodological optimizations.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="fc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/></svg>
+          </div>
+          <h3>Network Policy Enforcement</h3>
+          <p>Configurable allow/disallow lists gate every tool invocation by IP, CIDR, hostname, or URL — preventing scope creep at the MCP server layer, not just the UI.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="fc-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+          </div>
+          <h3>Tool Watcher Agent</h3>
+          <p>A background monitoring agent continuously watches live session logs and surfaces MCP tool opportunities and pivoting suggestions without interrupting the active engagement.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       ARCHITECTURE
+  ============================================================ -->
+  <section id="architecture">
+    <div class="section-inner">
+      <div class="section-label">// 03 — ARCHITECTURE</div>
+      <h2 class="section-title">Five Layers. Zero Cloud Dependencies.</h2>
+      <div class="arch-diagram">
+        <div class="arch-layer" data-layer="1">
+          <div class="arch-layer-label">LAYER 1 — OPERATOR</div>
+          <div class="arch-layer-inner">
+            <div class="arch-node an-user">
+              <div class="arch-icon">🖥️</div>
+              <strong>Browser / WebUI</strong>
+              <small>Vanilla HTML · JS · CSS</small>
+            </div>
+          </div>
+          <div class="arch-arrow">↓ HTTP / SSE</div>
+        </div>
+
+        <div class="arch-layer" data-layer="2">
+          <div class="arch-layer-label">LAYER 2 — MIDDLEWARE</div>
+          <div class="arch-layer-inner">
+            <div class="arch-node an-flask">
+              <div class="arch-icon">⚗️</div>
+              <strong>Flask Orchestrator</strong>
+              <small>app.py · RESTful API · SSE streaming</small>
+            </div>
+          </div>
+          <div class="arch-arrow">↓ Python asyncio</div>
+        </div>
+
+        <div class="arch-layer" data-layer="3">
+          <div class="arch-layer-label">LAYER 3 — AGENT ENGINE</div>
+          <div class="arch-layer-inner arch-dual">
+            <div class="arch-node an-mcp">
+              <div class="arch-icon">🧠</div>
+              <strong>MCP Client Engine</strong>
+              <small>mcp_client.py · context mgmt · tool routing</small>
+            </div>
+            <div class="arch-node an-logger">
+              <div class="arch-icon">📁</div>
+              <strong>Session Logger</strong>
+              <small>JSON tool calls · MD transcripts · annotations</small>
+            </div>
+          </div>
+          <div class="arch-arrow">↓ Ollama SDK / HTTP</div>
+        </div>
+
+        <div class="arch-layer" data-layer="4">
+          <div class="arch-layer-label">LAYER 4 — LLM BACKEND</div>
+          <div class="arch-layer-inner arch-multi">
+            <div class="arch-node an-llm">
+              <div class="arch-icon">🦙</div>
+              <strong>Ollama (local)</strong>
+              <small>llama3, mistral, qwen…</small>
+            </div>
+            <div class="arch-node an-llm an-secondary">
+              <div class="arch-icon">🔁</div>
+              <strong>LiteLLM Proxy</strong>
+              <small>optional · bearer auth</small>
+            </div>
+            <div class="arch-node an-llm an-secondary">
+              <div class="arch-icon">🤖</div>
+              <strong>Claude / OpenAI</strong>
+              <small>optional · api key</small>
+            </div>
+          </div>
+          <div class="arch-arrow">↓ stdio MCP protocol</div>
+        </div>
+
+        <div class="arch-layer" data-layer="5">
+          <div class="arch-layer-label">LAYER 5 — TOOL EXECUTION</div>
+          <div class="arch-layer-inner arch-multi">
+            <div class="arch-node an-tool">
+              <div class="arch-icon">🗺️</div>
+              <strong>nmap</strong>
+            </div>
+            <div class="arch-node an-tool">
+              <div class="arch-icon">🕷️</div>
+              <strong>gobuster</strong>
+            </div>
+            <div class="arch-node an-tool">
+              <div class="arch-icon">💀</div>
+              <strong>Metasploit</strong>
+            </div>
+            <div class="arch-node an-tool">
+              <div class="arch-icon">💉</div>
+              <strong>sqlmap</strong>
+            </div>
+            <div class="arch-node an-tool">
+              <div class="arch-icon">🔑</div>
+              <strong>hydra</strong>
+            </div>
+            <div class="arch-node an-tool an-more">
+              <strong>+ more</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       DEMO / VIDEOS
+  ============================================================ -->
+  <section id="demo">
+    <div class="section-inner">
+      <div class="section-label">// 04 — DEMO</div>
+      <h2 class="section-title">See It In Action</h2>
+      <p class="section-desc">Watch the agent autonomously chain reconnaissance and exploitation tasks through natural language commands.</p>
+      <div class="demo-container">
+        <div class="demo-placeholder">
+          <div class="demo-placeholder-inner">
+            <div class="demo-icon">▶</div>
+            <p>Demo video coming soon</p>
+            <small>Check back after the symposium, or <a href="https://github.com/raistlinJ/kali-mcp-webui" target="_blank">run it yourself</a></small>
+          </div>
+        </div>
+        <!-- SWAP the above block for an iframe or local <video> tag when ready:
+        <iframe
+          class="demo-video"
+          src="https://www.youtube.com/embed/YOUR_VIDEO_ID"
+          title="Kali MCP WebUI Demo"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen>
+        </iframe>
+        -->
+      </div>
+
+      <div class="screenshots-label">Screenshots</div>
+      <div class="screenshots-grid" id="screenshotsGrid">
+        <!-- Placeholder cards; replace src with real screenshots in assets/images/ -->
+        <div class="screenshot-card ss-placeholder" data-caption="Live Chat Interface — real-time tool streaming">
+          <div class="ss-ph-inner">
+            <div class="ss-ph-icon">💬</div>
+            <span>Live Chat Interface</span>
+          </div>
+        </div>
+        <div class="screenshot-card ss-placeholder" data-caption="Session Configuration — model selection & tool setup">
+          <div class="ss-ph-inner">
+            <div class="ss-ph-icon">⚙️</div>
+            <span>Session Configuration</span>
+          </div>
+        </div>
+        <div class="screenshot-card ss-placeholder" data-caption="Post-Mortem Analysis — AI-generated session review">
+          <div class="ss-ph-inner">
+            <div class="ss-ph-icon">📊</div>
+            <span>Post-Mortem Analysis</span>
+          </div>
+        </div>
+        <div class="screenshot-card ss-placeholder" data-caption="Past Sessions Browser — archives & transcripts">
+          <div class="ss-ph-inner">
+            <div class="ss-ph-icon">🗂️</div>
+            <span>Past Sessions Browser</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for screenshot enlargement -->
+    <div class="ss-modal" id="ssModal">
+      <div class="ss-modal-backdrop" id="ssModalBackdrop"></div>
+      <div class="ss-modal-content">
+        <button class="ss-modal-close" id="ssModalClose">&times;</button>
+        <img id="ssModalImg" src="" alt="" />
+        <p class="ss-modal-caption" id="ssModalCaption"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       INSTALL
+  ============================================================ -->
+  <section id="install">
+    <div class="section-inner">
+      <div class="section-label">// 05 — INSTALLATION</div>
+      <h2 class="section-title">Up and Running in Minutes</h2>
+      <div class="install-steps">
+
+        <div class="install-step">
+          <div class="step-num">01</div>
+          <div class="step-body">
+            <h3>Clone the Repository</h3>
+            <div class="code-block">
+              <code>git clone https://github.com/raistlinJ/kali-mcp-webui.git
+cd kali-mcp-webui</code>
+              <button class="copy-btn" data-copy="git clone https://github.com/raistlinJ/kali-mcp-webui.git&#10;cd kali-mcp-webui">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="install-step">
+          <div class="step-num">02</div>
+          <div class="step-body">
+            <h3>Install Python Dependencies</h3>
+            <div class="code-block">
+              <code>python3 -m venv venv &amp;&amp; source venv/bin/activate
+pip install Flask mcp ollama</code>
+              <button class="copy-btn" data-copy="python3 -m venv venv && source venv/bin/activate&#10;pip install Flask mcp ollama">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="install-step">
+          <div class="step-num">03</div>
+          <div class="step-body">
+            <h3>Start Ollama &amp; Pull a Model</h3>
+            <div class="code-block">
+              <code>ollama serve
+ollama pull llama3</code>
+              <button class="copy-btn" data-copy="ollama serve&#10;ollama pull llama3">Copy</button>
+            </div>
+            <p class="step-note">Any tool-calling model works. <code>llama3.1</code>, <code>qwen2.5</code>, and <code>mistral-nemo</code> are good choices.</p>
+          </div>
+        </div>
+
+        <div class="install-step">
+          <div class="step-num">04</div>
+          <div class="step-body">
+            <h3>Launch the Server</h3>
+            <div class="code-block">
+              <code>python3 app.py</code>
+              <button class="copy-btn" data-copy="python3 app.py">Copy</button>
+            </div>
+            <p class="step-note">Open <code>http://localhost:5055</code> in your browser. Select a model, enable tools, and click <strong>Start Service</strong>.</p>
+          </div>
+        </div>
+
+        <div class="install-step">
+          <div class="step-num">05</div>
+          <div class="step-body">
+            <h3>Or Use Docker</h3>
+            <div class="code-block">
+              <code>docker-compose up --build</code>
+              <button class="copy-btn" data-copy="docker-compose up --build">Copy</button>
+            </div>
+            <p class="step-note">A <code>Dockerfile</code> and <code>docker-compose.yml</code> are included for containerized deployments.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="req-box">
+        <h3>Requirements</h3>
+        <ul>
+          <li><strong>OS:</strong> Kali Linux (recommended) or any Debian-based distro with security tools installed</li>
+          <li><strong>Python:</strong> 3.10+</li>
+          <li><strong>LLM:</strong> <a href="https://ollama.com/" target="_blank">Ollama</a> or any Ollama-compatible endpoint</li>
+          <li><strong>Model:</strong> Any tool-calling model (llama3, llama3.1, qwen2.5, mistral, etc.)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TEAM
+  ============================================================ -->
+  <section id="team">
+    <div class="section-inner">
+      <div class="section-label">// 06 — TEAM</div>
+      <h2 class="section-title">Research Team</h2>
+      <p class="section-desc">
+        This tool was developed as part of ongoing cybersecurity research and submitted to symposium review.
+        We are actively extending the platform — contributions and feedback welcome.
+      </p>
+      <div class="team-grid">
+        <!-- Add team members here. Example structure: -->
+        <div class="team-card">
+          <div class="team-avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" width="48" height="48"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+          </div>
+          <div class="team-info">
+            <strong>Research Group</strong>
+            <span>Cyber Research Lab</span>
+            <a href="https://github.com/raistlinJ/kali-mcp-webui" target="_blank" class="team-link">GitHub →</a>
+          </div>
+        </div>
+        <!-- Duplicate and fill in real names / photos when ready -->
+      </div>
+
+      <div class="contact-box">
+        <h3>Contact &amp; Contributions</h3>
+        <p>Found a bug? Have a feature request? Open an issue or pull request on GitHub.</p>
+        <a href="https://github.com/raistlinJ/kali-mcp-webui/issues" target="_blank" class="btn btn-primary">Open an Issue</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FOOTER
+  ============================================================ -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-logo">
+        <span class="logo-bracket">[</span>KALI-MCP<span class="logo-bracket">]</span>
+        <span class="footer-sub">WebUI</span>
+      </div>
+      <p class="footer-desc">A privacy-preserving agentic penetration testing platform powered by the Model Context Protocol.</p>
+      <div class="footer-links">
+        <a href="https://github.com/raistlinJ/kali-mcp-webui" target="_blank">GitHub</a>
+        <a href="#about">About</a>
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="#team">Team</a>
+      </div>
+      <p class="footer-copy">&copy; <span id="footerYear"></span> Kali MCP WebUI Research Team. Released under MIT License.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
