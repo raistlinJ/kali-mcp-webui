@@ -211,6 +211,70 @@ class SessionLogger:
 
         self._emit_event("annotation", {"text": text, "span": category})
 
+    def log_keystrokes(self, keystrokes: list, source: str = "browser"):
+        """
+        Log a batch of keystrokes from browser or system keylogger.
+        
+        Args:
+            keystrokes: List of keystroke dicts with timestamp, key, modifiers, etc.
+            source: Either "browser" or "system"
+        """
+        if not keystrokes:
+            return
+            
+        # Ensure keystrokes directory exists
+        keystrokes_dir = os.path.join(self.run_dir, "keystrokes")
+        os.makedirs(keystrokes_dir, exist_ok=True)
+        
+        # Write to appropriate log file
+        log_filename = "browser_log.jsonl" if source == "browser" else "system_log.jsonl"
+        log_path = os.path.join(keystrokes_dir, log_filename)
+        
+        with open(log_path, "a") as f:
+            for keystroke in keystrokes:
+                f.write(json.dumps(keystroke) + "\n")
+        
+        self._emit_event("keystrokes_logged", {
+            "count": len(keystrokes),
+            "source": source
+        })
+
+    def get_keystrokes(self, source: str = None) -> dict:
+        """
+        Retrieve logged keystrokes for this session.
+        
+        Args:
+            source: Either "browser", "system", or None for both
+            
+        Returns:
+            Dict with "browser" and/or "system" keys containing lists of keystrokes
+        """
+        result = {}
+        keystrokes_dir = os.path.join(self.run_dir, "keystrokes")
+        
+        if not os.path.isdir(keystrokes_dir):
+            return result
+        
+        sources = [source] if source else ["browser", "system"]
+        
+        for src in sources:
+            log_filename = "browser_log.jsonl" if src == "browser" else "system_log.jsonl"
+            log_path = os.path.join(keystrokes_dir, log_filename)
+            
+            if os.path.isfile(log_path):
+                keystrokes = []
+                try:
+                    with open(log_path, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line:
+                                keystrokes.append(json.loads(line))
+                except Exception:
+                    pass
+                result[src] = keystrokes
+        
+        return result
+
     def update_metadata(self, updates: dict):
         """Merge new fields into session metadata and persist them."""
         if not updates:
