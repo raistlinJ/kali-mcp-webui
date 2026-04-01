@@ -16,15 +16,18 @@
   <nav id="navbar">
     <div class="nav-inner">
       <a href="#hero" class="nav-logo">
-        <span class="logo-bracket">[</span>KALI-MCP<span class="logo-bracket">]</span>
+        <span class="nav-logo-main">Kali MCP WebUI</span>
+        <span class="nav-logo-sub">Fully Localized Agentic Cybersecurity</span>
       </a>
       <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
         <span></span><span></span><span></span>
       </button>
       <ul class="nav-links" id="navLinks">
+        <li><a href="#ecosystem">Ecosystem</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="#features">Features</a></li>
         <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#findings">Findings</a></li>
         <li><a href="#demo">Demo</a></li>
         <li><a href="#install">Install</a></li>
         <li><a href="#team">Team</a></li>
@@ -50,12 +53,13 @@
         Research Tool &mdash; Submitted to Symposium
       </div>
       <h1 class="hero-title">
-        <span class="hero-title-top">KALI&nbsp;MCP</span>
-        <span class="hero-title-bottom">WebUI</span>
+        <span class="hero-title-main">KALI MCP WEBUI</span>
       </h1>
+      <p class="hero-overview-head">
+        From outcome-only benchmarking to full execution-trace analysis
+      </p>
       <p class="hero-sub">
-        A privacy-preserving, fully localized agentic penetration testing platform.<br/>
-        LLMs meet Kali Linux — without a single byte leaving your perimeter.
+        Most LLM pentesting systems are measured by outcomes, not behavior. AgentFlow changes that by instrumenting the full agent workflow in local environments, capturing prompts, responses, tool calls, outputs, and analyst annotations as structured traces. This observability reveals failure patterns like redundant reasoning loops and repeated tool invocations, creating a practical path to safer and more efficient agent-assisted cybersecurity.
       </p>
       <div class="hero-cta">
         <a href="https://github.com/raistlinJ/kali-mcp-webui" target="_blank" class="btn btn-primary">
@@ -90,25 +94,41 @@
         </div>
       </div>
     </div>
-    <div class="hero-terminal" aria-hidden="true">
-      <div class="terminal-bar">
-        <span class="t-dot t-red"></span>
-        <span class="t-dot t-yellow"></span>
-        <span class="t-dot t-green"></span>
-        <span class="t-title">kali-mcp-webui &mdash; bash</span>
-      </div>
-      <div class="terminal-body" id="terminalBody">
-        <div class="t-line"><span class="t-prompt">root@kali</span><span class="t-sep">:</span><span class="t-path">~/kali-mcp-webui</span><span class="t-sym">$</span> <span class="t-cmd">python3 app.py</span></div>
-        <div class="t-line t-out"> * Flask server starting on <span class="t-hl">http://localhost:5055</span></div>
-        <div class="t-line t-out"> * MCP server connecting...</div>
-        <div class="t-line t-out"> * Tools discovered: <span class="t-hl">nmap, gobuster, nikto, sqlmap, hydra</span></div>
-        <div class="t-line t-out"> * Session <span class="t-hl">2024-11-12_14-30-01_native</span> started</div>
-        <div class="t-line"><span class="t-prompt">llama3</span><span class="t-sep"> &gt; </span><span class="t-cmd t-user">Run a fast nmap scan against 192.168.1.0/24</span></div>
-        <div class="t-line t-out"> <span class="t-tool">[TOOL]</span> nmap -sV -T4 192.168.1.0/24</div>
-        <div class="t-line t-out t-result"> &nbsp;&nbsp;192.168.1.105: ports <span class="t-hl">22/tcp, 80/tcp, 443/tcp</span> open</div>
-        <div class="t-line t-out t-result"> &nbsp;&nbsp;192.168.1.201: ports <span class="t-hl">3389/tcp, 445/tcp</span> open</div>
-        <div class="t-line t-out"> <span class="t-analysis">[ANALYSIS]</span> Two hosts with exposed services. Recommend web enumeration on .105...</div>
-        <div class="t-cursor">█</div>
+  </section>
+
+  <!-- ============================================================
+       ECOSYSTEM
+  ============================================================ -->
+  <section id="ecosystem">
+    <div class="section-inner">
+      <div class="section-label">// 01 — PLATFORM OVERVIEW</div>
+      <h2 class="section-title">Tool Ecosystem and Execution Flow</h2>
+      <p class="section-desc">Kali MCP WebUI connects local LLM reasoning with MCP-based tool execution, policy enforcement, and structured telemetry so analysts can observe and improve every engagement.</p>
+
+      <div class="ecosystem-grid">
+        <article class="ecosystem-card">
+          <h3>Platform Overview</h3>
+          <ul>
+            <li>WebUI orchestrates analyst prompts, session controls, and live streaming updates.</li>
+            <li>MCP client broker handles context, tool routing, and model interactions.</li>
+            <li>Local execution keeps prompts, outputs, and findings inside your environment.</li>
+            <li>Structured logger captures transcripts, tool calls, artifacts, and annotations.</li>
+          </ul>
+        </article>
+
+        <article class="ecosystem-card">
+          <h3>Tool Ecosystem</h3>
+          <div class="tool-chip-wrap">
+            <span class="tool-chip">nmap</span>
+            <span class="tool-chip">gobuster</span>
+            <span class="tool-chip">nikto</span>
+            <span class="tool-chip">sqlmap</span>
+            <span class="tool-chip">hydra</span>
+            <span class="tool-chip">metasploit</span>
+            <span class="tool-chip">custom MCP tools</span>
+          </div>
+          <p class="ecosystem-note">Each invocation is scope-checked by allow/deny policy rules before execution.</p>
+        </article>
       </div>
     </div>
   </section>
@@ -118,7 +138,7 @@
   ============================================================ -->
   <section id="about">
     <div class="section-inner">
-      <div class="section-label">// 01 — ABOUT</div>
+      <div class="section-label">// 02 — ABOUT</div>
       <h2 class="section-title">The Problem with Cloud-Based Hacking Tools</h2>
       <div class="about-grid">
         <div class="about-text">
@@ -170,83 +190,28 @@
   ============================================================ -->
   <section id="features">
     <div class="section-inner">
-      <div class="section-label">// 02 — FEATURES</div>
+      <div class="section-label">// 03 — AUDIENCE FIT</div>
       <h2 class="section-title">Built for Operators. Designed for Researchers.</h2>
-      <div class="features-grid">
+      <div class="role-grid">
+        <article class="role-card">
+          <h3>Built for Operators</h3>
+          <ul>
+            <li>Human-in-the-loop WebUI for directing multi-step pentest objectives in natural language.</li>
+            <li>Context controls, tool scoping, and network allow or block rules to constrain execution.</li>
+            <li>Local-first operation with MCP-integrated tooling to keep sensitive telemetry in-house.</li>
+          </ul>
+        </article>
 
-        <div class="feature-card fc-highlight">
-          <div class="fc-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0H3"/></svg>
-          </div>
-          <h3>Fully Localized Execution</h3>
-          <p>Runs entirely on your machine or trusted VM. Credentials stay local and are never written to run logs. Supports Ollama, LiteLLM proxies, OpenAI-compatible endpoints, and Claude.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437 1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008Z"/></svg>
-          </div>
-          <h3>Agentic Tool Execution</h3>
-          <p>The LLM autonomously triggers Kali utilities — nmap, gobuster, Metasploit, sqlmap, and more — via MCP and integrates raw output directly into its reasoning loop.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6"/></svg>
-          </div>
-          <h3>Synchronous Subprocess Blocking</h3>
-          <p>Prevents LLM hallucinations by forcing the agent to wait for long-running processes to complete. The agent sees real output, not speculative completion.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
-          </div>
-          <h3>Comprehensive Audit Trails</h3>
-          <p>Generates structured JSON tool execution logs and human-readable Markdown transcripts for every session, downloadable as ZIP archives.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/></svg>
-          </div>
-          <h3>Human-in-the-Loop Annotations</h3>
-          <p>Analysts insert timestamped notes mid-engagement to guide the agent or flag areas of interest. Annotations feed into live span analysis and post-mortem reviews.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941"/></svg>
-          </div>
-          <h3>Live Span Analysis</h3>
-          <p>Analyze the last N minutes of a live engagement with one-shot LLM inference to generate rapid pivoting strategies or identify execution bottlenecks in real-time.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-          </div>
-          <h3>Post-Mortem Session Analysis</h3>
-          <p>Feed completed session transcripts back into the LLM to auto-generate narrative success summaries, highlight critical vulnerabilities, and pinpoint methodological optimizations.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/></svg>
-          </div>
-          <h3>Network Policy Enforcement</h3>
-          <p>Configurable allow/disallow lists gate every tool invocation by IP, CIDR, hostname, or URL — preventing scope creep at the MCP server layer, not just the UI.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-          </div>
-          <h3>Tool Watcher Agent</h3>
-          <p>A background monitoring agent continuously watches live session logs and surfaces MCP tool opportunities and pivoting suggestions without interrupting the active engagement.</p>
-        </div>
-
+        <article class="role-card">
+          <h3>Designed for Researchers</h3>
+          <ul>
+            <li>Structured traces capture prompts, responses, tool calls, outputs, annotations, and timing.</li>
+            <li>Session archives support post-hoc analysis of reasoning loops and orchestration efficiency.</li>
+            <li>Reproducible workflow data enables cross-run comparisons and method refinement.</li>
+          </ul>
+        </article>
       </div>
+      <p class="role-footnote">A single platform for bounded execution in operations and transparent workflow analysis in research.</p>
     </div>
   </section>
 
@@ -255,100 +220,97 @@
   ============================================================ -->
   <section id="architecture">
     <div class="section-inner">
-      <div class="section-label">// 03 — ARCHITECTURE</div>
-      <h2 class="section-title">Five Layers. Zero Cloud Dependencies.</h2>
-      <div class="arch-diagram">
-        <div class="arch-layer" data-layer="1">
-          <div class="arch-layer-label">LAYER 1 — OPERATOR</div>
-          <div class="arch-layer-inner">
-            <div class="arch-node an-user">
-              <div class="arch-icon">🖥️</div>
-              <strong>Browser / WebUI</strong>
-              <small>Vanilla HTML · JS · CSS</small>
+      <div class="section-label">// 04 — ARCHITECTURE</div>
+      <h2 class="section-title">AgentFlow Architecture</h2>
+
+      <div class="architecture-layout">
+        <div class="architecture-media">
+          <figure class="paper-figure">
+            <div class="paper-figure-frame">
+              <img src="assets/images/agentflow-architecture.png" alt="AgentFlow architecture showing human input, agentic broker, local execution, and observation telemetry loop" />
             </div>
-          </div>
-          <div class="arch-arrow">↓ HTTP / SSE</div>
+            <figcaption>
+              Figure 1. AgentFlow architecture supporting human-in-the-loop orchestration, local tool execution through MCP interfaces, and structured telemetry collection for post-hoc analysis.
+            </figcaption>
+          </figure>
         </div>
 
-        <div class="arch-layer" data-layer="2">
-          <div class="arch-layer-label">LAYER 2 — MIDDLEWARE</div>
-          <div class="arch-layer-inner">
-            <div class="arch-node an-flask">
-              <div class="arch-icon">⚗️</div>
-              <strong>Flask Orchestrator</strong>
-              <small>app.py · RESTful API · SSE streaming</small>
-            </div>
-          </div>
-          <div class="arch-arrow">↓ Python asyncio</div>
-        </div>
+        <div class="architecture-content">
+          <p class="architecture-summary">
+            The framework centers on a closed observation loop: analyst objectives enter through the WebUI, the Agentic Broker executes MCP-enabled tool actions, and structured session traces are continuously captured to support workflow diagnostics, reproducibility, and efficiency analysis.
+          </p>
 
-        <div class="arch-layer" data-layer="3">
-          <div class="arch-layer-label">LAYER 3 — AGENT ENGINE</div>
-          <div class="arch-layer-inner arch-dual">
-            <div class="arch-node an-mcp">
-              <div class="arch-icon">🧠</div>
-              <strong>MCP Client Engine</strong>
-              <small>mcp_client.py · context mgmt · tool routing</small>
-            </div>
-            <div class="arch-node an-logger">
-              <div class="arch-icon">📁</div>
-              <strong>Session Logger</strong>
-              <small>JSON tool calls · MD transcripts · annotations</small>
+          <div class="telemetry-panel">
+            <h3>Telemetry Captured Per Session</h3>
+            <div class="telemetry-list">
+              <span>Prompts</span>
+              <span>Model Responses</span>
+              <span>Tool Invocations</span>
+              <span>Command Outputs</span>
+              <span>Analyst Annotations</span>
+              <span>Timing Metadata</span>
+              <span>Artifacts and Logs</span>
             </div>
           </div>
-          <div class="arch-arrow">↓ Ollama SDK / HTTP</div>
         </div>
+      </div>
+    </div>
+  </section>
 
-        <div class="arch-layer" data-layer="4">
-          <div class="arch-layer-label">LAYER 4 — LLM BACKEND</div>
-          <div class="arch-layer-inner arch-multi">
-            <div class="arch-node an-llm">
-              <div class="arch-icon">🦙</div>
-              <strong>Ollama (local)</strong>
-              <small>llama3, mistral, qwen…</small>
-            </div>
-            <div class="arch-node an-llm an-secondary">
-              <div class="arch-icon">🔁</div>
-              <strong>LiteLLM Proxy</strong>
-              <small>optional · bearer auth</small>
-            </div>
-            <div class="arch-node an-llm an-secondary">
-              <div class="arch-icon">🤖</div>
-              <strong>Claude / OpenAI</strong>
-              <small>optional · api key</small>
-            </div>
-          </div>
-          <div class="arch-arrow">↓ stdio MCP protocol</div>
-        </div>
+  <!-- ============================================================
+       FINDINGS SNAPSHOT
+  ============================================================ -->
+  <section id="findings">
+    <div class="section-inner">
+      <div class="section-label">// 05 — FINDINGS SNAPSHOT</div>
+      <h2 class="section-title">Preliminary Results and Observations</h2>
+      <p class="section-desc">In a multi-step pivoting scenario, the AgentFlow workflow successfully reached the target objective using Ollama with MCP-connected tools. Instrumented traces enabled phase-level analysis of time and interaction patterns across reconnaissance, service identification, exploitation, and pivot setup.</p>
 
-        <div class="arch-layer" data-layer="5">
-          <div class="arch-layer-label">LAYER 5 — TOOL EXECUTION</div>
-          <div class="arch-layer-inner arch-multi">
-            <div class="arch-node an-tool">
-              <div class="arch-icon">🗺️</div>
-              <strong>nmap</strong>
-            </div>
-            <div class="arch-node an-tool">
-              <div class="arch-icon">🕷️</div>
-              <strong>gobuster</strong>
-            </div>
-            <div class="arch-node an-tool">
-              <div class="arch-icon">💀</div>
-              <strong>Metasploit</strong>
-            </div>
-            <div class="arch-node an-tool">
-              <div class="arch-icon">💉</div>
-              <strong>sqlmap</strong>
-            </div>
-            <div class="arch-node an-tool">
-              <div class="arch-icon">🔑</div>
-              <strong>hydra</strong>
-            </div>
-            <div class="arch-node an-tool an-more">
-              <strong>+ more</strong>
-            </div>
+      <div class="findings-context">
+        <article class="findings-setup">
+          <h3>Pivot Test Setup (Figure 2)</h3>
+          <ul>
+            <li>Scenario: multi-step pivoting engagement with staged reconnaissance and internal reachability constraints.</li>
+            <li>Execution: Ollama-based agent with MCP-connected cybersecurity tools in a local environment.</li>
+            <li>Measurement: trace-derived phase timing and interaction counts across the attack workflow.</li>
+          </ul>
+        </article>
+
+        <figure class="paper-figure findings-figure">
+          <div class="paper-figure-frame">
+            <img src="assets/images/pivot-test-figure.png" alt="Pivot testing scenario used for AgentFlow evaluation" />
           </div>
-        </div>
+          <figcaption>
+            Figure 2. Pivoting scenario used to generate execution traces for time and interaction analysis.
+          </figcaption>
+        </figure>
+      </div>
+
+      <div class="findings-grid">
+        <article class="finding-item">
+          <h3>Successful End-to-End Execution</h3>
+          <p>The agent completed the defined pivoting task while producing structured traces suitable for post-hoc analysis and replay.</p>
+        </article>
+        <article class="finding-item">
+          <h3>Observed vs. Estimated Efficient Workflow</h3>
+          <p>Trace-based analysis estimated roughly 50 minutes in the observed run versus about 11 minutes under a counterfactual efficient orchestration setting.</p>
+        </article>
+        <article class="finding-item">
+          <h3>Where Time Concentrated</h3>
+          <p>The largest overhead appeared in exploit selection, repeated exploit attempts, and pivot configuration phases.</p>
+        </article>
+        <article class="finding-item">
+          <h3>Actionable Failure Patterns</h3>
+          <p>Recurring patterns included redundant tool calls, command-context mismatches, exploit retry loops, and pivot setup complexity.</p>
+        </article>
+      </div>
+
+      <p class="findings-note">These observations are preliminary and drawn from controlled runs; they are intended to guide systematic workflow improvements rather than serve as broad statistical claims.</p>
+
+      <div class="telemetry-panel findings-conclusion">
+        <h3>Conclusion and Next Steps</h3>
+        <p>AgentFlow shifts evaluation from outcome-only benchmarking to execution-level observability. By embedding an LLM agent in a local, bounded tool environment and capturing full interaction traces, the framework enables more transparent diagnosis and iterative improvement of agent-assisted penetration testing workflows.</p>
+        <p>Future work expands scenario diversity and dataset scale, with increased automation and human-in-the-loop analysis to detect recurring inefficiencies and align agent behavior with established penetration testing practice.</p>
       </div>
     </div>
   </section>
@@ -358,7 +320,7 @@
   ============================================================ -->
   <section id="demo">
     <div class="section-inner">
-      <div class="section-label">// 04 — DEMO</div>
+      <div class="section-label">// 06 — DEMO</div>
       <h2 class="section-title">See It In Action</h2>
       <p class="section-desc">Watch the agent autonomously chain reconnaissance and exploitation tasks through natural language commands.</p>
       <div class="demo-container">
@@ -427,7 +389,7 @@
   ============================================================ -->
   <section id="install">
     <div class="section-inner">
-      <div class="section-label">// 05 — INSTALLATION</div>
+      <div class="section-label">// 07 — INSTALLATION</div>
       <h2 class="section-title">Up and Running in Minutes</h2>
       <div class="install-steps">
 
@@ -511,7 +473,7 @@ ollama pull llama3</code>
   ============================================================ -->
   <section id="team">
     <div class="section-inner">
-      <div class="section-label">// 06 — TEAM</div>
+      <div class="section-label">// 08 — TEAM</div>
       <h2 class="section-title">Research Team</h2>
       <p class="section-desc">
         This tool was developed as part of ongoing cybersecurity research and submitted to symposium review.
