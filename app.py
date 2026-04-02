@@ -1179,6 +1179,7 @@ def session_start():
     context_window = int(data.get('context_window', 8192))
     max_turns = int(data.get('max_turns', 20))
     network_policy = data.get('network_policy') or {"allow": ["*"], "disallow": []}
+    keylogger_enabled = bool(data.get('keylogger_enabled'))
 
     app.logger.info(
         'Session start requested provider=%s model=%s url=%s ssl_verify=%s context_window=%s max_turns=%s',
@@ -1190,11 +1191,12 @@ def session_start():
         max_turns,
     )
     app.logger.debug(
-        'Session start details server_command=%s tools_enabled=%s network_policy=%s auth=%s',
+        'Session start details server_command=%s tools_enabled=%s network_policy=%s auth=%s keylogger_enabled=%s',
         _redact_sensitive_text(server_command),
         len((tools_config or {}).get('tools', []) or []) if isinstance(tools_config, dict) else 0,
         _redacted_payload_snapshot(network_policy),
         bool(api_key),
+        keylogger_enabled,
     )
 
     if max_turns < 1 or max_turns > 100:
@@ -1268,6 +1270,12 @@ def session_start():
         async def _start():
             try:
                 tools = await session.start()
+                if keylogger_enabled and start_keylogger:
+                    try:
+                        base_dir = os.path.dirname(os.path.abspath(__file__))
+                        start_keylogger(run_id=run_id, base_dir=base_dir)
+                    except Exception as keylogger_exc:
+                        app.logger.warning('System keylogger start failed for run_id=%s: %s', run_id, keylogger_exc)
                 with _session_lock:
                     _session_state["session"] = session
                     _session_state["status"] = "running"
@@ -1568,6 +1576,12 @@ def session_stop():
         except Exception:
             # If the loop is already closed or failing
             pass
+
+    if stop_keylogger:
+        try:
+            stop_keylogger()
+        except Exception as keylogger_exc:
+            app.logger.warning('System keylogger stop failed: %s', keylogger_exc)
 
     return jsonify({'success': True, 'message': 'Stop signal sent and state reset.'})
 

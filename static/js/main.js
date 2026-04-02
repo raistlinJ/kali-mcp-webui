@@ -1476,6 +1476,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cmdType = kaliCommandType.value;
         const contextWindow = parseInt(document.getElementById('context-window').value, 10);
         const maxTurns = parseInt(maxTurnsInput.value, 10);
+        const keyloggerEnabled = Boolean(keyloggerEnableToggle?.checked);
         syncPolicyDraftFromEditor();
         const networkPolicy = {
             allow: Array.isArray(_policyDraft.allow) && _policyDraft.allow.length ? [..._policyDraft.allow] : ['*'],
@@ -1520,7 +1521,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, provider, api_key: apiKey, ssl_verify: sslVerify, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, max_turns: maxTurns, network_policy: networkPolicy })
+                body: JSON.stringify({ url, provider, api_key: apiKey, ssl_verify: sslVerify, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, max_turns: maxTurns, network_policy: networkPolicy, keylogger_enabled: keyloggerEnabled })
             });
             const data = await response.json();
 
