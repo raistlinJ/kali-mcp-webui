@@ -109,6 +109,24 @@ def _configure_logging():
 _configure_logging()
 
 
+def _static_asset_version() -> str:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidate_paths = [
+        os.path.join(base_dir, 'static', 'css', 'style.css'),
+        os.path.join(base_dir, 'static', 'js', 'main.js'),
+        os.path.join(base_dir, 'static', 'js', 'keylogger.js'),
+        os.path.join(base_dir, 'static', 'js', 'watcher.js'),
+        os.path.join(base_dir, 'templates', 'index.html'),
+    ]
+    timestamps = []
+    for path in candidate_paths:
+        try:
+            timestamps.append(int(os.path.getmtime(path)))
+        except OSError:
+            continue
+    return str(max(timestamps) if timestamps else int(time.time()))
+
+
 def _redact_sensitive_text(value) -> str:
     text = str(value or "")
     if not text:
@@ -1105,7 +1123,7 @@ def _log_request_end(response):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', static_asset_version=_static_asset_version())
 
 
 @app.route('/api/models', methods=['POST'])

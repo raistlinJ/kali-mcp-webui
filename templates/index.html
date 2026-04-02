@@ -8,7 +8,7 @@
     <meta name="description" content="Run Kali Linux MCP tools with local LLMs via the Model Context Protocol">
     <!-- Google Fonts for typography -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=static_asset_version) }}">
     <!-- Phosphor Icons fallback (deferred to avoid DNS blocking UI) -->
     <script src="https://unpkg.com/@phosphor-icons/web" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -1233,7 +1233,7 @@
             </div>
 </body>
 
-    <script src="{{ url_for('static', filename='js/keylogger.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/watcher.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/keylogger.js', v=static_asset_version) }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js', v=static_asset_version) }}"></script>
+    <script src="{{ url_for('static', filename='js/watcher.js', v=static_asset_version) }}"></script>
 </html>
