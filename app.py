@@ -2285,17 +2285,20 @@ def keylogger_batch():
     """Receive a batch of browser keystrokes and log them to the current session."""
     data = request.json or {}
     keystrokes = data.get('keystrokes', [])
-    run_id = data.get('run_id')
+    run_id = data.get('run_id') or data.get('runId')
 
     if not keystrokes:
         return jsonify({'success': True, 'logged': 0})
 
     try:
         if run_id:
-            from session_logger import SessionLogger
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            logger = SessionLogger(run_id, {}, base_dir=base_dir)
-            logger.log_keystrokes(keystrokes, source="browser")
+            keystrokes_dir = os.path.join(base_dir, "runs", run_id, "keystrokes")
+            os.makedirs(keystrokes_dir, exist_ok=True)
+            log_path = os.path.join(keystrokes_dir, "browser_log.jsonl")
+            with open(log_path, "a") as f:
+                for entry in keystrokes:
+                    f.write(json.dumps(entry) + "\n")
 
         return jsonify({'success': True, 'logged': len(keystrokes)})
     except Exception as e:
