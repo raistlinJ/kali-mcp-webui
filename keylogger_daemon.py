@@ -15,6 +15,7 @@ import json
 import os
 import queue
 import subprocess
+import subprocess
 import threading
 import time
 from datetime import datetime, timezone
@@ -24,6 +25,73 @@ from typing import Optional, Callable
 def _now_iso() -> str:
     """Return current UTC time in ISO format."""
     return datetime.now(timezone.utc).isoformat()
+
+
+def _check_xdotool_available() -> bool:
+    """Check if xdotool is available on the system."""
+    try:
+        result = subprocess.run(
+            ['which', 'xdotool'],
+            capture_output=True, text=True, timeout=2
+        )
+        return result.returncode == 0 and bool(result.stdout.strip())
+    except Exception:
+        return False
+
+
+def _get_linux_active_window() -> dict:
+    """Get active window info on Linux using xdotool or xprop."""
+    # Check if xdotool is available
+    if not _check_xdotool_available():
+        return {
+            "title": "unknown",
+            "application": "unknown",
+            "pid": None,
+            "platform": "Linux",
+            "note": "xdotool not installed - run: sudo apt install xdotool xprop"
+        }
+    
+    try:
+        # Try xdotool first
+        try:
+            result = subprocess.run(
+                ['xdotool', 'getactivewindow', 'getwindowname'],
+                capture_output=True, text=True, timeout=2
+            )
+            title = result.stdout.strip()
+            
+            pid_result = subprocess.run(
+                ['xdotool', 'getactivewindow', 'getwindowpid'],
+                capture_output=True, text=True, timeout=2
+            )
+            pid = pid_result.stdout.strip()
+            
+            # Get application name from WM_CLASS
+            win_id_result = subprocess.run(
+                ['xdotool', 'getactivewindow'],
+                capture_output=True, text=True, timeout=2
+            )
+            win_id = win_id_result.stdout.strip()
+            
+            if win_id:
+                app_result = subprocess.run(
+                    ['xprop', '-id', win_id, 'WM_CLASS'],
+                    capture_output=True, text=True, timeout=2
+                )
+                app = app_result.stdout.strip().split('"')[1] if '"' in app_result.stdout else "unknown"
+            else:
+                app = "unknown"
+            
+            return {
+                "title": title or "unknown",
+                "application": app,
+                "pid": pid if pid and pid != "0" else None,
+                "platform": "Linux"
+            }
+        except Exception as e:
+            return {"title": "unknown", "application": "unknown", "pid": None, "platform": "Linux", "error": str(e)}
+    except Exception as e:
+        return {"title": "unknown", "application": "unknown", "pid": None, "platform": "Linux", "error": str(e)}
 
 
 def _get_active_window_info() -> dict:
@@ -84,45 +152,6 @@ def _get_macos_active_window() -> dict:
         return {"title": "unknown", "application": "unknown", "pid": None, "error": str(e)}
 
 
-def _get_linux_active_window() -> dict:
-    """Get active window info on Linux using xdotool or xprop."""
-    try:
-        # Try xdotool first
-        try:
-            result = subprocess.run(
-                ['xdotool', 'getactivewindow', 'getwindowname'],
-                capture_output=True, text=True, timeout=2
-            )
-            title = result.stdout.strip()
-            
-            pid_result = subprocess.run(
-                ['xdotool', 'getactivewindow', 'getwindowpid'],
-                capture_output=True, text=True, timeout=2
-            )
-            pid = pid_result.stdout.strip()
-            
-            # Get application name from WM_CLASS
-            app_result = subprocess.run(
-                ['xprop', '-id', subprocess.run(['xdotool', 'getactivewindow'], capture_output=True, text=True, timeout=2).stdout.strip(), 'WM_CLASS'],
-                capture_output=True, text=True, timeout=2
-            )
-            app = app_result.stdout.strip().split('"')[1] if '"' in app_result.stdout else "unknown"
-            
-            return {
-                "title": title or "unknown",
-                "application": app,
-                "pid": pid if pid and pid != "0" else None,
-                "platform": "Linux"
-            }
-        except Exception:
-            # Fallback to xprop
-            win_id = subprocess.run(['xprop', '-root', '_NET_ACTIVE_WINDOW'], capture_output=True, text=True, timeout=2)
-            if win_id.returncode == 0:
-                # Extract window ID and query it
-                return {"title": "unknown", "application": "unknown", "pid": None, "platform": "Linux"}
-            return {"title": "unknown", "application": "unknown", "pid": None}
-    except Exception as e:
-        return {"title": "unknown", "application": "unknown", "pid": None, "error": str(e)}
 
 
 def _get_windows_active_window() -> dict:
@@ -532,3 +561,35 @@ def get_keylogger_status() -> dict:
         "run_id": _keylogger_instance._current_run_id,
         "buffer_size": _keylogger_instance.buffer_size
     }
+
+
+def check_keylogger_prerequisites() -> dict:
+    """
+    Check if keylogger prerequisites are met.
+    Returns status info including whether xdotool is available.
+    """
+    import platform
+    system = platform.system()
+    
+    result = {
+        "platform": system,
+        "xdotool_available": False,
+        "xdotool_note": "",
+        "recommended_action": ""
+    }
+    
+    if system == "Linux":
+        result["xdotool_available"] = _check_xdotool_available()
+        if not result["xdotool_available"]:
+            result["xdotool_note"] = "xdotool is not installed. System keylogger will not be able to detect active windows."
+            result["recommended_action"] = "Run: sudo ./install_prerequisites.sh"
+    elif system == "Darwin":
+        result["xdotool_available"] = True  # macOS uses AppleScript
+        result["xdotool_note"] = "macOS detected - using AppleScript for window detection"
+    elif system == "Windows":
+        result["xdotool_available"] = True  # Windows uses ctypes
+        result["xdotool_note"] = "Windows detected - using WinAPI for window detection"
+    else:
+        result["xdotool_note"] = f"Unknown platform: {system}"
+    
+    return result

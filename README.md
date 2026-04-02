@@ -14,6 +14,7 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 *   **Live Span Analysis**: Seamlessly analyze the last *N* minutes of a live engagement using a one-shot LLM inference to generate rapid pivoting strategies or identify execution bottlenecks in real-time.
 *   **Post-Mortem Session Analysis**: Feed an entire past session transcript (along with your manual annotations) back into the LLM to auto-generate narrative success summaries, highlight critical vulnerabilities, and pinpoint areas for methodological optimization.
 *   **Session Archiving**: Download entire session directories—including the generated artifacts, tool schemas, and transcription—as self-contained ZIP archives.
+*   **User Keylogger**: Optional browser and system-wide keystroke logging for interaction pattern analysis. Captures which applications/windows were active during each keystroke.
 
 ## Architecture
 
@@ -33,7 +34,22 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
     *   `Flask`
     *   `mcp` (Official Model Context Protocol SDK)
     *   `ollama`
+    *   `pynput` (for system keylogger)
     *   `asyncio`
+
+*   **System Keylogger Prerequisites (Linux)**:
+    *   `xdotool` - Required for active window detection
+    *   `xprop` - Required for application name detection
+    *   `python3-psutil` - Required for process information
+    
+    Install these packages with:
+    ```bash
+    sudo ./install_prerequisites.sh
+    ```
+    Or manually:
+    ```bash
+    sudo apt install xdotool xprop python3-psutil
+    ```
 
 ## Installation & Setup
 
@@ -82,6 +98,52 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
     *   Switch to the **Live Chat** tab.
     *   Issue a natural language command (e.g., *"Run a fast nmap scan against scanme.nmap.org"*).
     *   Watch as the agent dynamically executes the tool in the foreground, streams the output, and returns an analysis!
+
+## User Keylogger Feature
+
+The WebUI includes an optional keylogger feature that captures all user keystrokes for interaction pattern analysis.
+
+### Features
+
+- **Browser Keylogger**: Captures all keystrokes within the WebUI
+- **System Keylogger**: Captures system-wide keystrokes (requires `xdotool` on Linux)
+- **Window Tracking**: Records which application/window was active for each keystroke
+- **Privacy Protection**: Sensitive fields (passwords, API keys) are automatically excluded
+- **Session Correlation**: Keystrokes are linked to the current session for analysis
+
+### Enabling Keylogging
+
+1. Navigate to the **Configuration** tab
+2. Find the **Keylogger** section
+3. Check **Enable Keylogging**
+4. Start a session
+
+### Linux Prerequisites
+
+For full system keylogger functionality on Linux, you need `xdotool` installed:
+
+```bash
+sudo ./install_prerequisites.sh
+```
+
+This script will:
+- Detect your distribution (Kali 2025.x/2026.x, Debian, Ubuntu)
+- Install `xdotool`, `xprop`, and `python3-psutil`
+- Verify the installation
+
+Without `xdotool`, the system keylogger will still capture keystrokes but won't be able to detect which application/window was active.
+
+### Data Storage
+
+Keystrokes are stored in `runs/<run_id>/keystrokes/`:
+- `browser_log.jsonl` - Browser keystrokes with URL and page context
+- `system_log.jsonl` - System keystrokes with application and window title
+
+### Privacy Notes
+
+- Password fields and API key fields are automatically excluded
+- Sensitive field names (password, api_key, secret, token, etc.) are detected by class/id/name
+- Only metadata about sensitive field interaction is logged (not the actual keystrokes)
 
 ## Using the Observation & Analysis Engine
 

@@ -15,6 +15,19 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+# Keylogger integration
+try:
+    from keylogger_daemon import start_keylogger, stop_keylogger, pause_keylogger, resume_keylogger, get_keylogger_status, get_keylogger, check_keylogger_prerequisites
+except Exception as _keylogger_import_err:
+    print(f"[app] Keylogger unavailable: {_keylogger_import_err}", flush=True)
+    start_keylogger = None
+    stop_keylogger = None
+    pause_keylogger = None
+    resume_keylogger = None
+    get_keylogger_status = lambda: {"running": False, "paused": False, "run_id": None, "buffer_size": 0}
+    check_keylogger_prerequisites = lambda: {"error": "Keylogger not available"}
+    get_keylogger = None
+
 # Tool Watcher — background agent that spots MCP tool opportunities in logs
 try:
     from tool_watcher import ToolWatcher
@@ -2165,6 +2178,124 @@ def _validate_filename(filename: str):
     import re
     if not re.match(r'^[\w\-\.]+$', filename) or '..' in filename:
         abort(400, "Invalid filename")
+
+
+# -----------------------------------------------------------------
+# Keylogger API
+# -----------------------------------------------------------------
+
+@app.route('/api/keylogger/start', methods=['POST'])
+def keylogger_start():
+    """Start the system keylogger."""
+    if not start_keylogger:
+        return jsonify({'success': False, 'error': 'Keylogger not available.'}), 503
+
+    data = request.json or {}
+    run_id = data.get('run_id')
+
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        start_keylogger(run_id=run_id, base_dir=base_dir)
+        return jsonify({'success': True, 'message': 'System keylogger started.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/keylogger/stop', methods=['POST'])
+def keylogger_stop():
+    """Stop the system keylogger."""
+    if not stop_keylogger:
+        return jsonify({'success': False, 'error': 'Keylogger not available.'}), 503
+
+    try:
+        stop_keylogger()
+        return jsonify({'success': True, 'message': 'System keylogger stopped.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/keylogger/pause', methods=['POST'])
+def keylogger_pause():
+    """Pause the system keylogger."""
+    if not pause_keylogger:
+        return jsonify({'success': False, 'error': 'Keylogger not available.'}), 503
+
+    try:
+        pause_keylogger()
+        return jsonify({'success': True, 'message': 'System keylogger paused.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/keylogger/resume', methods=['POST'])
+def keylogger_resume():
+    """Resume the system keylogger."""
+    if not resume_keylogger:
+        return jsonify({'success': False, 'error': 'Keylogger not available.'}), 503
+
+    try:
+        resume_keylogger()
+        return jsonify({'success': True, 'message': 'System keylogger resumed.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/keylogger/status', methods=['GET'])
+def keylogger_status():
+    """Get the current keylogger status."""
+    try:
+        status = get_keylogger_status()
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({'running': False, 'paused': False, 'error': str(e)})
+
+
+@app.route('/api/keylogger/prerequisites', methods=['GET'])
+def keylogger_prerequisites():
+    """Check keylogger prerequisites (xdotool availability on Linux)."""
+    try:
+        prereqs = check_keylogger_prerequisites()
+        return jsonify(prereqs)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/api/keylogger/batch', methods=['POST'])
+def keylogger_batch():
+    """Receive a batch of browser keystrokes and log them to the current session."""
+    data = request.json or {}
+    keystrokes = data.get('keystrokes', [])
+    run_id = data.get('run_id')
+
+    if not keystrokes:
+        return jsonify({'success': True, 'logged': 0})
+
+    try:
+        if run_id:
+            from session_logger import SessionLogger
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            logger = SessionLogger(run_id, {}, base_dir=base_dir)
+            logger.log_keystrokes(keystrokes, source="browser")
+
+        return jsonify({'success': True, 'logged': len(keystrokes)})
+    except Exception as e:
+        app.logger.exception("Failed to log browser keystrokes")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/sessions/<run_id>/keystrokes', methods=['GET'])
+def get_session_keystrokes(run_id):
+    """Get keystrokes for a specific session."""
+    _validate_run_id(run_id)
+
+    try:
+        from session_logger import SessionLogger
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logger = SessionLogger(run_id, {}, base_dir=base_dir)
+        keystrokes = logger.get_keystrokes()
+        return jsonify(keystrokes)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
