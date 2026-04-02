@@ -181,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
     const LAST_SETTINGS_STORAGE_KEY = 'runtime:last-settings:v2';
+    const LAST_SETTINGS_SESSION_STORAGE_KEY = 'runtime:last-settings:session:v2';
     const API_KEY_SESSION_STORAGE_KEY = 'runtime:llm-api-key';
     const LEGACY_API_TOKEN_SESSION_STORAGE_KEY = 'runtime:llm-api-token';
     const MAX_PERSISTED_LIVE_LOG_HTML = 200000;
@@ -426,7 +427,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 savedAt: Date.now(),
             };
 
-            localStorage.setItem(LAST_SETTINGS_STORAGE_KEY, JSON.stringify(payload));
+            const encodedPayload = JSON.stringify(payload);
+            try {
+                safeLocalStorageSet(LAST_SETTINGS_STORAGE_KEY, encodedPayload);
+                sessionStorage.removeItem(LAST_SETTINGS_SESSION_STORAGE_KEY);
+            } catch (err) {
+                if (!isStorageQuotaError(err)) {
+                    throw err;
+                }
+                sessionStorage.setItem(LAST_SETTINGS_SESSION_STORAGE_KEY, encodedPayload);
+            }
         } catch (err) {
             console.warn('Failed to persist last-used settings:', err);
         }
@@ -434,7 +444,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function restoreLastSettings() {
         try {
-            const raw = localStorage.getItem(LAST_SETTINGS_STORAGE_KEY);
+            const raw = localStorage.getItem(LAST_SETTINGS_STORAGE_KEY)
+                || sessionStorage.getItem(LAST_SETTINGS_SESSION_STORAGE_KEY);
             if (!raw) {
                 return false;
             }
