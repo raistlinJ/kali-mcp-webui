@@ -98,6 +98,10 @@
                                 <i class="ph ph-toolbox"></i>
                                 <span>Tools</span>
                             </button>
+                            <button type="button" class="config-subtab-btn" data-config-target="config-logging-panel">
+                                <i class="ph ph-list-checks"></i>
+                                <span>Logging</span>
+                            </button>
                         </div>
 
                         <div class="config-subtab-panel active" id="config-runtime-panel">
@@ -453,23 +457,81 @@
                         </div>
                         </div>
 
-                        <!-- Keylogger Configuration -->
-                        <div class="divider"></div>
-                        <div class="form-section">
-                            <h2 class="section-title">
-                                <i class="ph ph-keyboard"></i>
-                                Keylogger
-                            </h2>
-                            <label class="checkbox-container" for="keylogger-enable-toggle" style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer;">
-                                <input type="checkbox" id="keylogger-enable-toggle" style="margin-top: 0.25rem;">
-                                <span style="flex: 1;">
-                                    <strong>Enable Keylogging</strong>
-                                    <p class="input-hint" style="margin-top: 0.4rem; font-size: 0.85rem;">
-                                        Capture all keystrokes (browser and system-wide) for interaction pattern analysis. 
-                                        Keystrokes are logged to the session archive. Sensitive fields (passwords, API keys) are excluded from browser logging.
-                                    </p>
-                                </span>
-                            </label>
+                        <!-- Logging Configuration -->
+                        <div class="config-subtab-panel" id="config-logging-panel">
+                            <div class="form-section">
+                                <h2 class="section-title">
+                                    <i class="ph ph-list-checks"></i>
+                                    Logging
+                                </h2>
+                                <p class="input-hint" style="margin-bottom: 1rem;">Select which data to capture and store in each session archive.</p>
+
+                                <div class="input-group config-card-lite">
+                                    <label><i class="ph ph-keyboard"></i>&nbsp; Keystrokes</label>
+                                    <label class="checkbox-container" for="keylogger-enable-toggle">
+                                        <input type="checkbox" id="keylogger-enable-toggle">
+                                        <span>
+                                            <strong>Enable Keylogging</strong>
+                                            <p class="input-hint" style="margin-top: 0.3rem;">Capture browser and system-wide keystrokes for interaction pattern analysis. Sensitive fields (passwords, API keys) are excluded.</p>
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <div class="input-group config-card-lite">
+                                    <label><i class="ph ph-chat-text"></i>&nbsp; Prompts &amp; Responses</label>
+                                    <label class="checkbox-container" for="log-prompts-toggle">
+                                        <input type="checkbox" id="log-prompts-toggle" checked>
+                                        <span>
+                                            <strong>Log Prompts &amp; Responses</strong>
+                                            <p class="input-hint" style="margin-top: 0.3rem;">Save every user prompt and LLM response to the session transcript.</p>
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <div class="input-group config-card-lite">
+                                    <label><i class="ph ph-wrench"></i>&nbsp; Tool Execution</label>
+                                    <label class="checkbox-container" for="log-tools-toggle">
+                                        <input type="checkbox" id="log-tools-toggle" checked>
+                                        <span>
+                                            <strong>Log Tool Calls &amp; Results</strong>
+                                            <p class="input-hint" style="margin-top: 0.3rem;">Record every MCP tool invocation, its arguments, and the raw output returned to the model.</p>
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <div class="input-group config-card-lite">
+                                    <label><i class="ph ph-files"></i>&nbsp; Artifacts</label>
+                                    <label class="checkbox-container" for="log-artifacts-toggle">
+                                        <input type="checkbox" id="log-artifacts-toggle" checked>
+                                        <span>
+                                            <strong>Save Artifacts</strong>
+                                            <p class="input-hint" style="margin-top: 0.3rem;">Collect files, screenshots, and other outputs produced during the session into the artifacts folder.</p>
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <div class="input-group config-card-lite">
+                                    <label><i class="ph ph-brain"></i>&nbsp; Analysis</label>
+                                    <label class="checkbox-container" for="log-analysis-toggle">
+                                        <input type="checkbox" id="log-analysis-toggle" checked>
+                                        <span>
+                                            <strong>Log Analysis Results</strong>
+                                            <p class="input-hint" style="margin-top: 0.3rem;">Persist analysis job outputs and findings alongside the session record.</p>
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <div class="input-group config-card-lite">
+                                    <label><i class="ph ph-activity"></i>&nbsp; Session Metadata</label>
+                                    <label class="checkbox-container" for="log-metadata-toggle">
+                                        <input type="checkbox" id="log-metadata-toggle" checked>
+                                        <span>
+                                            <strong>Log Session Metadata</strong>
+                                            <p class="input-hint" style="margin-top: 0.3rem;">Record timestamps, model name, provider, context settings, and tool configuration for each session.</p>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Service Action Buttons -->
