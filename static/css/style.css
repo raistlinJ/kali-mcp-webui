@@ -1621,6 +1621,93 @@ option {
     align-items: flex-end;
 }
 
+.chat-prompt-stack {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.chat-scope-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.85rem 1rem 0.75rem;
+    border-radius: 12px;
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    background: rgba(15, 23, 42, 0.3);
+}
+
+.chat-scope-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.chat-scope-header label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.chat-scope-value {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+#chat-scope-slider {
+    width: 100%;
+    margin: 0;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+}
+
+#chat-scope-slider:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.chat-scope-labels {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.45rem;
+}
+
+.chat-scope-label {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.2;
+    font-weight: 600;
+    padding: 0.4rem 0.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+
+.chat-scope-label:hover,
+.chat-scope-label:focus-visible {
+    border-color: rgba(59, 130, 246, 0.45);
+    color: var(--text-primary);
+    outline: none;
+}
+
+.chat-scope-label.active {
+    color: #eff6ff;
+    background: rgba(59, 130, 246, 0.22);
+    border-color: rgba(59, 130, 246, 0.42);
+}
+
+.chat-scope-help {
+    margin: 0;
+}
+
 #chat-prompt-input {
     width: 100%;
     min-width: 0;
@@ -1685,6 +1772,10 @@ option {
 
     .chat-console-controls {
         gap: 0.75rem;
+    }
+
+    .chat-scope-labels {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 

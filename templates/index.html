@@ -721,9 +721,26 @@
                                     </button>
                                 </div>
                                 <div class="chat-prompt-shell">
+                                    <div class="chat-prompt-stack">
+                                        <div class="chat-scope-control">
+                                            <div class="chat-scope-header">
+                                                <label for="chat-scope-slider">Scope</label>
+                                                <span class="chat-scope-value" id="chat-scope-value">Medium</span>
+                                            </div>
+                                            <input type="range" id="chat-scope-slider" min="0" max="4" step="1" value="2" disabled>
+                                            <div class="chat-scope-labels" id="chat-scope-labels">
+                                                <button type="button" class="chat-scope-label" data-scope-value="0" title="Broad: maximize coverage and explore the wider attack surface to identify anything materially exposed.">Broad</button>
+                                                <button type="button" class="chat-scope-label" data-scope-value="1" title="Medium-broad: cover the most relevant adjacent surfaces, but still prioritize the strongest leads.">Medium-Broad</button>
+                                                <button type="button" class="chat-scope-label active" data-scope-value="2" title="Medium: balance broad coverage with targeted follow-through.">Medium</button>
+                                                <button type="button" class="chat-scope-label" data-scope-value="3" title="Medium-narrow: stay focused on the best-looking paths and avoid unnecessary side exploration.">Medium-Narrow</button>
+                                                <button type="button" class="chat-scope-label" data-scope-value="4" title="Narrow: pursue the most promising path to at least one viable foothold with minimal lateral exploration.">Narrow</button>
+                                            </div>
+                                            <span class="input-hint chat-scope-help" id="chat-scope-help">Balanced breadth and depth. Explore enough surface to avoid blind spots, then follow the strongest path.</span>
+                                        </div>
                                     <textarea id="chat-prompt-input"
                                         placeholder="Start the service in the Configuration tab to begin..." rows="1"
                                         spellcheck="false" disabled></textarea>
+                                    </div>
                                 </div>
                                 <button type="button" id="chat-send-btn" class="btn btn-primary" title="Send" disabled>
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"

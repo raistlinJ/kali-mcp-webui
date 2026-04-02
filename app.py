@@ -1368,6 +1368,7 @@ def session_chat():
 
     data = request.json
     prompt = (data.get('prompt') or '').strip()
+    scope = (data.get('scope') or 'medium').strip()
     if not prompt:
         return jsonify({'success': False, 'error': 'Empty prompt.'}), 400
 
@@ -1381,7 +1382,7 @@ def session_chat():
 
     # Schedule the chat coroutine on the session's event loop
     future = asyncio.run_coroutine_threadsafe(
-        session.chat(prompt, cancel_event=cancel_event),
+        session.chat(prompt, cancel_event=cancel_event, scope=scope),
         loop,
     )
 

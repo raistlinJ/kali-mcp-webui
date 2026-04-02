@@ -66,6 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Chat Console UI
     const chatConsoleBar = document.getElementById('chat-console-bar');
+    const chatScopeSlider = document.getElementById('chat-scope-slider');
+    const chatScopeValue = document.getElementById('chat-scope-value');
+    const chatScopeHelp = document.getElementById('chat-scope-help');
+    const chatScopeLabels = document.querySelectorAll('.chat-scope-label');
     const chatPromptInput = document.getElementById('chat-prompt-input');
     const sendPromptBtn = document.getElementById('chat-send-btn');
     const annotateBtn = document.getElementById('chat-annotate-btn');
@@ -115,11 +119,64 @@ document.addEventListener('DOMContentLoaded', () => {
     let _analysisJobPathFilter = 'all';
     let _sessionsById = {};
     let _policyDraft = { allow: ['*'], disallow: [] };
+    const CHAT_SCOPE_LEVELS = [
+        {
+            id: 'broad',
+            label: 'Broad',
+            help: 'Maximize coverage. Explore the wider attack surface and identify any meaningful weakness or exposure.'
+        },
+        {
+            id: 'medium-broad',
+            label: 'Medium-Broad',
+            help: 'Keep good coverage across adjacent surfaces while still prioritizing the strongest leads.'
+        },
+        {
+            id: 'medium',
+            label: 'Medium',
+            help: 'Balanced breadth and depth. Explore enough surface to avoid blind spots, then follow the strongest path.'
+        },
+        {
+            id: 'medium-narrow',
+            label: 'Medium-Narrow',
+            help: 'Stay focused on the most promising paths and avoid unnecessary side exploration.'
+        },
+        {
+            id: 'narrow',
+            label: 'Narrow',
+            help: 'Pursue the most promising route to at least one viable foothold with minimal lateral exploration.'
+        }
+    ];
 
     let _eventSource = null;
     let _serviceRunning = false;
     let _chatBusy = false;
     let _logInitialCleared = false;
+
+    function getChatScopeIndex() {
+        const rawValue = Number.parseInt(chatScopeSlider?.value ?? '2', 10);
+        if (Number.isNaN(rawValue)) {
+            return 2;
+        }
+        return Math.max(0, Math.min(CHAT_SCOPE_LEVELS.length - 1, rawValue));
+    }
+
+    function getChatScopeConfig() {
+        return CHAT_SCOPE_LEVELS[getChatScopeIndex()] || CHAT_SCOPE_LEVELS[2];
+    }
+
+    function updateChatScopeUi() {
+        const activeIndex = getChatScopeIndex();
+        const scope = getChatScopeConfig();
+        if (chatScopeValue) {
+            chatScopeValue.textContent = scope.label;
+        }
+        if (chatScopeHelp) {
+            chatScopeHelp.textContent = scope.help;
+        }
+        chatScopeLabels.forEach(label => {
+            label.classList.toggle('active', Number.parseInt(label.dataset.scopeValue || '-1', 10) === activeIndex);
+        });
+    }
     let _sessionToStopId = null;
     let _currentRunId = null;
     let _awaitingPostToolReplyDecision = false;
@@ -724,15 +781,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    chatScopeSlider?.addEventListener('input', () => {
+        updateChatScopeUi();
+        localStorage.setItem('chat:scope', getChatScopeConfig().id);
+    });
+
+    chatScopeLabels.forEach(label => {
+        label.addEventListener('click', () => {
+            if (!chatScopeSlider || chatScopeSlider.disabled) {
+                return;
+            }
+            chatScopeSlider.value = label.dataset.scopeValue || '2';
+            updateChatScopeUi();
+            localStorage.setItem('chat:scope', getChatScopeConfig().id);
+        });
+    });
+
     // Restore keylogger setting from localStorage
     try {
         const keyloggerEnabled = localStorage.getItem('keylogger:enabled');
         if (keyloggerEnabled === 'true') {
             keyloggerEnableToggle.checked = true;
         }
+        const savedChatScope = localStorage.getItem('chat:scope');
+        const savedScopeIndex = CHAT_SCOPE_LEVELS.findIndex(scope => scope.id === savedChatScope);
+        if (chatScopeSlider && savedScopeIndex >= 0) {
+            chatScopeSlider.value = String(savedScopeIndex);
+        }
     } catch (err) {
         console.warn('Failed to restore keylogger setting:', err);
     }
+    updateChatScopeUi();
 
     providerSelect?.addEventListener('change', () => {
         const previousProvider = normalizeProvider(providerSelect?.dataset.previousProvider);
@@ -1556,6 +1635,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 switchTab('chat-pane');
                 
                 // Enable Chat Console inputs
+                chatScopeSlider.disabled = false;
                 chatPromptInput.disabled = false;
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;
@@ -1684,6 +1764,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function sendChat() {
         const prompt = chatPromptInput.value.trim();
         if (!prompt || _chatBusy || !_serviceRunning) return;
+        const scope = getChatScopeConfig().id;
 
         _chatBusy = true;
         chatPromptInput.value = '';
@@ -1702,7 +1783,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt })
+                body: JSON.stringify({ prompt, scope })
             });
             const data = await response.json();
             if (!data.success) {
@@ -1912,6 +1993,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setLivePolicyBadge(null);
         
         // Disable active chat inputs
+        chatScopeSlider.disabled = true;
         chatPromptInput.disabled = true;
         chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
         sendPromptBtn.disabled = true;
@@ -2348,6 +2430,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Enable Chat Console inputs
                 navChatBtn.disabled = false;
+                chatScopeSlider.disabled = false;
                 chatPromptInput.disabled = false;
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;
