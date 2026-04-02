@@ -758,6 +758,9 @@ document.addEventListener('DOMContentLoaded', () => {
     restoreLastSettings();
     _activePolicyEntryType = getSelectedPolicyEntryType();
     updateProviderUi();
+    if (fetchBtn) {
+        fetchBtn.disabled = false;
+    }
 
     const runtimeSettingElements = [providerSelect, ollamaUrlInput, sslVerifyToggle, modelSelect, maxTurnsInput, kaliCommandType, toolsJsonArea, document.getElementById('context-window')];
     runtimeSettingElements.forEach(el => {
@@ -815,6 +818,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ollamaFetchError) {
             ollamaFetchError.style.display = 'none';
             ollamaFetchError.innerText = '';
+        }
+        if (fetchBtn) {
+            fetchBtn.disabled = false;
         }
         persistLastSettings();
     });
@@ -1677,7 +1683,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setConfigEnabled(enabled) {
         const inputs = configPanel.querySelectorAll('input, select, textarea, button');
         inputs.forEach(el => {
-            if (el.id === 'start-service-btn' || el.id === 'stop-service-btn') return;
+            if (el.id === 'start-service-btn' || el.id === 'stop-service-btn' || el.id === 'fetch-models-btn') return;
             
             if (enabled) {
                 el.removeAttribute('data-service-disabled');
@@ -1688,6 +1694,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.disabled = true;
             }
         });
+        if (fetchBtn) {
+            fetchBtn.disabled = false;
+            fetchBtn.removeAttribute('data-service-disabled');
+            fetchBtn.removeAttribute('data-originally-disabled');
+        }
         configPanel.classList.toggle('config-disabled', !enabled);
     }
 

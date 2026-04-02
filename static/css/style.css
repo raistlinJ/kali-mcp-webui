@@ -1796,7 +1796,6 @@ option {
 
 .config-disabled {
     opacity: 0.5;
-    pointer-events: none;
     filter: grayscale(0.3);
     transition: opacity var(--transition-smooth), filter var(--transition-smooth);
 }
