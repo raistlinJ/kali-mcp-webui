@@ -1,34 +1,52 @@
 #!/bin/bash
 # script to safely initialize environments and run the Kali WebUI locally
 
+set -e
+
 echo "[kali-mcp-webui] Checking for required tools..."
 
-echo "[kali-mcp-webui] Setting up python virtual environment via uv..."
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VENV_DIR="$PROJECT_DIR/venv"
+PYTHON_BIN="$VENV_DIR/bin/python"
+BUILD_MODE=0
 
-# 1. Ensure uv is installed
-if ! command -v uv &> /dev/null; then
-    if [ -x "$HOME/.local/bin/uv" ]; then
-        export PATH="$HOME/.local/bin:$PATH"
-    else
-        echo "Installing uv locally..."
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="$HOME/.local/bin:$PATH"
-    fi
+if [[ "$*" == *"--build"* ]]; then
+    BUILD_MODE=1
 fi
 
-UV_BIN=$(command -v uv || echo "$HOME/.local/bin/uv")
+echo "[kali-mcp-webui] Using persistent virtual environment at $VENV_DIR"
 
-# 2. Pre-cache uv dependencies for offline support
-if [[ "$*" == *"--build"* ]]; then
-    echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
-    "$UV_BIN" run --with mcp --with requests --with flask --with ollama --with pynput python3 -c "print('Dependencies cached.')" 2>/dev/null || true
+# 1. Create venv on demand
+if [ ! -x "$PYTHON_BIN" ]; then
+    echo "[kali-mcp-webui] Virtual environment not found; creating it..."
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -m venv "$VENV_DIR"
+    else
+        echo "[kali-mcp-webui] ERROR: python3 is required to create the virtual environment."
+        exit 1
+    fi
+    BUILD_MODE=1
+fi
+
+# 2. Install dependencies only when explicitly building or after first-time venv creation
+if [ "$BUILD_MODE" -eq 1 ]; then
+    echo "[kali-mcp-webui] Installing Python dependencies into the persistent venv..."
+    "$PYTHON_BIN" -m pip install --upgrade pip
+    "$PYTHON_BIN" -m pip install -r "$PROJECT_DIR/requirements.txt"
+else
+    echo "[kali-mcp-webui] Verifying installed Python dependencies..."
+    if ! "$PYTHON_BIN" -c "import flask, requests, mcp, ollama, pynput" >/dev/null 2>&1; then
+        echo "[kali-mcp-webui] ERROR: Required Python dependencies are missing from $VENV_DIR"
+        echo "[kali-mcp-webui] Run ./start_local.sh --build once while online to install them."
+        exit 1
+    fi
 fi
 
 # Start kali_server.py REST API in the background (required for APT package mode)
 if [ -f /usr/share/mcp-kali-server/kali_server.py ]; then
     echo "[kali-mcp-webui] Starting kali_server.py REST API on port 5000..."
     pkill -f 'kali_server.py' 2>/dev/null || true; sleep 1
-    setsid "$UV_BIN" run --offline --with flask python3 /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &
+    setsid "$PYTHON_BIN" /usr/share/mcp-kali-server/kali_server.py >/tmp/kali_server.log 2>&1 &
     # Wait up to 30s for it to be ready
     for i in $(seq 1 30); do
         nc -z localhost 5000 2>/dev/null && echo "[kali-mcp-webui] kali_server.py ready on port 5000" && break
@@ -38,12 +56,6 @@ else
     echo "[kali-mcp-webui] Skipping kali_server.py (not found — APT package mode unavailable)"
 fi
 
-# Use uv to run the flask application automatically handling requirements
+# Use the persistent venv to run the flask application without re-resolving dependencies
 echo "[kali-mcp-webui] Starting Flask server..."
-if [[ "$*" == *"--build"* ]]; then
-    echo "[kali-mcp-webui] --build flag detected, reinstalling dependencies..."
-    "$UV_BIN" sync --reinstall
-    "$UV_BIN" run --with Flask --with requests --with mcp --with ollama --with pynput app.py
-else
-    "$UV_BIN" run --with Flask --with requests --with mcp --with ollama --with pynput app.py
-fi
+exec "$PYTHON_BIN" "$PROJECT_DIR/app.py"
