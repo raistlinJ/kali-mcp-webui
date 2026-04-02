@@ -237,6 +237,65 @@ class SessionLogger:
         with open(self._metadata_path, "w") as f:
             json.dump(self._metadata, f, indent=2)
 
+    def log_keystrokes(self, keystrokes: list, source: str = "browser"):
+        """
+        Log a batch of keystrokes to the session's keystrokes directory.
+        
+        Args:
+            keystrokes: List of keystroke dicts with timestamp, key, type, etc.
+            source: Either "browser" or "system"
+        """
+        if not keystrokes:
+            return
+        
+        keystrokes_dir = os.path.join(self.run_dir, "keystrokes")
+        os.makedirs(keystrokes_dir, exist_ok=True)
+        
+        if source == "browser":
+            log_path = os.path.join(keystrokes_dir, "browser_log.jsonl")
+        else:
+            log_path = os.path.join(keystrokes_dir, "system_log.jsonl")
+        
+        with open(log_path, "a") as f:
+            for entry in keystrokes:
+                f.write(json.dumps(entry) + "\n")
+
+    def get_keystrokes(self, source: str = None) -> dict:
+        """
+        Retrieve keystrokes from the session's keystrokes directory.
+        
+        Args:
+            source: Either "browser", "system", or None for both
+            
+        Returns:
+            Dict with 'browser' and/or 'system' keys containing lists of keystrokes
+        """
+        result = {"browser": [], "system": []}
+        
+        keystrokes_dir = os.path.join(self.run_dir, "keystrokes")
+        if not os.path.isdir(keystrokes_dir):
+            return result
+        
+        def load_log(path):
+            entries = []
+            if os.path.isfile(path):
+                with open(path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            try:
+                                entries.append(json.loads(line))
+                            except json.JSONDecodeError:
+                                pass
+            return entries
+        
+        if source is None or source == "browser":
+            result["browser"] = load_log(os.path.join(keystrokes_dir, "browser_log.jsonl"))
+        if source is None or source == "system":
+            result["system"] = load_log(os.path.join(keystrokes_dir, "system_log.jsonl"))
+        
+        return result
+
 
 def make_run_id(prefix: str = "") -> str:
     """Generate a unique run ID based on current timestamp."""
@@ -262,3 +321,8 @@ def load_session_list(base_dir: str = None) -> list:
             except Exception:
                 pass
     return sessions
+
+
+# ============================================================================
+# End of File
+# ============================================================================

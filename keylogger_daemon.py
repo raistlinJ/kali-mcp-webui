@@ -13,8 +13,6 @@ Features:
 
 import json
 import os
-import queue
-import subprocess
 import subprocess
 import threading
 import time
@@ -150,8 +148,6 @@ def _get_macos_active_window() -> dict:
         }
     except Exception as e:
         return {"title": "unknown", "application": "unknown", "pid": None, "error": str(e)}
-
-
 
 
 def _get_windows_active_window() -> dict:
@@ -360,6 +356,7 @@ class SystemKeylogger:
             # This is a simplified check - pynput doesn't provide direct access
             # to current modifier state in on_press/on_release
             # We'll track this via special key events
+            pass
         except Exception:
             pass
         return modifiers
