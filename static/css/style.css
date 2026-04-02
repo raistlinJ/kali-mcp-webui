@@ -1804,6 +1804,12 @@ option {
     pointer-events: auto;
 }
 
+#fetch-models-btn {
+    position: relative;
+    z-index: 5;
+    pointer-events: auto;
+}
+
 /* Stop button inline-flex to match start button */
 #stop-service-btn {
     width: 100%;
