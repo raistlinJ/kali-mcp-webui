@@ -1671,39 +1671,6 @@ option {
     opacity: 0.5;
 }
 
-.chat-scope-labels {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.45rem;
-}
-
-.chat-scope-label {
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.03);
-    color: var(--text-secondary);
-    font-size: 0.72rem;
-    line-height: 1.2;
-    font-weight: 600;
-    padding: 0.4rem 0.5rem;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
-}
-
-.chat-scope-label:hover,
-.chat-scope-label:focus-visible {
-    border-color: rgba(59, 130, 246, 0.45);
-    color: var(--text-primary);
-    outline: none;
-}
-
-.chat-scope-label.active {
-    color: #eff6ff;
-    background: rgba(59, 130, 246, 0.22);
-    border-color: rgba(59, 130, 246, 0.42);
-}
-
 .chat-scope-help {
     margin: 0;
 }
@@ -1772,10 +1739,6 @@ option {
 
     .chat-console-controls {
         gap: 0.75rem;
-    }
-
-    .chat-scope-labels {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 

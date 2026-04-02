@@ -32,14 +32,14 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 *   **Model**: A capable tool-calling model pulled into Ollama (e.g., `ollama run llama3` or `llama3.1`).
 *   **Python Dependencies**:
     *   `Flask`
+    *   `requests`
     *   `mcp` (Official Model Context Protocol SDK)
     *   `ollama`
     *   `pynput` (for system keylogger)
-    *   `asyncio`
 
 *   **System Keylogger Prerequisites (Linux)**:
     *   `xdotool` - Required for active window detection
-    *   `xprop` - Required for application name detection
+    *   `x11-utils` - Provides `xprop` for application name detection
     *   `python3-psutil` - Required for process information
     
     Install these packages with:
@@ -48,7 +48,7 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
     ```
     Or manually:
     ```bash
-    sudo apt install xdotool xprop python3-psutil
+    sudo apt install xdotool x11-utils python3-psutil
     ```
 
 ## Installation & Setup
@@ -59,18 +59,21 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
     cd kali-mcp-webui
     ```
 
-2.  **Set up a Virtual Environment (Optional but Recommended)**
+2.  **Install Dependencies**
+    Preferred local launcher:
+    ```bash
+    ./start_local.sh
+    ```
+    This bootstraps `uv` if needed and runs the WebUI with the required Python dependencies.
+
+    Manual installation alternative:
     ```bash
     python3 -m venv venv
     source venv/bin/activate
+    pip install -r requirements.txt
     ```
 
-3.  **Install Dependencies**
-    ```bash
-    pip install Flask mcp ollama
-    ```
-
-4.  **Ensure Ollama is Running**
+3.  **Ensure Ollama is Running**
     *   Start the Ollama service on your machine, or point the UI at an authenticated Ollama-compatible proxy.
     *   Ensure you have downloaded your preferred model: `ollama pull llama3`
 
@@ -79,9 +82,13 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 1.  **Start the Web Server**
     From the project root directory, run:
     ```bash
+    ./start_local.sh
+    ```
+    Manual alternative:
+    ```bash
     python3 app.py
     ```
-    *(By default, the Flask server will launch on `http://localhost:5055`)*
+    *(By default, the Flask server will launch on `http://localhost:5055`.)*
 
 2.  **Access the Dashboard**
     Open a web browser and navigate to `http://localhost:5055`.
@@ -96,8 +103,25 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 
 4.  **Begin Testing**
     *   Switch to the **Live Chat** tab.
+    *   Set the **Scope** slider above the prompt box to control how broadly or narrowly the agent should approach the current request.
     *   Issue a natural language command (e.g., *"Run a fast nmap scan against scanme.nmap.org"*).
     *   Watch as the agent dynamically executes the tool in the foreground, streams the output, and returns an analysis!
+
+### Scope Control
+
+The **Scope** slider sits directly above the Live Chat prompt box and changes the per-turn context guidance sent to the model before your prompt is processed.
+
+It does **not** change the configured context window size. Instead, it changes the **instructional scope** for that specific prompt: whether the agent should cast a wide net and look broadly for anything useful, or stay tightly focused on the most promising path.
+
+Each setting adds different scope guidance to the turn context:
+
+*   **Broad**: Instructs the model to maximize coverage across the reachable target surface, look for any meaningful weakness or misconfiguration, and favor breadth and triage over deep pursuit of one path. Best fit for blue-team style review or general exposure discovery.
+*   **Medium-Broad**: Instructs the model to cover the strongest adjacent attack surfaces while still prioritizing the best leads. Useful when you want broad situational awareness without fully exhaustive exploration.
+*   **Medium**: Instructs the model to balance surface coverage with targeted follow-through. This is the default setting and is meant for general-purpose engagements.
+*   **Medium-Narrow**: Instructs the model to stay focused on the strongest-looking paths and minimize side exploration unless needed to validate a hypothesis or unblock the current line of work.
+*   **Narrow**: Instructs the model to pursue the most promising route to at least one viable foothold or concrete way in, while avoiding broad enumeration unless it directly supports that goal. Best fit for tightly targeted red-team style probing.
+
+Scope is applied **per prompt**, so you can widen or narrow the agent's behavior as the engagement evolves.
 
 ## User Keylogger Feature
 
@@ -110,11 +134,12 @@ The WebUI includes an optional keylogger feature that captures all user keystrok
 - **Window Tracking**: Records which application/window was active for each keystroke
 - **Privacy Protection**: Sensitive fields (passwords, API keys) are automatically excluded
 - **Session Correlation**: Keystrokes are linked to the current session for analysis
+- **Archive Support**: Captured keystrokes are written into `runs/<run_id>/keystrokes/` and included in session downloads
 
 ### Enabling Keylogging
 
 1. Navigate to the **Configuration** tab
-2. Find the **Keylogger** section
+2. Open the **Logging** subtab
 3. Check **Enable Keylogging**
 4. Start a session
 
@@ -128,10 +153,14 @@ sudo ./install_prerequisites.sh
 
 This script will:
 - Detect your distribution (Kali 2025.x/2026.x, Debian, Ubuntu)
-- Install `xdotool`, `xprop`, and `python3-psutil`
+- Install `xdotool`, `x11-utils`, and `python3-psutil`
 - Verify the installation
 
 Without `xdotool`, the system keylogger will still capture keystrokes but won't be able to detect which application/window was active.
+
+### Docker Note
+
+When the WebUI is running inside Docker, the system-wide keylogger is automatically disabled. Browser keystroke logging still works, but `system_log.jsonl` will not be produced from containerized runs.
 
 ### Data Storage
 

@@ -69,7 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatScopeSlider = document.getElementById('chat-scope-slider');
     const chatScopeValue = document.getElementById('chat-scope-value');
     const chatScopeHelp = document.getElementById('chat-scope-help');
-    const chatScopeLabels = document.querySelectorAll('.chat-scope-label');
     const chatPromptInput = document.getElementById('chat-prompt-input');
     const sendPromptBtn = document.getElementById('chat-send-btn');
     const annotateBtn = document.getElementById('chat-annotate-btn');
@@ -165,7 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateChatScopeUi() {
-        const activeIndex = getChatScopeIndex();
         const scope = getChatScopeConfig();
         if (chatScopeValue) {
             chatScopeValue.textContent = scope.label;
@@ -173,9 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chatScopeHelp) {
             chatScopeHelp.textContent = scope.help;
         }
-        chatScopeLabels.forEach(label => {
-            label.classList.toggle('active', Number.parseInt(label.dataset.scopeValue || '-1', 10) === activeIndex);
-        });
     }
     let _sessionToStopId = null;
     let _currentRunId = null;
@@ -784,17 +779,6 @@ document.addEventListener('DOMContentLoaded', () => {
     chatScopeSlider?.addEventListener('input', () => {
         updateChatScopeUi();
         localStorage.setItem('chat:scope', getChatScopeConfig().id);
-    });
-
-    chatScopeLabels.forEach(label => {
-        label.addEventListener('click', () => {
-            if (!chatScopeSlider || chatScopeSlider.disabled) {
-                return;
-            }
-            chatScopeSlider.value = label.dataset.scopeValue || '2';
-            updateChatScopeUi();
-            localStorage.setItem('chat:scope', getChatScopeConfig().id);
-        });
     });
 
     // Restore keylogger setting from localStorage
