@@ -183,6 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const LAST_SETTINGS_STORAGE_KEY = 'runtime:last-settings:v2';
     const API_KEY_SESSION_STORAGE_KEY = 'runtime:llm-api-key';
     const LEGACY_API_TOKEN_SESSION_STORAGE_KEY = 'runtime:llm-api-token';
+    const MAX_PERSISTED_LIVE_LOG_HTML = 200000;
     let _analysisConfigResolver = null;
     let _analysisConfigOptions = null;
     const DEFAULT_ANALYSIS_OUTPUTS = ['tooling_assets', 'progress_analysis'];
@@ -1154,17 +1155,82 @@ document.addEventListener('DOMContentLoaded', () => {
         return runId ? `${LIVE_LOG_STORAGE_PREFIX}${runId}` : null;
     }
 
+    function isStorageQuotaError(err) {
+        return err instanceof DOMException && (
+            err.name === 'QuotaExceededError'
+            || err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+            || err.code === 22
+            || err.code === 1014
+        );
+    }
+
+    function trimPersistedLogHtml(html) {
+        const text = String(html || '');
+        if (text.length <= MAX_PERSISTED_LIVE_LOG_HTML) {
+            return text;
+        }
+        return text.slice(text.length - MAX_PERSISTED_LIVE_LOG_HTML);
+    }
+
+    function pruneStoredLiveLogs(excludeRunId = null) {
+        const entries = [];
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = localStorage.key(index);
+            if (!key || !key.startsWith(LIVE_LOG_STORAGE_PREFIX)) {
+                continue;
+            }
+            const runId = key.slice(LIVE_LOG_STORAGE_PREFIX.length);
+            if (excludeRunId && runId === excludeRunId) {
+                continue;
+            }
+            let savedAt = 0;
+            try {
+                const raw = localStorage.getItem(key);
+                const payload = raw ? JSON.parse(raw) : null;
+                savedAt = Number(payload?.savedAt || 0);
+            } catch (err) {
+                savedAt = 0;
+            }
+            entries.push({ key, savedAt });
+        }
+
+        entries.sort((a, b) => a.savedAt - b.savedAt);
+        entries.forEach(entry => {
+            localStorage.removeItem(entry.key);
+        });
+        return entries.length;
+    }
+
+    function safeLocalStorageSet(key, value, { excludeRunId = null } = {}) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (err) {
+            if (!isStorageQuotaError(err)) {
+                throw err;
+            }
+
+            const prunedCount = pruneStoredLiveLogs(excludeRunId);
+            if (!prunedCount) {
+                throw err;
+            }
+
+            localStorage.setItem(key, value);
+            return true;
+        }
+    }
+
     function persistLiveLog(runId = _currentRunId) {
         const storageKey = getLiveLogStorageKey(runId);
         if (!storageKey) return;
 
         try {
-            localStorage.setItem(storageKey, JSON.stringify({
-                html: liveLogViewer.innerHTML,
+            safeLocalStorageSet(storageKey, JSON.stringify({
+                html: trimPersistedLogHtml(liveLogViewer.innerHTML),
                 cleared: _logInitialCleared,
                 savedAt: Date.now(),
-            }));
-            localStorage.setItem(LAST_ACTIVE_RUN_STORAGE_KEY, runId);
+            }), { excludeRunId: runId });
+            safeLocalStorageSet(LAST_ACTIVE_RUN_STORAGE_KEY, runId, { excludeRunId: runId });
         } catch (err) {
             console.warn('Failed to persist live log state:', err);
         }
