@@ -207,8 +207,9 @@
     /**
      * Flush buffer to server
      */
-    async function flushBuffer() {
-        if (buffer.length === 0 || !CONFIG.enabled || CONFIG.paused) return;
+    async function flushBuffer(force = false) {
+        if (buffer.length === 0) return;
+        if (!force && (!CONFIG.enabled || CONFIG.paused)) return;
 
         const dataToSend = [...buffer];
         buffer = [];
@@ -318,14 +319,15 @@
     async function stop() {
         if (!CONFIG.enabled) return;
 
-        CONFIG.enabled = false;
         CONFIG.paused = false;
 
         // Stop flush timer
         stopFlushTimer();
 
-        // Flush remaining buffer
-        await flushBuffer();
+        // Flush remaining buffer before disabling
+        await flushBuffer(true);
+
+        CONFIG.enabled = false;
 
         // Remove event listeners
         document.removeEventListener('keydown', handleKeyDown, true);

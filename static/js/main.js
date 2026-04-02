@@ -1563,6 +1563,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatDownloadBtn.style.display = 'inline-block';
 
                 openSseStream();
+
+                // Start browser keylogger if enabled
+                if (keyloggerEnableToggle?.checked && window.BrowserKeylogger) {
+                    window.BrowserKeylogger.start(data.run_id);
+                }
+
                 showAlert('Service started! Use the Prompt console to chat.', 'success');
                 // Clear stale watcher suggestions from any previous session
                 if (typeof window.watcherClearSuggestions === 'function') {
@@ -1918,6 +1924,11 @@ document.addEventListener('DOMContentLoaded', () => {
         navChatBtn.disabled = true; 
 
         loadSessions(); // Refresh history
+
+        // Stop browser keylogger
+        if (window.BrowserKeylogger?.getStatus().enabled) {
+            window.BrowserKeylogger.stop();
+        }
 
         // Notify the watcher tab that the session stopped
         if (typeof window.watcherHandleSessionStopped === 'function') {
