@@ -16,17 +16,37 @@ from datetime import datetime
 app = Flask(__name__)
 
 # Keylogger integration
-try:
-    from keylogger_daemon import start_keylogger, stop_keylogger, pause_keylogger, resume_keylogger, get_keylogger_status, get_keylogger, check_keylogger_prerequisites
-except Exception as _keylogger_import_err:
-    print(f"[app] Keylogger unavailable: {_keylogger_import_err}", flush=True)
+def _running_in_docker() -> bool:
+    """Detect whether we are executing inside a Docker container."""
+    if os.path.exists('/.dockerenv'):
+        return True
+    try:
+        with open('/proc/1/cgroup', 'r') as _f:
+            return 'docker' in _f.read()
+    except OSError:
+        return False
+
+if _running_in_docker():
+    print("[app] Docker container detected — keylogger disabled.", flush=True)
     start_keylogger = None
     stop_keylogger = None
     pause_keylogger = None
     resume_keylogger = None
-    get_keylogger_status = lambda: {"running": False, "paused": False, "run_id": None, "buffer_size": 0}
-    check_keylogger_prerequisites = lambda: {"error": "Keylogger not available"}
+    get_keylogger_status = lambda: {"running": False, "paused": False, "run_id": None, "buffer_size": 0, "disabled": "keylogger unavailable in Docker"}
+    check_keylogger_prerequisites = lambda: {"error": "Keylogger disabled in Docker container"}
     get_keylogger = None
+else:
+    try:
+        from keylogger_daemon import start_keylogger, stop_keylogger, pause_keylogger, resume_keylogger, get_keylogger_status, get_keylogger, check_keylogger_prerequisites
+    except Exception as _keylogger_import_err:
+        print(f"[app] Keylogger unavailable: {_keylogger_import_err}", flush=True)
+        start_keylogger = None
+        stop_keylogger = None
+        pause_keylogger = None
+        resume_keylogger = None
+        get_keylogger_status = lambda: {"running": False, "paused": False, "run_id": None, "buffer_size": 0}
+        check_keylogger_prerequisites = lambda: {"error": "Keylogger not available"}
+        get_keylogger = None
 
 # Tool Watcher — background agent that spots MCP tool opportunities in logs
 try:

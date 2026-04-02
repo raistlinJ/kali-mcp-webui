@@ -39,7 +39,7 @@ if [ "$DISTRO_ID" = "kali" ]; then
     
     # Install xdotool for active window detection (required for system keylogger)
     echo "[prerequisites] Installing xdotool..."
-    $SUDO apt-get install -y -qq xdotool xprop
+    $SUDO apt-get install -y -qq xdotool x11-utils
     
     # Install psutil dependencies (for process info)
     echo "[prerequisites] Installing python3-psutil..."
@@ -51,14 +51,14 @@ elif [ "$DISTRO_ID" = "debian" ]; then
     echo "[prerequisites] Debian detected - installing keylogger dependencies..."
     
     $SUDO apt-get update -qq
-    $SUDO apt-get install -y -qq xdotool xproc python3-psutil
+    $SUDO apt-get install -y -qq xdotool x11-utils python3-psutil
     
     echo "[prerequisites] Debian prerequisites installed successfully!"
 elif [ "$DISTRO_ID" = "ubuntu" ]; then
     echo "[prerequisites] Ubuntu detected - installing keylogger dependencies..."
     
     $SUDO apt-get update -qq
-    $SUDO apt-get install -y -qq xdotool xproc python3-psutil
+    $SUDO apt-get install -y -qq xdotool x11-utils python3-psutil
     
     echo "[prerequisites] Ubuntu prerequisites installed successfully!"
 else

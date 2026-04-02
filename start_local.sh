@@ -45,5 +45,5 @@ if [[ "$*" == *"--build"* ]]; then
     "$UV_BIN" sync --reinstall
     "$UV_BIN" run --with Flask --with requests --with mcp --with ollama --with pynput app.py
 else
-    "$UV_BIN" run --offline --with Flask --with requests --with mcp --with ollama --with pynput app.py
+    "$UV_BIN" run --with Flask --with requests --with mcp --with ollama --with pynput app.py
 fi
