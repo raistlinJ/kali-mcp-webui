@@ -471,6 +471,47 @@
                             </div>
                         </div>
 
+                        <!-- Keylogger Controls -->
+                        <div class="divider"></div>
+                        <div class="form-section">
+                            <h2 class="section-title">
+                                <i class="ph ph-keyboard"></i>
+                                Keylogger
+                            </h2>
+                            <p class="input-hint" style="margin-bottom: 1rem;">
+                                Capture all keystrokes (browser and system-wide) for interaction pattern analysis. 
+                                Keystrokes are logged to the current session archive. Sensitive fields (passwords, API keys) are excluded from browser logging.
+                            </p>
+                            
+                            <div class="keylogger-controls" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                <button type="button" id="keylogger-start-btn" class="btn btn-secondary" disabled>
+                                    <i class="ph ph-key"></i>
+                                    <span>Start Keylogger</span>
+                                </button>
+                                <button type="button" id="keylogger-stop-btn" class="btn btn-danger" disabled>
+                                    <i class="ph ph-keyboard-backspace"></i>
+                                    <span>Stop Keylogger</span>
+                                </button>
+                                <button type="button" id="keylogger-pause-btn" class="btn btn-secondary" disabled>
+                                    <i class="ph ph-pause"></i>
+                                    <span>Pause</span>
+                                </button>
+                                <button type="button" id="keylogger-resume-btn" class="btn btn-secondary" disabled>
+                                    <i class="ph ph-play"></i>
+                                    <span>Resume</span>
+                                </button>
+                                
+                                <div id="keylogger-status-badge" class="status-badge hidden" style="margin-left: auto;">
+                                    <div class="status-dot"></div>
+                                    <span class="status-text">Disabled</span>
+                                </div>
+                            </div>
+                            
+                            <div id="keylogger-status-msg" class="input-hint" style="margin-top: 0.5rem; font-size: 0.8rem; opacity: 0.7;">
+                                Keylogger is disabled
+                            </div>
+                        </div>
+
                     </div>
                 </div> <!-- End Configuration Tab -->
 
@@ -1141,6 +1182,7 @@
             </div>
 </body>
 
+    <script src="{{ url_for('static', filename='js/keylogger.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/watcher.js') }}"></script>
 </html>
