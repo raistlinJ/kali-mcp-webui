@@ -21,7 +21,7 @@ UV_BIN=$(command -v uv || echo "$HOME/.local/bin/uv")
 # 2. Pre-cache uv dependencies for offline support
 if [[ "$*" == *"--build"* ]]; then
     echo "[kali-mcp-webui] Pre-caching Python dependencies for offline support..."
-    "$UV_BIN" run --with mcp --with requests --with flask --with ollama python3 -c "print('Dependencies cached.')" 2>/dev/null || true
+    "$UV_BIN" run --with mcp --with requests --with flask --with ollama --with pynput python3 -c "print('Dependencies cached.')" 2>/dev/null || true
 fi
 
 # Start kali_server.py REST API in the background (required for APT package mode)
@@ -43,7 +43,7 @@ echo "[kali-mcp-webui] Starting Flask server..."
 if [[ "$*" == *"--build"* ]]; then
     echo "[kali-mcp-webui] --build flag detected, reinstalling dependencies..."
     "$UV_BIN" sync --reinstall
-    "$UV_BIN" run --with Flask --with requests --with mcp --with ollama app.py
+    "$UV_BIN" run --with Flask --with requests --with mcp --with ollama --with pynput app.py
 else
-    "$UV_BIN" run --offline --with Flask --with requests --with mcp --with ollama app.py
+    "$UV_BIN" run --offline --with Flask --with requests --with mcp --with ollama --with pynput app.py
 fi

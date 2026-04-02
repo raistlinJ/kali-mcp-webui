@@ -48,6 +48,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const toolsConfigSection = document.getElementById('tools-config-section');
     const toolsConfigEmpty = document.getElementById('tools-config-empty');
     const configToolsTabBtn = document.getElementById('config-tools-tab-btn');
+
+    // Keylogger references
+    const keyloggerEnableToggle = document.getElementById('keylogger-enable-toggle');
     const configSubtabBtns = document.querySelectorAll('.config-subtab-btn');
     const configSubtabPanels = document.querySelectorAll('.config-subtab-panel');
 
@@ -711,6 +714,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const eventName = el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input';
         el.addEventListener(eventName, persistLastSettings);
     });
+
+    // Keylogger toggle handler
+    keyloggerEnableToggle?.addEventListener('change', () => {
+        const enabled = keyloggerEnableToggle.checked;
+        localStorage.setItem('keylogger:enabled', String(enabled));
+        if (enabled) {
+            showAlert('Keylogging enabled. Keystrokes will be captured during sessions.', 'success');
+        }
+    });
+
+    // Restore keylogger setting from localStorage
+    try {
+        const keyloggerEnabled = localStorage.getItem('keylogger:enabled');
+        if (keyloggerEnabled === 'true') {
+            keyloggerEnableToggle.checked = true;
+        }
+    } catch (err) {
+        console.warn('Failed to restore keylogger setting:', err);
+    }
 
     providerSelect?.addEventListener('change', () => {
         const previousProvider = normalizeProvider(providerSelect?.dataset.previousProvider);
