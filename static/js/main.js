@@ -118,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _analysisJobPathFilter = 'all';
     let _sessionsById = {};
     let _policyDraft = { allow: ['*'], disallow: [] };
+    let _activePolicyEntryType = 'allow';
     const CHAT_SCOPE_LEVELS = [
         {
             id: 'broad',
@@ -879,8 +880,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const selected = Array.from(policyEntryTypeInputs).find(input => input.checked);
         return selected?.value === 'disallow' ? 'disallow' : 'allow';
     }
-
-    let _activePolicyEntryType = getSelectedPolicyEntryType();
 
     function updatePolicyEntryEditor() {
         if (!policyTargetsInput) {
