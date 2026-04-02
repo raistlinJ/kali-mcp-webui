@@ -710,15 +710,6 @@
                                             </li>
                                         </ul>
                                     </div>
-                                    <button type="button" id="chat-stop-btn" class="btn btn-secondary"
-                                        title="Stop Current Session" disabled>
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
-                                            viewBox="0 0 256 256">
-                                            <path
-                                                d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM160,104v48a8,8,0,0,1-8,8H104a8,8,0,0,1-8-8V104a8,8,0,0,1,8-8h48A8,8,0,0,1,160,104Z">
-                                            </path>
-                                        </svg>
-                                    </button>
                                 </div>
                                 <div class="chat-prompt-shell">
                                     <div class="chat-prompt-stack">
@@ -730,9 +721,20 @@
                                             <input type="range" id="chat-scope-slider" min="0" max="4" step="1" value="2" disabled>
                                             <span class="input-hint chat-scope-help" id="chat-scope-help">Balanced breadth and depth. Explore enough surface to avoid blind spots, then follow the strongest path.</span>
                                         </div>
-                                    <textarea id="chat-prompt-input"
-                                        placeholder="Start the service in the Configuration tab to begin..." rows="1"
-                                        spellcheck="false" disabled></textarea>
+                                        <div class="chat-entry-row">
+                                            <textarea id="chat-prompt-input"
+                                                placeholder="Start the service in the Configuration tab to begin..." rows="1"
+                                                spellcheck="false" disabled></textarea>
+                                            <button type="button" id="chat-stop-btn" class="btn btn-secondary"
+                                                title="Stop Current Session" disabled>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                                                    viewBox="0 0 256 256">
+                                                    <path
+                                                        d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM160,104v48a8,8,0,0,1-8,8H104a8,8,0,0,1-8-8V104a8,8,0,0,1,8-8h48A8,8,0,0,1,160,104Z">
+                                                    </path>
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <button type="button" id="chat-send-btn" class="btn btn-primary" title="Send" disabled>

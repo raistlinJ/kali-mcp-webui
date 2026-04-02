@@ -1628,6 +1628,13 @@ option {
     gap: 0.7rem;
 }
 
+.chat-entry-row {
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
 .chat-scope-control {
     display: flex;
     flex-direction: column;
@@ -1676,6 +1683,7 @@ option {
 }
 
 #chat-prompt-input {
+    flex: 1 1 auto;
     width: 100%;
     min-width: 0;
     border-radius: 12px;
@@ -1739,6 +1747,10 @@ option {
 
     .chat-console-controls {
         gap: 0.75rem;
+    }
+
+    .chat-entry-row {
+        gap: 0.6rem;
     }
 }
 

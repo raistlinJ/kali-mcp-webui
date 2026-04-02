@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _awaitingToolTimeoutDecision = false;
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
-    const LAST_SETTINGS_STORAGE_KEY = 'runtime:last-settings:v1';
+    const LAST_SETTINGS_STORAGE_KEY = 'runtime:last-settings:v2';
     const API_KEY_SESSION_STORAGE_KEY = 'runtime:llm-api-key';
     const LEGACY_API_TOKEN_SESSION_STORAGE_KEY = 'runtime:llm-api-token';
     let _analysisConfigResolver = null;
@@ -756,6 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisProviderSelect.dataset.previousProvider = normalizeProvider(analysisProviderSelect.value);
     }
     restoreLastSettings();
+    _activePolicyEntryType = getSelectedPolicyEntryType();
     updateProviderUi();
 
     const runtimeSettingElements = [providerSelect, ollamaUrlInput, sslVerifyToggle, modelSelect, maxTurnsInput, kaliCommandType, toolsJsonArea, document.getElementById('context-window')];
@@ -873,6 +874,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return selected?.value === 'disallow' ? 'disallow' : 'allow';
     }
 
+    let _activePolicyEntryType = getSelectedPolicyEntryType();
+
     function updatePolicyEntryEditor() {
         if (!policyTargetsInput) {
             return;
@@ -893,19 +896,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function syncPolicyDraftFromEditor() {
+    function syncPolicyDraftFromEditor(entryTypeOverride = null) {
         if (!policyTargetsInput) {
             return;
         }
 
-        const entryType = getSelectedPolicyEntryType();
+        const entryType = entryTypeOverride === 'disallow' ? 'disallow' : (entryTypeOverride === 'allow' ? 'allow' : getSelectedPolicyEntryType());
         const defaultValue = entryType === 'allow' ? ['*'] : [];
         _policyDraft[entryType] = parsePolicyList(policyTargetsInput.value, defaultValue);
     }
 
     policyEntryTypeInputs.forEach(input => {
         input.addEventListener('change', () => {
-            syncPolicyDraftFromEditor();
+            syncPolicyDraftFromEditor(_activePolicyEntryType);
+            _activePolicyEntryType = getSelectedPolicyEntryType();
             updatePolicyEntryEditor();
             persistLastSettings();
         });
@@ -913,6 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     policyTargetsInput?.addEventListener('input', () => {
         syncPolicyDraftFromEditor();
+        _activePolicyEntryType = getSelectedPolicyEntryType();
         persistLastSettings();
     });
     updatePolicyEntryEditor();
