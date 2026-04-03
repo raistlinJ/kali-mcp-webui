@@ -1414,6 +1414,113 @@ option {
     gap: 0.35rem;
 }
 
+.active-tool-status {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.8rem 0.95rem;
+    border-radius: 10px;
+    border: 1px solid rgba(245, 158, 11, 0.24);
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.1), rgba(15, 23, 42, 0.34));
+}
+
+.active-tool-status-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.active-tool-status-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+}
+
+.active-tool-status-kicker {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(252, 211, 77, 0.85);
+}
+
+.active-tool-status-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.active-tool-status-elapsed {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #fcd34d;
+    white-space: nowrap;
+}
+
+.active-tool-status-progress {
+    position: relative;
+    overflow: hidden;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.active-tool-status-bar {
+    position: absolute;
+    inset: 0;
+    width: 42%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.1), rgba(251, 191, 36, 0.95), rgba(245, 158, 11, 0.1));
+    animation: active-tool-progress 1.35s ease-in-out infinite;
+}
+
+.active-tool-status-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.55rem 1rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.active-tool-status-note {
+    font-weight: 600;
+}
+
+.active-tool-status-args {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    word-break: break-word;
+}
+
+.active-tool-status.is-waiting {
+    border-color: rgba(96, 165, 250, 0.26);
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.1), rgba(15, 23, 42, 0.34));
+}
+
+.active-tool-status.is-waiting .active-tool-status-elapsed {
+    color: #93c5fd;
+}
+
+.active-tool-status.is-waiting .active-tool-status-kicker {
+    color: rgba(147, 197, 253, 0.88);
+}
+
+.active-tool-status.is-waiting .active-tool-status-bar {
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(96, 165, 250, 0.95), rgba(59, 130, 246, 0.1));
+}
+
+@keyframes active-tool-progress {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(240%);
+    }
+}
+
 .log-entry {
     font-size: 0.82rem;
     line-height: 1.5;

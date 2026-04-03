@@ -668,6 +668,22 @@
                                 <div class="context-usage-fill" id="context-usage-fill" style="width:0%"></div>
                             </div>
                         </div>
+                        <div class="active-tool-status" id="active-tool-status" style="display:none;">
+                            <div class="active-tool-status-header">
+                                <div class="active-tool-status-titles">
+                                    <span class="active-tool-status-kicker">Current Tool</span>
+                                    <span class="active-tool-status-name" id="active-tool-name">Waiting</span>
+                                </div>
+                                <span class="active-tool-status-elapsed" id="active-tool-elapsed">00:00</span>
+                            </div>
+                            <div class="active-tool-status-progress" aria-hidden="true">
+                                <span class="active-tool-status-bar"></span>
+                            </div>
+                            <div class="active-tool-status-meta">
+                                <span class="active-tool-status-note" id="active-tool-meta">Running…</span>
+                                <span class="active-tool-status-args" id="active-tool-args"></span>
+                            </div>
+                        </div>
                         <div class="live-log-viewer" id="live-log-viewer">
                             <div class="log-entry log-status">Waiting for service to start...</div>
                         </div>
@@ -1029,10 +1045,10 @@
                     </div>
                     <div class="modal-body">
                         <p id="post-tool-reply-message" style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; margin: 0;">
-                            The model completed the tool calls but returned an empty final reply.
+                            The model completed the tool calls, returned an empty final reply, and then failed one automatic final-answer retry.
                         </p>
                         <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5; margin: 0; opacity: 0.9;">
-                            Retry asks the model for a final answer one more time. Cancel restores the conversation to before the failed model response so you can choose a different next step.
+                            Retry asks the model for one more final answer attempt. Cancel restores the conversation to before the failed model response so you can choose a different next step.
                         </p>
                     </div>
                     <div class="modal-footer">

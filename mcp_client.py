@@ -1464,10 +1464,10 @@ class MCPSession:
         }
 
         _emit(self.event_callback, "status", {
-            "message": "Model failed to produce a final reply after tools. Waiting for user decision: retry or cancel and restore."
+            "message": "Model still failed to produce a final reply after an automatic retry. Waiting for user decision: retry again or cancel and restore."
         })
         _emit(self.event_callback, "post_tool_reply_decision", {
-            "message": "The model completed the tool calls but returned an empty final reply. Retry the final answer, or cancel and restore to the state before the failed model response.",
+            "message": "The model completed the tool calls, returned an empty final reply, and then failed one automatic final-answer retry. Retry once more, or cancel and restore to the state before the failed model response.",
             "options": ["retry", "cancel"],
         })
 
@@ -1943,6 +1943,15 @@ class MCPSession:
                         self._logger.log_response(benign_content)
                         _emit(self.event_callback, "chat_done", {
                             "message": "Finalized benign no-findings tool result without retry."
+                        })
+                        return
+
+                    recovered_content = await self._retry_empty_reply_after_tools(prompt, turn_tool_results)
+                    if recovered_content:
+                        self.messages.append({"role": "assistant", "content": recovered_content})
+                        self._logger.log_response(recovered_content)
+                        _emit(self.event_callback, "chat_done", {
+                            "message": "Recovered final answer after automatic retry."
                         })
                         return
 

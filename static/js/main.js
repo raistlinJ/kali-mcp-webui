@@ -61,6 +61,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const configPanel = document.getElementById('config-panel');
     const liveLogPanel = document.getElementById('live-log-panel');
     const liveLogViewer = document.getElementById('live-log-viewer');
+    const activeToolStatus = document.getElementById('active-tool-status');
+    const activeToolName = document.getElementById('active-tool-name');
+    const activeToolElapsed = document.getElementById('active-tool-elapsed');
+    const activeToolMeta = document.getElementById('active-tool-meta');
+    const activeToolArgs = document.getElementById('active-tool-args');
     const toolsBadge = document.getElementById('service-tools-badge');
     const policyBadge = document.getElementById('service-policy-badge');
 
@@ -230,6 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let _awaitingPostToolReplyDecision = false;
     let _awaitingDangerousToolApproval = false;
     let _awaitingToolTimeoutDecision = false;
+    let _activeToolState = null;
+    let _activeToolTicker = null;
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
     const LAST_SETTINGS_STORAGE_KEY = 'runtime:last-settings:v2';
@@ -1481,9 +1488,96 @@ document.addEventListener('DOMContentLoaded', () => {
         liveLogViewer.scrollTop = liveLogViewer.scrollHeight;
         persistLiveLog();
     }
+
+    function formatElapsedDuration(ms) {
+        const totalSeconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        if (hours > 0) {
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function summarizeToolArgs(args) {
+        const raw = JSON.stringify(args || {});
+        if (!raw || raw === '{}') {
+            return 'Args: (none)';
+        }
+        const compact = raw.length > 140 ? `${raw.slice(0, 137)}...` : raw;
+        return `Args: ${compact}`;
+    }
+
+    function stopActiveToolTicker() {
+        if (_activeToolTicker) {
+            clearInterval(_activeToolTicker);
+            _activeToolTicker = null;
+        }
+    }
+
+    function renderActiveToolStatus() {
+        if (!activeToolStatus || !_activeToolState) {
+            if (activeToolStatus) {
+                activeToolStatus.style.display = 'none';
+                activeToolStatus.classList.remove('is-waiting');
+            }
+            return;
+        }
+
+        const elapsedMs = Date.now() - _activeToolState.startedAt;
+        activeToolStatus.style.display = 'flex';
+        activeToolStatus.classList.toggle('is-waiting', _activeToolState.phase === 'waiting');
+        activeToolName.textContent = _activeToolState.tool || 'Running tool';
+        activeToolElapsed.textContent = formatElapsedDuration(elapsedMs);
+        activeToolMeta.textContent = _activeToolState.note || 'Running tool…';
+        activeToolArgs.textContent = summarizeToolArgs(_activeToolState.args);
+    }
+
+    function ensureActiveToolTicker() {
+        if (_activeToolTicker || !_activeToolState) {
+            return;
+        }
+        _activeToolTicker = window.setInterval(() => {
+            if (!_activeToolState) {
+                stopActiveToolTicker();
+                return;
+            }
+            renderActiveToolStatus();
+        }, 1000);
+    }
+
+    function beginActiveTool(event) {
+        _activeToolState = {
+            tool: String(event?.tool || 'Running tool'),
+            args: event?.args || {},
+            startedAt: Date.now(),
+            phase: 'running',
+            note: 'Running. Progress depends on the tool; elapsed time updates live.',
+        };
+        renderActiveToolStatus();
+        ensureActiveToolTicker();
+    }
+
+    function markActiveToolWaiting(message) {
+        if (!_activeToolState) {
+            return;
+        }
+        _activeToolState.phase = 'waiting';
+        _activeToolState.note = message || 'Paused at a timeout checkpoint and waiting for a decision.';
+        renderActiveToolStatus();
+    }
+
+    function clearActiveToolStatus() {
+        _activeToolState = null;
+        stopActiveToolTicker();
+        renderActiveToolStatus();
+    }
+
     function clearLog() {
         liveLogViewer.innerHTML = '';
         _logInitialCleared = false;
+        clearActiveToolStatus();
         persistLiveLog();
     }
     function closeSse() {
@@ -1938,6 +2032,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setChatReady() {
         _chatBusy = false;
+        clearActiveToolStatus();
         closePostToolReplyModal();
         closeToolTimeoutModal();
         
@@ -2121,6 +2216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         _currentRunId = null;
         _logInitialCleared = false; // Reset for next run
         updateStatus('success', 'Service Stopped');
+        clearActiveToolStatus();
         closePostToolReplyModal();
         closeToolTimeoutModal();
 
@@ -2171,15 +2267,17 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'response':
                 appendLog(`<span class="log-label">🤖 Response</span>\n<pre class="log-pre">${escapeHtml(event.text)}</pre>`, 'log-response'); break;
             case 'tool_call':
+                beginActiveTool(event);
                 appendLog(`<span class="log-label">🔧 Tool Call</span> <strong>${escapeHtml(event.tool)}</strong> — args: <code>${escapeHtml(JSON.stringify(event.args))}</code>`, 'log-tool-call'); break;
             case 'tool_result': {
+                clearActiveToolStatus();
                 const exitBadge = event.exit_code === 0 ? `<span class="exit-ok">exit 0</span>` : `<span class="exit-err">exit ${event.exit_code}</span>`;
                 appendLog(`<span class="log-label">📋 Result</span> <strong>${escapeHtml(event.tool)}</strong> ${exitBadge} (${event.duration_ms}ms)\n<pre class="log-pre">${escapeHtml(event.result || '(no output)')}</pre>`, 'log-tool-result');
                 break;
             }
             case 'status': {
                 const transientRecoveryStatuses = [
-                    'Model failed to produce a final reply after tools. Waiting for user decision: retry or cancel and restore.',
+                    'Model still failed to produce a final reply after an automatic retry. Waiting for user decision: retry again or cancel and restore.',
                     'Model returned an empty post-tool reply; retrying once without tools for a final answer …',
                 ];
                 if (!transientRecoveryStatuses.includes(event.message || '')) {
@@ -2189,10 +2287,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             case 'context_usage': updateContextBar(event); break;
             case 'service_started': appendLog(`<span class="log-label">🟢 Service Started</span>`, 'log-done'); break;
-            case 'service_stopped': appendLog(`<span class="log-label">🔴 Service Stopped</span>`, 'log-status'); break;
+            case 'service_stopped': clearActiveToolStatus(); appendLog(`<span class="log-label">🔴 Service Stopped</span>`, 'log-status'); break;
             case 'post_tool_reply_decision':
                 _awaitingPostToolReplyDecision = true;
-                postToolReplyMessage.textContent = event.message || 'The model completed the tool calls but returned an empty final reply.';
+                postToolReplyMessage.textContent = event.message || 'The model completed the tool calls, returned an empty final reply, and then failed one automatic final-answer retry.';
                 postToolReplyModalOverlay.style.display = 'flex';
                 break;
             case 'dangerous_tool_approval':
@@ -2203,6 +2301,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'tool_timeout_decision':
                 _awaitingToolTimeoutDecision = true;
+                markActiveToolWaiting('Paused at a timeout checkpoint. Waiting for your decision to keep running or stop it.');
                 toolTimeoutMessage.textContent = event.message || 'A tool reached its timeout checkpoint.';
                 toolTimeoutCommand.textContent = String(event.command || '');
                 toolTimeoutModalOverlay.style.display = 'flex';
@@ -2211,6 +2310,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendLog(`<span class="log-label">✅ Turn Complete</span> ${escapeHtml(event.message || 'Ready for next prompt.')}`, 'log-done');
                 setChatReady(); break;
             case 'error':
+                clearActiveToolStatus();
                 appendLog(`<span class="log-label">❌ Error</span>\n<pre class="log-pre log-error-text">${escapeHtml(event.message)}</pre>`, 'log-error');
                 updateStatus('error', 'Error'); setChatReady(); break;
             case 'done': appendLog(`<span class="log-label">⏹️ Done</span>`, 'log-done'); break;
