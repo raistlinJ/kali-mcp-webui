@@ -115,6 +115,10 @@ The Live Chat pane is intentionally bounded and scrollable so long runs do not k
 
 When a tool is running, its current elapsed time is shown inline on the matching **Tool Call** row. If a tool pauses at a timeout checkpoint, that same row changes state to indicate it is waiting for a decision.
 
+If a tool launches an interactive session that the backend can preserve safely, the result now returns a preserved session id and the agent can continue through dedicated interactive session tools instead of hanging. For Metasploit-style flows, the result also includes manual recreation guidance so you can move the session into your own terminal if you prefer direct control there. When a session cannot be preserved safely, the backend falls back to a handoff message instead of letting the agent hang.
+
+Tools can opt into preserved interactive-session handling by setting `"interactive_capable": true` in `kali_tools.json`. `msf_run` is enabled this way by default in the generated tool config, and you can add the same flag to other tools you explicitly want the backend to treat as interactive-capable.
+
 If a turn hits the configured max-turn limit before the model produces a normal final reply, the backend now emits a synthesized assistant summary that includes the **last command run** and a concise summary of the recent tool results, instead of leaving the Live Chat view stranded on the last raw tool result.
 
 ### Scope Control

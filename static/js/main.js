@@ -436,10 +436,11 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (name === 'msf_run') {
                 toolDefinition = {
                     name: "msf_run",
-                    description: "Execute a Metasploit command sequence in batch mode. Example: 'use auxiliary/scanner/http/jboss_vulnscan; set RHOSTS 10.0.2.2; run'. Exploit modules get a short default WfsDelay and non-interactive session handling unless you override them.",
+                    description: "Execute a Metasploit command sequence in batch mode. Example: 'use auxiliary/scanner/http/jboss_vulnscan; set RHOSTS 10.0.2.2; run'. Exploit modules get a short default WfsDelay and preserved interactive-session handling when a real session opens, unless you override the workflow manually.",
                     command: "msfconsole",
                     base_args: ["-q", "-x", "{args}; exit"],
                     timeout_seconds: 90,
+                    interactive_capable: true,
                     allow_args: true
                 };
             } else if (name === 'proxychains') {
