@@ -2709,15 +2709,53 @@ document.addEventListener('DOMContentLoaded', () => {
         try { const res = await fetch(`/api/sessions/${_browseRunId}/artifacts/${filename}`); const data = await res.json(); detailContent.innerHTML = `<div style="margin-bottom:0.5rem;"><button onclick="renderTab('artifacts')" style="background:none;border:none;color:var(--accent-primary);cursor:pointer;">← Back</button> &nbsp;${escapeHtml(filename)}</div><pre>${escapeHtml(data.content || '(empty)')}</pre>`; } catch { detailContent.innerHTML = '<div class="empty-state">Could not load artifact.</div>'; }
     }
 
+    function downloadFilenameFromResponse(response, fallbackName) {
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match?.[1]) {
+            return decodeURIComponent(utf8Match[1]);
+        }
+        const asciiMatch = disposition.match(/filename="?([^";]+)"?/i);
+        if (asciiMatch?.[1]) {
+            return asciiMatch[1];
+        }
+        return fallbackName;
+    }
+
+    async function downloadSessionArchive(runId) {
+        if (!runId) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/sessions/${runId}/download`);
+            if (!response.ok) {
+                throw new Error(`Download failed (${response.status})`);
+            }
+
+            const blob = await response.blob();
+            const downloadUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = downloadFilenameFromResponse(response, `acosta_kali_mcp_run_${runId}.zip`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(downloadUrl);
+        } catch (err) {
+            showAlert(`Failed to download archive: ${err.message}`, 'error');
+        }
+    }
+
     document.getElementById('detail-tabs').addEventListener('click', e => { const tab = e.target.closest('.detail-tab'); if (tab && _browseRunId) renderTab(tab.dataset.tab); });
     document.getElementById('refresh-sessions-btn').addEventListener('click', loadSessions);
 
-    chatDownloadBtn.addEventListener('click', () => {
-        if (_currentRunId) window.location.href = `/api/sessions/${_currentRunId}/download`;
+    chatDownloadBtn.addEventListener('click', async () => {
+        await downloadSessionArchive(_currentRunId);
     });
     
-    sessionDownloadBtn.addEventListener('click', () => {
-        if (_browseRunId) window.location.href = `/api/sessions/${_browseRunId}/download`;
+    sessionDownloadBtn.addEventListener('click', async () => {
+        await downloadSessionArchive(_browseRunId);
     });
     
     sessionAnalyzeBtn.addEventListener('click', async () => {
