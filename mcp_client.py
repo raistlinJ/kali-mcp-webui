@@ -997,6 +997,39 @@ def _build_tool_result_fallback(prompt: str, tool_results: list[dict]) -> str:
     )
 
 
+def _format_tool_invocation_summary(tool_name: str, args: dict | None) -> str:
+    payload = args or {}
+    if isinstance(payload, dict):
+        shell_args = payload.get('args')
+        if isinstance(shell_args, str) and shell_args.strip():
+            return f"{tool_name} {shell_args.strip()}"
+
+        compact = json.dumps(payload, ensure_ascii=True)
+        if compact and compact != '{}':
+            return f"{tool_name} {compact}"
+
+    return tool_name
+
+
+def _build_max_turn_summary(prompt: str, tool_results: list[dict], max_iterations: int) -> str:
+    last_tool = tool_results[-1] if tool_results else None
+    if not last_tool:
+        return (
+            f"I hit the max turn limit ({max_iterations}) before producing a final answer. "
+            "No completed tool result was available to summarize."
+        )
+
+    last_command = _format_tool_invocation_summary(
+        str(last_tool.get('tool', 'unknown')),
+        last_tool.get('args', {}) or {},
+    )
+    result_summary = _build_tool_result_fallback(prompt, tool_results[-8:])
+    return (
+        f"I hit the max turn limit ({max_iterations}) before producing a final answer. "
+        f"Last command run: {last_command}. {result_summary}"
+    )
+
+
 def _extract_tool_info(tc) -> tuple[str, dict]:
     """Safely extract function name and arguments from a tool call (dict or object)."""
     func = getattr(tc, "function", None)
@@ -1309,11 +1342,14 @@ class MCPSession:
     def _messages_for_turn(self, scope: str | None, urgency: str | None) -> list[dict]:
         if not self.messages:
             return []
-        scope_message = {"role": "system", "content": self._scope_instruction(scope)}
-        urgency_message = {"role": "system", "content": self._urgency_instruction(urgency)}
+        control_messages = []
+        if scope is not None:
+            control_messages.append({"role": "system", "content": self._scope_instruction(scope)})
+        if urgency is not None:
+            control_messages.append({"role": "system", "content": self._urgency_instruction(urgency)})
         if self.messages[0].get("role") == "system":
-            return [self.messages[0], scope_message, urgency_message, *self.messages[1:]]
-        return [scope_message, urgency_message, *self.messages]
+            return [self.messages[0], *control_messages, *self.messages[1:]]
+        return [*control_messages, *self.messages]
 
     async def _retry_empty_reply_after_tools(self, prompt: str, tool_results: list[dict]) -> str | None:
         _emit(self.event_callback, "status", {
@@ -2151,6 +2187,10 @@ class MCPSession:
         _emit(self.event_callback, "status", {
             "message": f"Reached maximum iterations ({max_iterations}) for this turn."
         })
+        if turn_tool_results:
+            max_turn_summary = _build_max_turn_summary(prompt, turn_tool_results, max_iterations)
+            self.messages.append({"role": "assistant", "content": max_turn_summary})
+            self._logger.log_response(max_turn_summary)
         _emit(self.event_callback, "chat_done", {
             "message": "Max iterations reached. Ready for next prompt."
         })

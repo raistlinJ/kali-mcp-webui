@@ -1415,7 +1415,7 @@ option {
 .live-log-viewer {
     flex: 1 1 auto;
     min-height: 0;
-    max-height: none;
+    max-height: min(54vh, 540px);
     height: 100%;
     overflow-y: auto;
     padding: 0.55rem 0.35rem;
@@ -1425,113 +1425,6 @@ option {
     display: flex;
     flex-direction: column;
     gap: 0.28rem;
-}
-
-.active-tool-status {
-    display: flex;
-    flex-direction: column;
-    gap: 0.38rem;
-    padding: 0.55rem 0.7rem;
-    border-radius: 9px;
-    border: 1px solid rgba(245, 158, 11, 0.24);
-    background: linear-gradient(180deg, rgba(245, 158, 11, 0.1), rgba(15, 23, 42, 0.34));
-}
-
-.active-tool-status-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
-.active-tool-status-titles {
-    display: flex;
-    flex-direction: column;
-    gap: 0.12rem;
-    min-width: 0;
-}
-
-.active-tool-status-kicker {
-    font-size: 0.64rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgba(252, 211, 77, 0.85);
-}
-
-.active-tool-status-name {
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    word-break: break-word;
-}
-
-.active-tool-status-elapsed {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #fcd34d;
-    white-space: nowrap;
-}
-
-.active-tool-status-progress {
-    position: relative;
-    overflow: hidden;
-    height: 6px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-}
-
-.active-tool-status-bar {
-    position: absolute;
-    inset: 0;
-    width: 42%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, rgba(245, 158, 11, 0.1), rgba(251, 191, 36, 0.95), rgba(245, 158, 11, 0.1));
-    animation: active-tool-progress 1.35s ease-in-out infinite;
-}
-
-.active-tool-status-meta {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 0.35rem 0.8rem;
-    font-size: 0.74rem;
-    color: var(--text-secondary);
-}
-
-.active-tool-status-note {
-    font-weight: 600;
-}
-
-.active-tool-status-args {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    word-break: break-word;
-}
-
-.active-tool-status.is-waiting {
-    border-color: rgba(96, 165, 250, 0.26);
-    background: linear-gradient(180deg, rgba(59, 130, 246, 0.1), rgba(15, 23, 42, 0.34));
-}
-
-.active-tool-status.is-waiting .active-tool-status-elapsed {
-    color: #93c5fd;
-}
-
-.active-tool-status.is-waiting .active-tool-status-kicker {
-    color: rgba(147, 197, 253, 0.88);
-}
-
-.active-tool-status.is-waiting .active-tool-status-bar {
-    background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(96, 165, 250, 0.95), rgba(59, 130, 246, 0.1));
-}
-
-@keyframes active-tool-progress {
-    0% {
-        transform: translateX(-100%);
-    }
-    100% {
-        transform: translateX(240%);
-    }
 }
 
 .log-entry {
@@ -1578,6 +1471,73 @@ option {
     border-left-color: #fbbf24;
     background: rgba(245, 158, 11, 0.06);
     color: #fcd34d;
+}
+
+.log-tool-call-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+}
+
+.log-tool-runtime-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.14rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid rgba(251, 191, 36, 0.24);
+    background: rgba(251, 191, 36, 0.12);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.log-tool-runtime-chip.is-running {
+    color: #fcd34d;
+}
+
+.log-tool-runtime-chip.is-waiting {
+    color: #93c5fd;
+    border-color: rgba(96, 165, 250, 0.24);
+    background: rgba(59, 130, 246, 0.14);
+}
+
+.log-tool-runtime-chip.is-complete {
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.24);
+    background: rgba(34, 197, 94, 0.12);
+}
+
+.log-tool-runtime-chip.is-error {
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.24);
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.log-tool-call-meta {
+    margin-top: 0.24rem;
+    font-size: 0.72rem;
+    color: rgba(252, 211, 77, 0.9);
+}
+
+.log-tool-call-meta code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.71rem;
+    color: inherit;
+}
+
+.log-tool-call-note {
+    margin-top: 0.26rem;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.log-tool-call.log-tool-call-waiting {
+    border-left-color: #60a5fa;
+    background: rgba(59, 130, 246, 0.08);
 }
 
 .log-tool-result {
@@ -1835,6 +1795,13 @@ option {
     gap: 0.75rem;
 }
 
+.chat-control-heading {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
 .chat-control-header label {
     font-size: 0.72rem;
     font-weight: 700;
@@ -1843,10 +1810,54 @@ option {
     color: var(--text-secondary);
 }
 
+.chat-control-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.16rem 0.42rem;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.chat-control-toggle input[type="checkbox"] {
+    margin: 0;
+    width: 0.78rem;
+    height: 0.78rem;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+}
+
+.chat-control-toggle span {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
 .chat-control-value {
     font-size: 0.72rem;
     font-weight: 600;
     color: var(--accent-primary);
+}
+
+.chat-scope-control.control-disabled {
+    opacity: 0.72;
+}
+
+.chat-scope-control.control-disabled .chat-control-value {
+    color: var(--text-secondary);
+}
+
+.chat-scope-control.control-disabled .chat-control-help {
+    color: var(--text-secondary);
+    opacity: 0.78;
+}
+
+.chat-scope-control.control-disabled .chat-control-toggle {
+    border-color: rgba(148, 163, 184, 0.24);
 }
 
 .chat-control-slider {
@@ -1927,7 +1938,7 @@ option {
 
     .live-log-viewer {
         min-height: 180px;
-        max-height: none;
+        max-height: min(44vh, 360px);
     }
 
     .chat-console-wrapper {
@@ -1940,6 +1951,14 @@ option {
 
     .chat-control-row {
         grid-template-columns: 1fr;
+    }
+
+    .chat-control-header {
+        gap: 0.55rem;
+    }
+
+    .chat-control-heading {
+        gap: 0.35rem;
     }
 
     .chat-entry-row {

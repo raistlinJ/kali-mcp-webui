@@ -1386,8 +1386,12 @@ def session_chat():
 
     data = request.json
     prompt = (data.get('prompt') or '').strip()
-    scope = (data.get('scope') or 'medium').strip()
-    urgency = (data.get('urgency') or 'balanced').strip()
+    scope_enabled = bool(data.get('scope_enabled', True))
+    urgency_enabled = bool(data.get('urgency_enabled', True))
+    raw_scope = data.get('scope')
+    raw_urgency = data.get('urgency')
+    scope = str(raw_scope).strip() if scope_enabled and raw_scope is not None else None
+    urgency = str(raw_urgency).strip() if urgency_enabled and raw_urgency is not None else None
     if not prompt:
         return jsonify({'success': False, 'error': 'Empty prompt.'}), 400
 

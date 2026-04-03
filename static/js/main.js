@@ -61,20 +61,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const configPanel = document.getElementById('config-panel');
     const liveLogPanel = document.getElementById('live-log-panel');
     const liveLogViewer = document.getElementById('live-log-viewer');
-    const activeToolStatus = document.getElementById('active-tool-status');
-    const activeToolName = document.getElementById('active-tool-name');
-    const activeToolElapsed = document.getElementById('active-tool-elapsed');
-    const activeToolMeta = document.getElementById('active-tool-meta');
-    const activeToolArgs = document.getElementById('active-tool-args');
     const toolsBadge = document.getElementById('service-tools-badge');
     const policyBadge = document.getElementById('service-policy-badge');
 
     // Chat Console UI
     const chatConsoleBar = document.getElementById('chat-console-bar');
     const chatScopeSlider = document.getElementById('chat-scope-slider');
+    const chatScopeEnabled = document.getElementById('chat-scope-enabled');
     const chatScopeValue = document.getElementById('chat-scope-value');
     const chatScopeHelp = document.getElementById('chat-scope-help');
     const chatUrgencySlider = document.getElementById('chat-urgency-slider');
+    const chatUrgencyEnabled = document.getElementById('chat-urgency-enabled');
     const chatUrgencyValue = document.getElementById('chat-urgency-value');
     const chatUrgencyHelp = document.getElementById('chat-urgency-help');
     const chatPromptInput = document.getElementById('chat-prompt-input');
@@ -199,13 +196,34 @@ document.addEventListener('DOMContentLoaded', () => {
         return CHAT_SCOPE_LEVELS[getChatScopeIndex()] || CHAT_SCOPE_LEVELS[2];
     }
 
+    function isChatScopeEnabled() {
+        return chatScopeEnabled?.checked !== false;
+    }
+
     function updateChatScopeUi() {
         const scope = getChatScopeConfig();
+        const enabled = isChatScopeEnabled();
+        const scopeContainer = chatScopeSlider?.closest('.chat-scope-control');
         if (chatScopeValue) {
-            chatScopeValue.textContent = scope.label;
+            chatScopeValue.textContent = enabled ? scope.label : 'Off';
         }
         if (chatScopeHelp) {
-            chatScopeHelp.textContent = scope.help;
+            chatScopeHelp.textContent = enabled
+                ? scope.help
+                : 'Scope guidance is disabled for this prompt. No extra breadth/depth instruction will be appended.';
+        }
+        if (chatScopeEnabled) {
+            const toggleText = chatScopeEnabled.closest('.chat-control-toggle')?.querySelector('span');
+            if (toggleText) {
+                toggleText.textContent = enabled ? 'On' : 'Off';
+            }
+            chatScopeEnabled.disabled = !_serviceRunning;
+        }
+        if (chatScopeSlider) {
+            chatScopeSlider.disabled = !_serviceRunning || !enabled;
+        }
+        if (scopeContainer) {
+            scopeContainer.classList.toggle('control-disabled', !enabled);
         }
     }
 
@@ -221,14 +239,40 @@ document.addEventListener('DOMContentLoaded', () => {
         return CHAT_URGENCY_LEVELS[getChatUrgencyIndex()] || CHAT_URGENCY_LEVELS[2];
     }
 
+    function isChatUrgencyEnabled() {
+        return chatUrgencyEnabled?.checked !== false;
+    }
+
     function updateChatUrgencyUi() {
         const urgency = getChatUrgencyConfig();
+        const enabled = isChatUrgencyEnabled();
+        const urgencyContainer = chatUrgencySlider?.closest('.chat-scope-control');
         if (chatUrgencyValue) {
-            chatUrgencyValue.textContent = urgency.label;
+            chatUrgencyValue.textContent = enabled ? urgency.label : 'Off';
         }
         if (chatUrgencyHelp) {
-            chatUrgencyHelp.textContent = urgency.help;
+            chatUrgencyHelp.textContent = enabled
+                ? urgency.help
+                : 'Urgency guidance is disabled for this prompt. No extra timing or tempo instruction will be appended.';
         }
+        if (chatUrgencyEnabled) {
+            const toggleText = chatUrgencyEnabled.closest('.chat-control-toggle')?.querySelector('span');
+            if (toggleText) {
+                toggleText.textContent = enabled ? 'On' : 'Off';
+            }
+            chatUrgencyEnabled.disabled = !_serviceRunning;
+        }
+        if (chatUrgencySlider) {
+            chatUrgencySlider.disabled = !_serviceRunning || !enabled;
+        }
+        if (urgencyContainer) {
+            urgencyContainer.classList.toggle('control-disabled', !enabled);
+        }
+    }
+
+    function updateChatControlAvailability() {
+        updateChatScopeUi();
+        updateChatUrgencyUi();
     }
     let _sessionToStopId = null;
     let _currentRunId = null;
@@ -237,6 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _awaitingToolTimeoutDecision = false;
     let _activeToolState = null;
     let _activeToolTicker = null;
+    let _activeToolEntry = null;
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
     const LAST_SETTINGS_STORAGE_KEY = 'runtime:last-settings:v2';
@@ -244,6 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_KEY_SESSION_STORAGE_KEY = 'runtime:llm-api-key';
     const LEGACY_API_TOKEN_SESSION_STORAGE_KEY = 'runtime:llm-api-token';
     const MAX_PERSISTED_LIVE_LOG_HTML = 200000;
+    const MAX_LIVE_LOG_ENTRIES = 80;
     let _analysisConfigResolver = null;
     let _analysisConfigOptions = null;
     const DEFAULT_ANALYSIS_OUTPUTS = ['tooling_assets', 'progress_analysis'];
@@ -857,9 +903,19 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('chat:scope', getChatScopeConfig().id);
     });
 
+    chatScopeEnabled?.addEventListener('change', () => {
+        localStorage.setItem('chat:scope:enabled', String(isChatScopeEnabled()));
+        updateChatScopeUi();
+    });
+
     chatUrgencySlider?.addEventListener('input', () => {
         updateChatUrgencyUi();
         localStorage.setItem('chat:urgency', getChatUrgencyConfig().id);
+    });
+
+    chatUrgencyEnabled?.addEventListener('change', () => {
+        localStorage.setItem('chat:urgency:enabled', String(isChatUrgencyEnabled()));
+        updateChatUrgencyUi();
     });
 
     // Restore keylogger setting from localStorage
@@ -873,16 +929,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chatScopeSlider && savedScopeIndex >= 0) {
             chatScopeSlider.value = String(savedScopeIndex);
         }
+        const savedChatScopeEnabled = localStorage.getItem('chat:scope:enabled');
+        if (chatScopeEnabled && savedChatScopeEnabled !== null) {
+            chatScopeEnabled.checked = savedChatScopeEnabled !== 'false';
+        }
         const savedChatUrgency = localStorage.getItem('chat:urgency');
         const savedUrgencyIndex = CHAT_URGENCY_LEVELS.findIndex(level => level.id === savedChatUrgency);
         if (chatUrgencySlider && savedUrgencyIndex >= 0) {
             chatUrgencySlider.value = String(savedUrgencyIndex);
         }
+        const savedChatUrgencyEnabled = localStorage.getItem('chat:urgency:enabled');
+        if (chatUrgencyEnabled && savedChatUrgencyEnabled !== null) {
+            chatUrgencyEnabled.checked = savedChatUrgencyEnabled !== 'false';
+        }
     } catch (err) {
         console.warn('Failed to restore keylogger setting:', err);
     }
-    updateChatScopeUi();
-    updateChatUrgencyUi();
+    updateChatControlAvailability();
 
     providerSelect?.addEventListener('change', () => {
         const previousProvider = normalizeProvider(providerSelect?.dataset.previousProvider);
@@ -1329,6 +1392,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!payload || typeof payload.html !== 'string') return false;
 
             liveLogViewer.innerHTML = payload.html;
+            while (liveLogViewer.children.length > MAX_LIVE_LOG_ENTRIES) {
+                liveLogViewer.removeChild(liveLogViewer.firstElementChild);
+            }
             _logInitialCleared = Boolean(payload.cleared || payload.html.trim());
             return true;
         } catch (err) {
@@ -1485,8 +1551,19 @@ document.addEventListener('DOMContentLoaded', () => {
         entry.className = `log-entry ${cssClass}`;
         entry.innerHTML = html;
         liveLogViewer.appendChild(entry);
+        while (liveLogViewer.children.length > MAX_LIVE_LOG_ENTRIES) {
+            const firstChild = liveLogViewer.firstElementChild;
+            if (!firstChild) {
+                break;
+            }
+            if (_activeToolEntry === firstChild) {
+                _activeToolEntry = null;
+            }
+            liveLogViewer.removeChild(firstChild);
+        }
         liveLogViewer.scrollTop = liveLogViewer.scrollHeight;
         persistLiveLog();
+        return entry;
     }
 
     function formatElapsedDuration(ms) {
@@ -1509,29 +1586,55 @@ document.addEventListener('DOMContentLoaded', () => {
         return `Args: ${compact}`;
     }
 
+    function renderActiveToolEntry() {
+        if (!_activeToolState || !_activeToolEntry) {
+            return;
+        }
+
+        const elapsedMs = Date.now() - _activeToolState.startedAt;
+        const runtime = formatElapsedDuration(elapsedMs);
+        const phaseLabel = _activeToolState.phase === 'waiting' ? 'Waiting' : 'Running';
+        const argsJson = JSON.stringify(_activeToolState.args || {});
+        const note = _activeToolState.note || 'Running. Progress depends on the tool; elapsed time updates live.';
+
+        _activeToolEntry.classList.toggle('log-tool-call-waiting', _activeToolState.phase === 'waiting');
+        _activeToolEntry.innerHTML = `
+            <div class="log-tool-call-row">
+                <span><span class="log-label">🔧 Tool Call</span> <strong>${escapeHtml(_activeToolState.tool || 'Running tool')}</strong></span>
+                <span class="log-tool-runtime-chip ${_activeToolState.phase === 'waiting' ? 'is-waiting' : 'is-running'}">${phaseLabel} ${runtime}</span>
+            </div>
+            <div class="log-tool-call-meta">args: <code>${escapeHtml(argsJson)}</code></div>
+            <div class="log-tool-call-note">${escapeHtml(note)}</div>
+        `;
+    }
+
+    function finalizeActiveToolEntry(note, phaseClass = 'is-complete', phaseLabel = 'Completed', durationMs = null) {
+        if (!_activeToolState || !_activeToolEntry) {
+            return;
+        }
+
+        const effectiveDuration = durationMs == null
+            ? (Date.now() - _activeToolState.startedAt)
+            : Number(durationMs) || 0;
+        const runtime = formatElapsedDuration(effectiveDuration);
+        const argsJson = JSON.stringify(_activeToolState.args || {});
+
+        _activeToolEntry.classList.remove('log-tool-call-waiting');
+        _activeToolEntry.innerHTML = `
+            <div class="log-tool-call-row">
+                <span><span class="log-label">🔧 Tool Call</span> <strong>${escapeHtml(_activeToolState.tool || 'Running tool')}</strong></span>
+                <span class="log-tool-runtime-chip ${phaseClass}">${phaseLabel} ${runtime}</span>
+            </div>
+            <div class="log-tool-call-meta">args: <code>${escapeHtml(argsJson)}</code></div>
+            <div class="log-tool-call-note">${escapeHtml(note)}</div>
+        `;
+    }
+
     function stopActiveToolTicker() {
         if (_activeToolTicker) {
             clearInterval(_activeToolTicker);
             _activeToolTicker = null;
         }
-    }
-
-    function renderActiveToolStatus() {
-        if (!activeToolStatus || !_activeToolState) {
-            if (activeToolStatus) {
-                activeToolStatus.style.display = 'none';
-                activeToolStatus.classList.remove('is-waiting');
-            }
-            return;
-        }
-
-        const elapsedMs = Date.now() - _activeToolState.startedAt;
-        activeToolStatus.style.display = 'flex';
-        activeToolStatus.classList.toggle('is-waiting', _activeToolState.phase === 'waiting');
-        activeToolName.textContent = _activeToolState.tool || 'Running tool';
-        activeToolElapsed.textContent = formatElapsedDuration(elapsedMs);
-        activeToolMeta.textContent = _activeToolState.note || 'Running tool…';
-        activeToolArgs.textContent = summarizeToolArgs(_activeToolState.args);
     }
 
     function ensureActiveToolTicker() {
@@ -1543,11 +1646,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 stopActiveToolTicker();
                 return;
             }
-            renderActiveToolStatus();
+            renderActiveToolEntry();
         }, 1000);
     }
 
-    function beginActiveTool(event) {
+    function beginActiveTool(event, entry) {
         _activeToolState = {
             tool: String(event?.tool || 'Running tool'),
             args: event?.args || {},
@@ -1555,7 +1658,8 @@ document.addEventListener('DOMContentLoaded', () => {
             phase: 'running',
             note: 'Running. Progress depends on the tool; elapsed time updates live.',
         };
-        renderActiveToolStatus();
+        _activeToolEntry = entry || null;
+        renderActiveToolEntry();
         ensureActiveToolTicker();
     }
 
@@ -1565,13 +1669,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         _activeToolState.phase = 'waiting';
         _activeToolState.note = message || 'Paused at a timeout checkpoint and waiting for a decision.';
-        renderActiveToolStatus();
+        renderActiveToolEntry();
+        persistLiveLog();
     }
 
     function clearActiveToolStatus() {
         _activeToolState = null;
+        _activeToolEntry = null;
         stopActiveToolTicker();
-        renderActiveToolStatus();
     }
 
     function clearLog() {
@@ -1863,8 +1968,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 switchTab('chat-pane');
                 
                 // Enable Chat Console inputs
-                chatScopeSlider.disabled = false;
-                chatUrgencySlider.disabled = false;
+                updateChatControlAvailability();
                 chatPromptInput.disabled = false;
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;
@@ -1998,8 +2102,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function sendChat() {
         const prompt = chatPromptInput.value.trim();
         if (!prompt || _chatBusy || !_serviceRunning) return;
-        const scope = getChatScopeConfig().id;
-        const urgency = getChatUrgencyConfig().id;
+        const scopeEnabled = isChatScopeEnabled();
+        const urgencyEnabled = isChatUrgencyEnabled();
+        const scope = scopeEnabled ? getChatScopeConfig().id : null;
+        const urgency = urgencyEnabled ? getChatUrgencyConfig().id : null;
 
         _chatBusy = true;
         chatPromptInput.value = '';
@@ -2018,7 +2124,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, scope, urgency })
+                body: JSON.stringify({
+                    prompt,
+                    scope,
+                    urgency,
+                    scope_enabled: scopeEnabled,
+                    urgency_enabled: urgencyEnabled,
+                })
             });
             const data = await response.json();
             if (!data.success) {
@@ -2230,8 +2342,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setLivePolicyBadge(null);
         
         // Disable active chat inputs
-        chatScopeSlider.disabled = true;
-        chatUrgencySlider.disabled = true;
+        updateChatControlAvailability();
         chatPromptInput.disabled = true;
         chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
         sendPromptBtn.disabled = true;
@@ -2266,10 +2377,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendLog(`<span class="log-label">👤 Prompt</span> ${escapeHtml(event.text)}`, 'log-prompt'); break;
             case 'response':
                 appendLog(`<span class="log-label">🤖 Response</span>\n<pre class="log-pre">${escapeHtml(event.text)}</pre>`, 'log-response'); break;
-            case 'tool_call':
-                beginActiveTool(event);
-                appendLog(`<span class="log-label">🔧 Tool Call</span> <strong>${escapeHtml(event.tool)}</strong> — args: <code>${escapeHtml(JSON.stringify(event.args))}</code>`, 'log-tool-call'); break;
+            case 'tool_call': {
+                const entry = appendLog('', 'log-tool-call');
+                beginActiveTool(event, entry);
+                persistLiveLog();
+                break;
+            }
             case 'tool_result': {
+                finalizeActiveToolEntry(
+                    `Finished in ${formatElapsedDuration(event.duration_ms || 0)}.`,
+                    event.exit_code === 0 ? 'is-complete' : 'is-error',
+                    event.exit_code === 0 ? 'Completed' : 'Failed',
+                    event.duration_ms,
+                );
                 clearActiveToolStatus();
                 const exitBadge = event.exit_code === 0 ? `<span class="exit-ok">exit 0</span>` : `<span class="exit-err">exit ${event.exit_code}</span>`;
                 appendLog(`<span class="log-label">📋 Result</span> <strong>${escapeHtml(event.tool)}</strong> ${exitBadge} (${event.duration_ms}ms)\n<pre class="log-pre">${escapeHtml(event.result || '(no output)')}</pre>`, 'log-tool-result');
@@ -2287,7 +2407,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             case 'context_usage': updateContextBar(event); break;
             case 'service_started': appendLog(`<span class="log-label">🟢 Service Started</span>`, 'log-done'); break;
-            case 'service_stopped': clearActiveToolStatus(); appendLog(`<span class="log-label">🔴 Service Stopped</span>`, 'log-status'); break;
+            case 'service_stopped':
+                finalizeActiveToolEntry('Stopped before a result event was received.', 'is-error', 'Stopped');
+                clearActiveToolStatus();
+                appendLog(`<span class="log-label">🔴 Service Stopped</span>`, 'log-status');
+                break;
             case 'post_tool_reply_decision':
                 _awaitingPostToolReplyDecision = true;
                 postToolReplyMessage.textContent = event.message || 'The model completed the tool calls, returned an empty final reply, and then failed one automatic final-answer retry.';
@@ -2310,6 +2434,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendLog(`<span class="log-label">✅ Turn Complete</span> ${escapeHtml(event.message || 'Ready for next prompt.')}`, 'log-done');
                 setChatReady(); break;
             case 'error':
+                finalizeActiveToolEntry('Interrupted before a result event was received.', 'is-error', 'Interrupted');
                 clearActiveToolStatus();
                 appendLog(`<span class="log-label">❌ Error</span>\n<pre class="log-pre log-error-text">${escapeHtml(event.message)}</pre>`, 'log-error');
                 updateStatus('error', 'Error'); setChatReady(); break;
@@ -2672,8 +2797,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Enable Chat Console inputs
                 navChatBtn.disabled = false;
-                chatScopeSlider.disabled = false;
-                chatUrgencySlider.disabled = false;
+                updateChatControlAvailability();
                 chatPromptInput.disabled = false;
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;

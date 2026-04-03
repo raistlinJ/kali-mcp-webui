@@ -668,22 +668,6 @@
                                 <div class="context-usage-fill" id="context-usage-fill" style="width:0%"></div>
                             </div>
                         </div>
-                        <div class="active-tool-status" id="active-tool-status" style="display:none;">
-                            <div class="active-tool-status-header">
-                                <div class="active-tool-status-titles">
-                                    <span class="active-tool-status-kicker">Current Tool</span>
-                                    <span class="active-tool-status-name" id="active-tool-name">Waiting</span>
-                                </div>
-                                <span class="active-tool-status-elapsed" id="active-tool-elapsed">00:00</span>
-                            </div>
-                            <div class="active-tool-status-progress" aria-hidden="true">
-                                <span class="active-tool-status-bar"></span>
-                            </div>
-                            <div class="active-tool-status-meta">
-                                <span class="active-tool-status-note" id="active-tool-meta">Running…</span>
-                                <span class="active-tool-status-args" id="active-tool-args"></span>
-                            </div>
-                        </div>
                         <div class="live-log-viewer" id="live-log-viewer">
                             <div class="log-entry log-status">Waiting for service to start...</div>
                         </div>
@@ -740,7 +724,13 @@
                                             <div class="chat-control-row">
                                                 <div class="chat-scope-control">
                                                     <div class="chat-control-header">
-                                                        <label for="chat-scope-slider">Scope</label>
+                                                        <div class="chat-control-heading">
+                                                            <label for="chat-scope-slider">Scope</label>
+                                                            <label class="chat-control-toggle" for="chat-scope-enabled">
+                                                                <input type="checkbox" id="chat-scope-enabled" checked disabled>
+                                                                <span>On</span>
+                                                            </label>
+                                                        </div>
                                                         <span class="chat-control-value" id="chat-scope-value">Medium</span>
                                                     </div>
                                                     <input type="range" id="chat-scope-slider" class="chat-control-slider" min="0" max="4" step="1" value="2" disabled>
@@ -748,7 +738,13 @@
                                                 </div>
                                                 <div class="chat-scope-control chat-urgency-control">
                                                     <div class="chat-control-header">
-                                                        <label for="chat-urgency-slider">Urgency</label>
+                                                        <div class="chat-control-heading">
+                                                            <label for="chat-urgency-slider">Urgency</label>
+                                                            <label class="chat-control-toggle" for="chat-urgency-enabled">
+                                                                <input type="checkbox" id="chat-urgency-enabled" checked disabled>
+                                                                <span>On</span>
+                                                            </label>
+                                                        </div>
                                                         <span class="chat-control-value" id="chat-urgency-value">Balanced</span>
                                                     </div>
                                                     <input type="range" id="chat-urgency-slider" class="chat-control-slider" min="0" max="4" step="1" value="2" disabled>
