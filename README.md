@@ -13,12 +13,12 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 *   **Human-in-the-Loop (HITL) Annotations**: Analysts can actively insert timestamped notes and tag areas of interest mid-execution to guide the agent or flag data for later review.
 *   **Live Span Analysis**: Seamlessly analyze the last *N* minutes of a live engagement using a one-shot LLM inference to generate rapid pivoting strategies or identify execution bottlenecks in real-time.
 *   **Post-Mortem Session Analysis**: Feed an entire past session transcript (along with your manual annotations) back into the LLM to auto-generate narrative success summaries, highlight critical vulnerabilities, and pinpoint areas for methodological optimization.
-*   **Session Archiving**: Download entire session directories—including the generated artifacts, tool schemas, and transcription—as self-contained ZIP archives.
+*   **Session Archiving**: Download entire session directories—including the generated artifacts, tool schemas, and transcription—as self-contained ZIP archives without interrupting the active Live Chat stream.
 *   **User Keylogger**: Optional browser and system-wide keystroke logging for interaction pattern analysis. Captures which applications/windows were active during each keystroke.
 
 ## Architecture
 
-*   **Frontend**: A responsive Vanilla HTML/JS/CSS WebUI with a persistent chat console, real-time token tracking, dynamic tool execution indicators, and a session browser.
+*   **Frontend**: A responsive Vanilla HTML/JS/CSS WebUI with a persistent chat console, real-time token tracking, inline tool execution runtime indicators, bounded scrollable live output, and a session browser.
 *   **Middleware Orchestrator**: A Python Flask server (`app.py`) that handles RESTful routing and streams real-time interaction events to the frontend via Server-Sent Events (SSE).
 *   **MCP Client Engine**: `mcp_client.py` acts as the intelligent broker, managing the context window, parsing LLM payloads, and mapping them to standard I/O subprocess executions.
 *   **LLM Backend**: Powered by the Python `ollama` library, driving conversational endpoints against a local or proxied Ollama-compatible model endpoint (e.g., `llama3`).
@@ -103,15 +103,27 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 
 4.  **Begin Testing**
     *   Switch to the **Live Chat** tab.
-    *   Set the **Scope** and **Urgency** sliders above the prompt box to control how broadly and how aggressively the agent should approach the current request.
+    *   Open **Prompt Controls** above the prompt box.
+    *   Use the per-control **On/Off** toggles to decide whether **Scope** and **Urgency** should apply to this prompt.
+    *   Set the **Scope** and **Urgency** sliders to control how broadly and how aggressively the agent should approach the current request.
     *   Issue a natural language command (e.g., *"Run a fast nmap scan against scanme.nmap.org"*).
-    *   Watch as the agent dynamically executes the tool in the foreground, streams the output, and returns an analysis!
+    *   Watch as the agent dynamically executes the tool in the foreground, shows the active runtime inline on the tool-call row, streams bounded live output, and returns an analysis.
+
+### Live Chat Behavior
+
+The Live Chat pane is intentionally bounded and scrollable so long runs do not keep stretching the page. The UI keeps only a recent window of prompt output in the live pane, while the full session remains available in the downloaded archive and run directory.
+
+When a tool is running, its current elapsed time is shown inline on the matching **Tool Call** row. If a tool pauses at a timeout checkpoint, that same row changes state to indicate it is waiting for a decision.
+
+If a turn hits the configured max-turn limit before the model produces a normal final reply, the backend now emits a synthesized assistant summary that includes the **last command run** and a concise summary of the recent tool results, instead of leaving the Live Chat view stranded on the last raw tool result.
 
 ### Scope Control
 
-The **Scope** slider sits directly above the Live Chat prompt box and changes the per-turn context guidance sent to the model before your prompt is processed.
+The **Scope** control sits inside **Prompt Controls** above the Live Chat prompt box and changes the per-turn execution guidance sent to the model before your prompt is processed.
 
 It does **not** change the configured context window size. Instead, it changes the **instructional scope** for that specific prompt: whether the agent should cast a wide net and look broadly for anything useful, or stay tightly focused on the most promising path.
+
+You can toggle **Scope** off for any prompt. When it is off, no extra scope directive is appended for that turn.
 
 Each setting adds different scope guidance to the turn context:
 
@@ -121,13 +133,15 @@ Each setting adds different scope guidance to the turn context:
 *   **Medium-Narrow**: Instructs the model to stay focused on the strongest-looking paths and minimize side exploration unless needed to validate a hypothesis or unblock the current line of work.
 *   **Narrow**: Instructs the model to pursue the most promising route to at least one viable foothold or concrete way in, while avoiding broad enumeration unless it directly supports that goal. Best fit for tightly targeted red-team style probing.
 
-Scope is applied **per prompt**, so you can widen or narrow the agent's behavior as the engagement evolves.
+Scope is applied **per prompt**, so you can widen or narrow the agent's behavior as the engagement evolves. The active setting is injected into the main turn system directive for that request rather than being treated as a passive UI hint.
 
 ### Urgency Control
 
-The **Urgency** slider sits next to **Scope** above the Live Chat prompt box and changes the per-turn execution tempo guidance sent to the model.
+The **Urgency** control sits next to **Scope** inside **Prompt Controls** and changes the per-turn execution tempo guidance sent to the model.
 
 It is meant to influence how aggressively the agent operates: scan timing, batching, parallelism, and how much time it should spend validating and going deep before returning progress.
+
+You can also toggle **Urgency** off for any prompt. When it is off, no extra urgency directive is appended for that turn.
 
 Each setting adds different urgency guidance to the turn context:
 
@@ -137,7 +151,7 @@ Each setting adds different urgency guidance to the turn context:
 *   **Fast**: Pushes the agent toward quicker iteration, more assertive timing, and higher parallelism when appropriate.
 *   **Speed**: Optimizes for rapid answers using aggressive but still policy-compliant timing and concurrency, accepting more noise and less depth when useful.
 
-Urgency is also applied **per prompt**, so you can slow the agent down for quiet enumeration and then turn it up when you want faster feedback.
+Urgency is also applied **per prompt**, so you can slow the agent down for quiet enumeration and then turn it up when you want faster feedback. Like Scope, the active urgency setting is folded into the main system directive for the turn so it has stronger weight during tool planning.
 
 ## User Keylogger Feature
 
