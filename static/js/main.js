@@ -1595,7 +1595,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const runtime = formatElapsedDuration(elapsedMs);
         const phaseLabel = _activeToolState.phase === 'waiting' ? 'Waiting' : 'Running';
         const argsJson = JSON.stringify(_activeToolState.args || {});
-        const note = _activeToolState.note || 'Running. Progress depends on the tool; elapsed time updates live.';
+        const note = String(_activeToolState.note || '').trim();
 
         _activeToolEntry.classList.toggle('log-tool-call-waiting', _activeToolState.phase === 'waiting');
         _activeToolEntry.innerHTML = `
@@ -1604,7 +1604,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="log-tool-runtime-chip ${_activeToolState.phase === 'waiting' ? 'is-waiting' : 'is-running'}">${phaseLabel} ${runtime}</span>
             </div>
             <div class="log-tool-call-meta">args: <code>${escapeHtml(argsJson)}</code></div>
-            <div class="log-tool-call-note">${escapeHtml(note)}</div>
+            ${note ? `<div class="log-tool-call-note">${escapeHtml(note)}</div>` : ''}
         `;
     }
 
@@ -1656,7 +1656,7 @@ document.addEventListener('DOMContentLoaded', () => {
             args: event?.args || {},
             startedAt: Date.now(),
             phase: 'running',
-            note: 'Running. Progress depends on the tool; elapsed time updates live.',
+            note: '',
         };
         _activeToolEntry = entry || null;
         renderActiveToolEntry();

@@ -1339,17 +1339,34 @@ class MCPSession:
             "while still obeying the access policy and tool safety constraints."
         )
 
+    def _turn_control_directive(self, scope: str | None, urgency: str | None) -> str:
+        directives = []
+        if scope is not None:
+            directives.append(self._scope_instruction(scope))
+        if urgency is not None:
+            directives.append(self._urgency_instruction(urgency))
+        if not directives:
+            return ""
+        return (
+            "Turn-specific execution controls follow. These controls are mandatory for this turn and must materially affect "
+            "tool choice, command shape, enumeration breadth, scan timing, batching, parallelism, and stopping criteria. "
+            "Do not acknowledge the controls explicitly unless the user asks; apply them in the work itself.\n\n"
+            + "\n\n".join(directives)
+        )
+
     def _messages_for_turn(self, scope: str | None, urgency: str | None) -> list[dict]:
         if not self.messages:
             return []
-        control_messages = []
-        if scope is not None:
-            control_messages.append({"role": "system", "content": self._scope_instruction(scope)})
-        if urgency is not None:
-            control_messages.append({"role": "system", "content": self._urgency_instruction(urgency)})
+        turn_directive = self._turn_control_directive(scope, urgency)
         if self.messages[0].get("role") == "system":
-            return [self.messages[0], *control_messages, *self.messages[1:]]
-        return [*control_messages, *self.messages]
+            if not turn_directive:
+                return list(self.messages)
+            merged_system = dict(self.messages[0])
+            merged_system["content"] = f"{self.messages[0].get('content', '')}\n\n{turn_directive}"
+            return [merged_system, *self.messages[1:]]
+        if not turn_directive:
+            return list(self.messages)
+        return [{"role": "system", "content": turn_directive}, *self.messages]
 
     async def _retry_empty_reply_after_tools(self, prompt: str, tool_results: list[dict]) -> str | None:
         _emit(self.event_callback, "status", {
@@ -1867,6 +1884,17 @@ class MCPSession:
             })
 
             turn_messages = self._messages_for_turn(scope, urgency)
+            active_scope = self._normalize_scope(scope) if scope is not None else None
+            active_urgency = self._normalize_urgency(urgency) if urgency is not None else None
+            if active_scope or active_urgency:
+                controls_summary = []
+                if active_scope:
+                    controls_summary.append(f"scope={active_scope}")
+                if active_urgency:
+                    controls_summary.append(f"urgency={active_urgency}")
+                _emit(self.event_callback, "status", {
+                    "message": f"Applying prompt controls for this turn: {', '.join(controls_summary)}."
+                })
 
             # Call Ollama
             _emit(self.event_callback, "status", {
