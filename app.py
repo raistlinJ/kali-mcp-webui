@@ -1422,9 +1422,18 @@ def session_cancel_prompt():
             }), 409
         loop = _session_state["loop"]
         cancel_event = _session_state.get("cancel_event")
+        run_id = _session_state.get('run_id')
 
     if cancel_event and loop:
         app.logger.info('Prompt cancel requested run_id=%s', _session_state.get('run_id'))
+        if run_id:
+            control_dir = os.path.join(RUNS_DIR, run_id, 'control')
+            try:
+                os.makedirs(control_dir, exist_ok=True)
+                with open(os.path.join(control_dir, 'tool_cancel_request.json'), 'w') as f:
+                    json.dump({'run_id': run_id, 'timestamp': time.time()}, f, indent=2)
+            except Exception as exc:
+                app.logger.warning('Failed to write tool cancel request for run_id=%s: %s', run_id, exc)
         loop.call_soon_threadsafe(cancel_event.set)
         return jsonify({'success': True, 'message': 'Cancel signal sent.'})
     else:

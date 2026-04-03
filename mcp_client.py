@@ -1239,28 +1239,33 @@ class MCPSession:
             "broad": (
                 "Use a broad assessment scope for this request. Favor wide coverage across the reachable target surface, "
                 "identify any meaningful exposure, weakness, or misconfiguration, and pivot when a line of inquiry stalls. "
-                "Prioritize breadth and triage over deep pursuit of a single path."
+                "Prioritize breadth and triage over deep pursuit of a single path. Enumerate adjacent services, hosts, or "
+                "surfaces before committing too early to one route."
             ),
             "medium-broad": (
                 "Use a medium-broad scope for this request. Cover the strongest adjacent attack surfaces and enumerate enough "
-                "to avoid blind spots, while still concentrating effort on the best leads."
+                "to avoid blind spots, while still concentrating effort on the best leads. Do not stop at the first plausible "
+                "lead if nearby surfaces remain cheap to check."
             ),
             "medium": (
                 "Use a balanced scope for this request. Combine sensible surface coverage with targeted follow-through on the "
-                "most promising findings."
+                "most promising findings. Explore enough to avoid obvious blind spots, then go deeper on the strongest result."
             ),
             "medium-narrow": (
                 "Use a medium-narrow scope for this request. Stay focused on the most promising paths and minimize side "
-                "exploration unless it is needed to validate or unblock the leading hypothesis."
+                "exploration unless it is needed to validate or unblock the leading hypothesis. Avoid broad side enumeration "
+                "unless it directly supports the current path."
             ),
             "narrow": (
                 "Use a narrow scope for this request. Focus on finding at least one viable path to initial access or meaningful "
-                "compromise, and avoid broad enumeration unless it directly supports the most promising route."
+                "compromise, and avoid broad enumeration unless it directly supports the most promising route. Stay tightly on "
+                "one path instead of branching into adjacent opportunities."
             ),
         }
         return (
             f"Scope mode for this user request: {normalized}. "
-            f"{guidance[normalized]} Keep obeying the access policy and tool safety constraints."
+            f"{guidance[normalized]} Treat scope as an execution directive for this turn: it should materially change how much "
+            "surface you cover before replying. Keep obeying the access policy and tool safety constraints."
         )
 
     def _urgency_instruction(self, urgency: str | None) -> str:
@@ -1269,30 +1274,36 @@ class MCPSession:
             "stealthy": (
                 "Use a low-urgency, stealth-first operating tempo for this request. Prefer quieter commands, lower-noise timing, "
                 "smaller batches, and limited parallelism. Spend more time verifying each lead before escalating command intensity "
-                "or scan aggressiveness."
+                "or scan aggressiveness. Avoid aggressive scan settings, high-rate concurrency, or speed-first shortcuts unless the "
+                "user explicitly asks for them."
             ),
             "methodical": (
                 "Use a cautious, methodical operating tempo for this request. Favor thorough validation and reasonable depth over "
                 "raw speed. Keep concurrency modest, avoid aggressive timing unless it is clearly justified, and sequence work so "
-                "findings stay explainable."
+                "findings stay explainable. Prefer deliberate but not unnecessarily slow execution."
             ),
             "balanced": (
                 "Use a balanced operating tempo for this request. Trade off stealth, depth, and speed pragmatically based on the "
-                "task, without defaulting to either slow exhaustive work or aggressive high-speed probing."
+                "task, without defaulting to either slow exhaustive work or aggressive high-speed probing. Use normal timing and "
+                "normal validation unless the situation clearly calls for something else."
             ),
             "fast": (
                 "Use a fast operating tempo for this request. Bias toward quicker feedback and shorter iteration cycles. When allowed "
-                "and appropriate, use more assertive timing, broader batching, and higher parallelism to move the investigation along."
+                "and appropriate, use more assertive timing, broader batching, and higher parallelism to move the investigation along. "
+                "Prefer efficient scans and lighter validation over exhaustive confirmation."
             ),
             "speed": (
                 "Use a speed-first operating tempo for this request. Optimize for rapid answers using aggressive but still safe timing, "
-                "parallelism, and command intensity where appropriate. Accept more noise and less depth when that materially improves speed."
+                "parallelism, and command intensity where appropriate. Accept more noise and less depth when that materially improves speed. "
+                "For example, prefer faster scan settings, shorter feedback loops, and minimal confirmation before reporting progress; "
+                "do not add slow-down options such as scan delays unless they are clearly necessary for correctness, scope, or stealth."
             ),
         }
         return (
             f"Urgency mode for this user request: {normalized}. "
             f"{guidance[normalized]} Let this influence choices such as scan timing, concurrency, batching, and how much time to spend "
-            "going deep before returning progress, while still obeying the access policy and tool safety constraints."
+            "going deep before returning progress. Treat urgency as an execution directive for this turn, not just a stylistic hint, "
+            "while still obeying the access policy and tool safety constraints."
         )
 
     def _messages_for_turn(self, scope: str | None, urgency: str | None) -> list[dict]:

@@ -85,6 +85,8 @@ _TIMEOUT_CONTROL_DIRNAME = "control"
 _TIMEOUT_REQUEST_FILENAME = "tool_timeout_request.json"
 _TIMEOUT_RESPONSE_FILENAME = "tool_timeout_response.json"
 _TIMEOUT_DECISION_POLL_SECONDS = 0.25
+_CANCEL_REQUEST_FILENAME = "tool_cancel_request.json"
+_PROCESS_CANCEL_POLL_SECONDS = 0.25
 
 try:
     _NETWORK_POLICY = json.loads(os.environ.get("MCP_NETWORK_POLICY", ""))
@@ -269,8 +271,20 @@ def _timeout_response_path() -> str | None:
     return os.path.join(control_dir, _TIMEOUT_RESPONSE_FILENAME)
 
 
+def _cancel_request_path() -> str | None:
+    control_dir = _timeout_control_dir()
+    if not control_dir:
+        return None
+    return os.path.join(control_dir, _CANCEL_REQUEST_FILENAME)
+
+
+def _cancel_requested() -> bool:
+    path = _cancel_request_path()
+    return bool(path and os.path.exists(path))
+
+
 def _clear_timeout_control_files():
-    for path in (_timeout_request_path(), _timeout_response_path()):
+    for path in (_timeout_request_path(), _timeout_response_path(), _cancel_request_path()):
         if path and os.path.exists(path):
             try:
                 os.remove(path)
@@ -319,6 +333,9 @@ def _await_timeout_decision(proc: subprocess.Popen, tool_name: str, arguments: d
             if proc.poll() is not None:
                 return "finished"
 
+            if _cancel_requested():
+                return "kill"
+
             if response_path and os.path.exists(response_path):
                 try:
                     with open(response_path) as f:
@@ -359,22 +376,44 @@ def _run_subprocess_with_timeout_prompt(cmd: list[str], timeout_seconds: int, to
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     checkpoint_index = 0
     _clear_timeout_control_files()
+    next_checkpoint_at = t0 + timeout_seconds
 
     while True:
         try:
-            stdout, stderr = proc.communicate(timeout=timeout_seconds)
+            remaining_to_checkpoint = max(0.0, next_checkpoint_at - time.time())
+            wait_slice = min(_PROCESS_CANCEL_POLL_SECONDS, remaining_to_checkpoint)
+            stdout, stderr = proc.communicate(timeout=wait_slice)
             return {
                 "stdout": stdout or "",
                 "stderr": stderr or "",
                 "returncode": proc.returncode,
                 "duration_ms": int((time.time() - t0) * 1000),
                 "timed_out_kill": False,
+                "cancelled": False,
                 "checkpoint_index": checkpoint_index,
             }
         except subprocess.TimeoutExpired:
+            if _cancel_requested():
+                if proc.poll() is None:
+                    proc.kill()
+                stdout, stderr = proc.communicate()
+                return {
+                    "stdout": stdout or "",
+                    "stderr": stderr or "",
+                    "returncode": -1,
+                    "duration_ms": int((time.time() - t0) * 1000),
+                    "timed_out_kill": False,
+                    "cancelled": True,
+                    "checkpoint_index": checkpoint_index,
+                }
+
+            if time.time() < next_checkpoint_at:
+                continue
+
             checkpoint_index += 1
             action = _await_timeout_decision(proc, tool_name, arguments, cmd, timeout_seconds, checkpoint_index)
             if action == "wait":
+                next_checkpoint_at = time.time() + timeout_seconds
                 continue
 
             if action != "finished" and proc.poll() is None:
@@ -386,6 +425,7 @@ def _run_subprocess_with_timeout_prompt(cmd: list[str], timeout_seconds: int, to
                 "returncode": -1,
                 "duration_ms": int((time.time() - t0) * 1000),
                 "timed_out_kill": action == "kill",
+                "cancelled": False,
                 "checkpoint_index": checkpoint_index,
             }
 
@@ -421,6 +461,52 @@ def _build_shell_command(name: str, arguments: dict) -> tuple[list[str] | None, 
         return _normalize_extended_shell_command(shell_parts)
 
     return shell_parts, None
+
+
+def _requested_shell_command(arguments: dict) -> str | None:
+    raw_args = (arguments.get("args", "") or "").strip()
+    if not raw_args:
+        return None
+    try:
+        shell_parts = shlex.split(raw_args)
+    except Exception:
+        shell_parts = raw_args.split()
+    if not shell_parts:
+        return None
+    return shell_parts[0]
+
+
+def _requested_shell_parts(arguments: dict) -> list[str]:
+    raw_args = (arguments.get("args", "") or "").strip()
+    if not raw_args:
+        return []
+    try:
+        return shlex.split(raw_args)
+    except Exception:
+        return raw_args.split()
+
+
+def _resolve_shell_delegation(config: dict, current_tool_name: str, arguments: dict) -> tuple[str, dict, dict] | None:
+    shell_parts = _requested_shell_parts(arguments)
+    if not shell_parts:
+        return None
+
+    requested_command = shell_parts[0]
+    if requested_command == current_tool_name:
+        return None
+
+    delegated_tool = next(
+        (
+            tool for tool in config.get("tools", [])
+            if isinstance(tool, dict) and str(tool.get("name", "")).strip() == requested_command
+        ),
+        None,
+    )
+    if not delegated_tool:
+        return None
+
+    delegated_args = shlex.join(shell_parts[1:]) if len(shell_parts) > 1 else ""
+    return requested_command, delegated_tool, {"args": delegated_args}
 
 
 def _run_shell_sequence(arguments: dict, timeout_seconds: int) -> tuple[str, int, int]:
@@ -684,10 +770,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     if not policy_allowed:
         return [TextContent(type="text", text=f"Policy blocked tool call to {name}: {policy_message}")]
 
+    delegated_from_shell = False
     if name in {"shell", "shell_extended"}:
-        cmd, error_text = _build_shell_command(name, arguments)
-        if error_text:
-            return [TextContent(type="text", text=error_text)]
+        delegation = _resolve_shell_delegation(config, name, arguments)
+        if delegation:
+            name, tool_config, arguments = delegation
+            delegated_from_shell = True
+        else:
+            cmd, error_text = _build_shell_command(name, arguments)
+            if error_text:
+                return [TextContent(type="text", text=error_text)]
     elif name == "shell_sequence":
         timeout_seconds = int(tool_config.get("timeout_seconds", 120) or 120)
         output, exit_code, duration_ms = _run_shell_sequence(arguments, timeout_seconds)
@@ -703,7 +795,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         cmd, error_text = _build_dangerous_shell_command(arguments)
         if error_text:
             return [TextContent(type="text", text=error_text)]
-    else:
+    if name not in {"shell", "shell_extended", "shell_sequence", "shell_dangerous"} or delegated_from_shell:
         cmd = [tool_config["command"]]
         base_args = tool_config.get("base_args", [])
         user_args = arguments.get("args", "")
@@ -730,7 +822,14 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
         output = _strip_ansi(execution.get("stdout") or "")
         stderr = _strip_ansi(execution.get("stderr") or "")
-        if execution.get("timed_out_kill"):
+        if execution.get("cancelled"):
+            elapsed_seconds = max(1, int(duration_ms / 1000))
+            output = f"Execution cancelled after {elapsed_seconds} seconds by the user."
+            if execution.get("stdout"):
+                output += f"\n\nPartial STDOUT:\n{_strip_ansi(execution.get('stdout') or '')}"
+            if stderr:
+                output += f"\n\nPartial STDERR:\n{stderr}"
+        elif execution.get("timed_out_kill"):
             elapsed_seconds = max(int(duration_ms / 1000), int(timeout_seconds))
             output = (
                 f"Execution stopped after {elapsed_seconds} seconds because the user chose kill "
