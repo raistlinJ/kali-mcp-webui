@@ -1228,6 +1228,11 @@ class MCPSession:
         allowed = {"broad", "medium-broad", "medium", "medium-narrow", "narrow"}
         return candidate if candidate in allowed else "medium"
 
+    def _normalize_urgency(self, urgency: str | None) -> str:
+        candidate = str(urgency or "balanced").strip().lower()
+        allowed = {"stealthy", "methodical", "balanced", "fast", "speed"}
+        return candidate if candidate in allowed else "balanced"
+
     def _scope_instruction(self, scope: str | None) -> str:
         normalized = self._normalize_scope(scope)
         guidance = {
@@ -1258,13 +1263,46 @@ class MCPSession:
             f"{guidance[normalized]} Keep obeying the access policy and tool safety constraints."
         )
 
-    def _messages_for_turn(self, scope: str | None) -> list[dict]:
+    def _urgency_instruction(self, urgency: str | None) -> str:
+        normalized = self._normalize_urgency(urgency)
+        guidance = {
+            "stealthy": (
+                "Use a low-urgency, stealth-first operating tempo for this request. Prefer quieter commands, lower-noise timing, "
+                "smaller batches, and limited parallelism. Spend more time verifying each lead before escalating command intensity "
+                "or scan aggressiveness."
+            ),
+            "methodical": (
+                "Use a cautious, methodical operating tempo for this request. Favor thorough validation and reasonable depth over "
+                "raw speed. Keep concurrency modest, avoid aggressive timing unless it is clearly justified, and sequence work so "
+                "findings stay explainable."
+            ),
+            "balanced": (
+                "Use a balanced operating tempo for this request. Trade off stealth, depth, and speed pragmatically based on the "
+                "task, without defaulting to either slow exhaustive work or aggressive high-speed probing."
+            ),
+            "fast": (
+                "Use a fast operating tempo for this request. Bias toward quicker feedback and shorter iteration cycles. When allowed "
+                "and appropriate, use more assertive timing, broader batching, and higher parallelism to move the investigation along."
+            ),
+            "speed": (
+                "Use a speed-first operating tempo for this request. Optimize for rapid answers using aggressive but still safe timing, "
+                "parallelism, and command intensity where appropriate. Accept more noise and less depth when that materially improves speed."
+            ),
+        }
+        return (
+            f"Urgency mode for this user request: {normalized}. "
+            f"{guidance[normalized]} Let this influence choices such as scan timing, concurrency, batching, and how much time to spend "
+            "going deep before returning progress, while still obeying the access policy and tool safety constraints."
+        )
+
+    def _messages_for_turn(self, scope: str | None, urgency: str | None) -> list[dict]:
         if not self.messages:
             return []
         scope_message = {"role": "system", "content": self._scope_instruction(scope)}
+        urgency_message = {"role": "system", "content": self._urgency_instruction(urgency)}
         if self.messages[0].get("role") == "system":
-            return [self.messages[0], scope_message, *self.messages[1:]]
-        return [scope_message, *self.messages]
+            return [self.messages[0], scope_message, urgency_message, *self.messages[1:]]
+        return [scope_message, urgency_message, *self.messages]
 
     async def _retry_empty_reply_after_tools(self, prompt: str, tool_results: list[dict]) -> str | None:
         _emit(self.event_callback, "status", {
@@ -1306,13 +1344,13 @@ class MCPSession:
 
         return None
 
-    async def _repair_litellm_tool_reply(self, prompt: str, malformed_content: str, scope: str | None = None) -> dict | None:
+    async def _repair_litellm_tool_reply(self, prompt: str, malformed_content: str, scope: str | None = None, urgency: str | None = None) -> dict | None:
         _emit(self.event_callback, "status", {
             "message": f"{_provider_display_name(self.llm_provider)} returned a malformed tool-planning reply; retrying once with stricter tool-calling instructions …"
         })
 
         repair_messages = [
-            *self._messages_for_turn(scope),
+            *self._messages_for_turn(scope, urgency),
             {
                 "role": "system",
                 "content": (
@@ -1350,7 +1388,7 @@ class MCPSession:
             })
             return None
 
-    async def _recover_litellm_tool_plan(self, prompt: str, malformed_content: str, scope: str | None = None) -> dict | None:
+    async def _recover_litellm_tool_plan(self, prompt: str, malformed_content: str, scope: str | None = None, urgency: str | None = None) -> dict | None:
         tool_catalog = []
         for tool in self._ollama_tools_minimal or self._ollama_tools:
             function = (tool or {}).get("function") or {}
@@ -1369,7 +1407,7 @@ class MCPSession:
                 self._client.chat,
                 model=self.model,
                 messages=[
-                    *self._messages_for_turn(scope),
+                    *self._messages_for_turn(scope, urgency),
                     {
                         "role": "system",
                         "content": (
@@ -1732,7 +1770,7 @@ class MCPSession:
         self._started = True
         return self.tool_names
 
-    async def chat(self, prompt: str, cancel_event: asyncio.Event | None = None, scope: str | None = None):
+    async def chat(self, prompt: str, cancel_event: asyncio.Event | None = None, scope: str | None = None, urgency: str | None = None):
         """
         Send a user prompt into the running session. Runs the full agent loop
         (LLM → tool calls → LLM … until text-only response), then returns.
@@ -1746,7 +1784,7 @@ class MCPSession:
         # Serialise chat calls so two prompts don't overlap
         async with self._chat_lock:
             try:
-                await self._run_agent_loop(prompt, cancel_event, scope=scope)
+                await self._run_agent_loop(prompt, cancel_event, scope=scope, urgency=urgency)
             except Exception as e:
                 _emit(self.event_callback, "error", {
                     "message": "The session hit an internal runtime error. Check server logs for details."
@@ -1754,7 +1792,7 @@ class MCPSession:
                 print(f"Crash in agent loop: {type(e).__name__}: {e}")
                 traceback.print_exc()
 
-    async def _run_agent_loop(self, prompt: str, cancel_event: asyncio.Event | None, scope: str | None = None):
+    async def _run_agent_loop(self, prompt: str, cancel_event: asyncio.Event | None, scope: str | None = None, urgency: str | None = None):
         """Core agent loop for a single chat turn."""
         self._logger.log_prompt(prompt)
         self.messages.append({"role": "user", "content": prompt})
@@ -1781,7 +1819,7 @@ class MCPSession:
                 "model_max": self._model_max_ctx,
             })
 
-            turn_messages = self._messages_for_turn(scope)
+            turn_messages = self._messages_for_turn(scope, urgency)
 
             # Call Ollama
             _emit(self.event_callback, "status", {
@@ -1858,7 +1896,7 @@ class MCPSession:
                     except Exception:
                         pass
 
-                repaired_response = await self._repair_litellm_tool_reply(prompt, content, scope=scope)
+                repaired_response = await self._repair_litellm_tool_reply(prompt, content, scope=scope, urgency=urgency)
                 if repaired_response:
                     response = repaired_response
                     original_msg = response.get("message", response)
@@ -1866,7 +1904,7 @@ class MCPSession:
                     tool_calls = original_msg.get("tool_calls", getattr(original_msg, "tool_calls", None))
 
                 if not tool_calls and _looks_like_malformed_tool_planning(content):
-                    recovered_response = await self._recover_litellm_tool_plan(prompt, content, scope=scope)
+                    recovered_response = await self._recover_litellm_tool_plan(prompt, content, scope=scope, urgency=urgency)
                     if recovered_response:
                         response = recovered_response
                         original_msg = response.get("message", response)

@@ -69,6 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatScopeSlider = document.getElementById('chat-scope-slider');
     const chatScopeValue = document.getElementById('chat-scope-value');
     const chatScopeHelp = document.getElementById('chat-scope-help');
+    const chatUrgencySlider = document.getElementById('chat-urgency-slider');
+    const chatUrgencyValue = document.getElementById('chat-urgency-value');
+    const chatUrgencyHelp = document.getElementById('chat-urgency-help');
     const chatPromptInput = document.getElementById('chat-prompt-input');
     const sendPromptBtn = document.getElementById('chat-send-btn');
     const annotateBtn = document.getElementById('chat-annotate-btn');
@@ -146,6 +149,33 @@ document.addEventListener('DOMContentLoaded', () => {
             help: 'Pursue the most promising route to at least one viable foothold with minimal lateral exploration.'
         }
     ];
+    const CHAT_URGENCY_LEVELS = [
+        {
+            id: 'stealthy',
+            label: 'Stealthy',
+            help: 'Prefer quieter, lower-noise commands. Bias toward slower timing, smaller batches, and deeper verification before escalating.'
+        },
+        {
+            id: 'methodical',
+            label: 'Methodical',
+            help: 'Stay cautious and thorough. Keep parallelism limited, avoid aggressive timing unless justified, and validate findings before broadening.'
+        },
+        {
+            id: 'balanced',
+            label: 'Balanced',
+            help: 'Balanced pace. Trade off stealth, depth, timing, and parallelism without pushing too hard in either direction.'
+        },
+        {
+            id: 'fast',
+            label: 'Fast',
+            help: 'Bias toward quicker feedback. Use more assertive timing, parallelism, and shallower confirmation when that improves iteration speed.'
+        },
+        {
+            id: 'speed',
+            label: 'Speed',
+            help: 'Optimize for speed. Prefer aggressive but still safe timing and concurrency to get answers quickly, accepting more noise and less depth.'
+        }
+    ];
 
     let _eventSource = null;
     let _serviceRunning = false;
@@ -171,6 +201,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (chatScopeHelp) {
             chatScopeHelp.textContent = scope.help;
+        }
+    }
+
+    function getChatUrgencyIndex() {
+        const rawValue = Number.parseInt(chatUrgencySlider?.value ?? '2', 10);
+        if (Number.isNaN(rawValue)) {
+            return 2;
+        }
+        return Math.max(0, Math.min(CHAT_URGENCY_LEVELS.length - 1, rawValue));
+    }
+
+    function getChatUrgencyConfig() {
+        return CHAT_URGENCY_LEVELS[getChatUrgencyIndex()] || CHAT_URGENCY_LEVELS[2];
+    }
+
+    function updateChatUrgencyUi() {
+        const urgency = getChatUrgencyConfig();
+        if (chatUrgencyValue) {
+            chatUrgencyValue.textContent = urgency.label;
+        }
+        if (chatUrgencyHelp) {
+            chatUrgencyHelp.textContent = urgency.help;
         }
     }
     let _sessionToStopId = null;
@@ -798,6 +850,11 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('chat:scope', getChatScopeConfig().id);
     });
 
+    chatUrgencySlider?.addEventListener('input', () => {
+        updateChatUrgencyUi();
+        localStorage.setItem('chat:urgency', getChatUrgencyConfig().id);
+    });
+
     // Restore keylogger setting from localStorage
     try {
         const keyloggerEnabled = localStorage.getItem('keylogger:enabled');
@@ -809,10 +866,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chatScopeSlider && savedScopeIndex >= 0) {
             chatScopeSlider.value = String(savedScopeIndex);
         }
+        const savedChatUrgency = localStorage.getItem('chat:urgency');
+        const savedUrgencyIndex = CHAT_URGENCY_LEVELS.findIndex(level => level.id === savedChatUrgency);
+        if (chatUrgencySlider && savedUrgencyIndex >= 0) {
+            chatUrgencySlider.value = String(savedUrgencyIndex);
+        }
     } catch (err) {
         console.warn('Failed to restore keylogger setting:', err);
     }
     updateChatScopeUi();
+    updateChatUrgencyUi();
 
     providerSelect?.addEventListener('change', () => {
         const previousProvider = normalizeProvider(providerSelect?.dataset.previousProvider);
@@ -1707,6 +1770,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Enable Chat Console inputs
                 chatScopeSlider.disabled = false;
+                chatUrgencySlider.disabled = false;
                 chatPromptInput.disabled = false;
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;
@@ -1841,6 +1905,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const prompt = chatPromptInput.value.trim();
         if (!prompt || _chatBusy || !_serviceRunning) return;
         const scope = getChatScopeConfig().id;
+        const urgency = getChatUrgencyConfig().id;
 
         _chatBusy = true;
         chatPromptInput.value = '';
@@ -1859,7 +1924,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, scope })
+                body: JSON.stringify({ prompt, scope, urgency })
             });
             const data = await response.json();
             if (!data.success) {
@@ -2070,6 +2135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Disable active chat inputs
         chatScopeSlider.disabled = true;
+        chatUrgencySlider.disabled = true;
         chatPromptInput.disabled = true;
         chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
         sendPromptBtn.disabled = true;
@@ -2507,6 +2573,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Enable Chat Console inputs
                 navChatBtn.disabled = false;
                 chatScopeSlider.disabled = false;
+                chatUrgencySlider.disabled = false;
                 chatPromptInput.disabled = false;
                 chatPromptInput.placeholder = "Type your prompt and press Enter to run...";
                 sendPromptBtn.disabled = false;

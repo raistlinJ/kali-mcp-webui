@@ -103,7 +103,7 @@ Unlike cloud-dependent conversational hacking tools, this platform ensures that 
 
 4.  **Begin Testing**
     *   Switch to the **Live Chat** tab.
-    *   Set the **Scope** slider above the prompt box to control how broadly or narrowly the agent should approach the current request.
+    *   Set the **Scope** and **Urgency** sliders above the prompt box to control how broadly and how aggressively the agent should approach the current request.
     *   Issue a natural language command (e.g., *"Run a fast nmap scan against scanme.nmap.org"*).
     *   Watch as the agent dynamically executes the tool in the foreground, streams the output, and returns an analysis!
 
@@ -122,6 +122,22 @@ Each setting adds different scope guidance to the turn context:
 *   **Narrow**: Instructs the model to pursue the most promising route to at least one viable foothold or concrete way in, while avoiding broad enumeration unless it directly supports that goal. Best fit for tightly targeted red-team style probing.
 
 Scope is applied **per prompt**, so you can widen or narrow the agent's behavior as the engagement evolves.
+
+### Urgency Control
+
+The **Urgency** slider sits next to **Scope** above the Live Chat prompt box and changes the per-turn execution tempo guidance sent to the model.
+
+It is meant to influence how aggressively the agent operates: scan timing, batching, parallelism, and how much time it should spend validating and going deep before returning progress.
+
+Each setting adds different urgency guidance to the turn context:
+
+*   **Stealthy**: Biases the agent toward quieter, lower-noise commands, slower timing, smaller batches, and deeper verification before escalating.
+*   **Methodical**: Keeps the agent cautious and thorough, with modest concurrency and a preference for explainable, validated progress over speed.
+*   **Balanced**: Uses a middle-ground tempo and trades off stealth, depth, and speed pragmatically. This is the default setting.
+*   **Fast**: Pushes the agent toward quicker iteration, more assertive timing, and higher parallelism when appropriate.
+*   **Speed**: Optimizes for rapid answers using aggressive but still policy-compliant timing and concurrency, accepting more noise and less depth when useful.
+
+Urgency is also applied **per prompt**, so you can slow the agent down for quiet enumeration and then turn it up when you want faster feedback.
 
 ## User Keylogger Feature
 

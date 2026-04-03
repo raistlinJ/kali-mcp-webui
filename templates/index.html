@@ -712,13 +712,23 @@
                                 </div>
                                 <div class="chat-prompt-shell">
                                     <div class="chat-prompt-stack">
-                                        <div class="chat-scope-control">
-                                            <div class="chat-scope-header">
-                                                <label for="chat-scope-slider">Scope</label>
-                                                <span class="chat-scope-value" id="chat-scope-value">Medium</span>
+                                        <div class="chat-control-row">
+                                            <div class="chat-scope-control">
+                                                <div class="chat-control-header">
+                                                    <label for="chat-scope-slider">Scope</label>
+                                                    <span class="chat-control-value" id="chat-scope-value">Medium</span>
+                                                </div>
+                                                <input type="range" id="chat-scope-slider" class="chat-control-slider" min="0" max="4" step="1" value="2" disabled>
+                                                <span class="input-hint chat-control-help" id="chat-scope-help">Balanced breadth and depth. Explore enough surface to avoid blind spots, then follow the strongest path.</span>
                                             </div>
-                                            <input type="range" id="chat-scope-slider" min="0" max="4" step="1" value="2" disabled>
-                                            <span class="input-hint chat-scope-help" id="chat-scope-help">Balanced breadth and depth. Explore enough surface to avoid blind spots, then follow the strongest path.</span>
+                                            <div class="chat-scope-control chat-urgency-control">
+                                                <div class="chat-control-header">
+                                                    <label for="chat-urgency-slider">Urgency</label>
+                                                    <span class="chat-control-value" id="chat-urgency-value">Balanced</span>
+                                                </div>
+                                                <input type="range" id="chat-urgency-slider" class="chat-control-slider" min="0" max="4" step="1" value="2" disabled>
+                                                <span class="input-hint chat-control-help" id="chat-urgency-help">Balanced pace. Trade off stealth, depth, timing, and parallelism without pushing too hard in either direction.</span>
+                                            </div>
                                         </div>
                                         <div class="chat-entry-row">
                                             <button type="button" id="chat-stop-btn" class="btn btn-secondary"

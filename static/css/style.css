@@ -1628,6 +1628,12 @@ option {
     gap: 0.7rem;
 }
 
+.chat-control-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
 .chat-entry-row {
     width: 100%;
     display: flex;
@@ -1638,6 +1644,7 @@ option {
 .chat-scope-control {
     display: flex;
     flex-direction: column;
+    min-width: 0;
     gap: 0.55rem;
     padding: 0.85rem 1rem 0.75rem;
     border-radius: 12px;
@@ -1645,14 +1652,14 @@ option {
     background: rgba(15, 23, 42, 0.3);
 }
 
-.chat-scope-header {
+.chat-control-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
 }
 
-.chat-scope-header label {
+.chat-control-header label {
     font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -1660,26 +1667,30 @@ option {
     color: var(--text-secondary);
 }
 
-.chat-scope-value {
+.chat-control-value {
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--accent-primary);
 }
 
-#chat-scope-slider {
+.chat-control-slider {
     width: 100%;
     margin: 0;
     accent-color: var(--accent-primary);
     cursor: pointer;
 }
 
-#chat-scope-slider:disabled {
+.chat-control-slider:disabled {
     cursor: not-allowed;
     opacity: 0.5;
 }
 
-.chat-scope-help {
+.chat-control-help {
     margin: 0;
+}
+
+.chat-urgency-control .chat-control-value {
+    color: #f59e0b;
 }
 
 #chat-prompt-input {
@@ -1747,6 +1758,10 @@ option {
 
     .chat-console-controls {
         gap: 0.75rem;
+    }
+
+    .chat-control-row {
+        grid-template-columns: 1fr;
     }
 
     .chat-entry-row {
