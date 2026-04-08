@@ -1609,15 +1609,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const elapsedMs = Date.now() - _activeToolState.startedAt;
         const runtime = formatElapsedDuration(elapsedMs);
-        const phaseLabel = _activeToolState.phase === 'waiting' ? 'Waiting' : 'Running';
+        let phaseLabel = 'Running';
+        let chipClass = 'is-running';
+        if (_activeToolState.phase === 'waiting') {
+            phaseLabel = 'Awaiting Input';
+            chipClass = 'is-waiting';
+        } else if (_activeToolState.phase === 'killing') {
+            phaseLabel = 'Terminating...';
+            chipClass = 'is-waiting';
+        }
+        
         const argsJson = JSON.stringify(_activeToolState.args || {});
         const note = String(_activeToolState.note || '').trim();
 
-        _activeToolEntry.classList.toggle('log-tool-call-waiting', _activeToolState.phase === 'waiting');
+        _activeToolEntry.classList.toggle('log-tool-call-waiting', _activeToolState.phase === 'waiting' || _activeToolState.phase === 'killing');
         _activeToolEntry.innerHTML = `
             <div class="log-tool-call-row">
                 <span><span class="log-label">🔧 Tool Call</span> <strong>${escapeHtml(_activeToolState.tool || 'Running tool')}</strong></span>
-                <span class="log-tool-runtime-chip ${_activeToolState.phase === 'waiting' ? 'is-waiting' : 'is-running'}">${phaseLabel} ${runtime}</span>
+                <span class="log-tool-runtime-chip ${chipClass}">${phaseLabel} ${runtime}</span>
             </div>
             <div class="log-tool-call-meta">args: <code>${escapeHtml(argsJson)}</code></div>
             ${note ? `<div class="log-tool-call-note">${escapeHtml(note)}</div>` : ''}
@@ -1827,6 +1836,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             closeToolTimeoutModal();
+            
+            // Immediately reflect the user's decision in the live log UI so they know their click registered
+            if (_activeToolState && _activeToolEntry) {
+                if (action === 'kill') {
+                    _activeToolState.phase = 'killing';
+                    _activeToolState.note = "Termination requested. Waiting for process to die...";
+                } else {
+                    _activeToolState.phase = 'running';
+                    _activeToolState.note = "Allowed to continue running...";
+                }
+                renderActiveToolEntry();
+            }
         } catch (error) {
             waitToolTimeoutBtn.disabled = false;
             killToolTimeoutBtn.disabled = false;
