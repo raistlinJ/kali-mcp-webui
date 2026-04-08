@@ -304,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_KEY_SESSION_STORAGE_KEY = 'runtime:llm-api-key';
     const LEGACY_API_TOKEN_SESSION_STORAGE_KEY = 'runtime:llm-api-token';
     const MAX_PERSISTED_LIVE_LOG_HTML = 200000;
-    const MAX_LIVE_LOG_ENTRIES = 80;
+    const MAX_LIVE_LOG_ENTRIES = 25;
     let _analysisConfigResolver = null;
     let _analysisConfigOptions = null;
     const DEFAULT_ANALYSIS_OUTPUTS = ['tooling_assets', 'progress_analysis'];
@@ -2108,10 +2108,43 @@ document.addEventListener('DOMContentLoaded', () => {
         resizeChatPromptInput();
     });
 
+    const PROMPT_HISTORY_MAX = 50;
+    const promptHistory = [];
+    let promptHistoryIndex = -1;
+    let promptCurrentDraft = "";
+
     chatPromptInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendChat();
+        } else if (e.key === 'ArrowUp') {
+            if (chatPromptInput.selectionStart === 0 && chatPromptInput.selectionEnd === 0) {
+                if (promptHistoryIndex < 0) {
+                    promptHistoryIndex = promptHistory.length;
+                }
+                if (promptHistoryIndex > 0) {
+                    if (promptHistoryIndex === promptHistory.length) {
+                        promptCurrentDraft = chatPromptInput.value;
+                    }
+                    promptHistoryIndex--;
+                    chatPromptInput.value = promptHistory[promptHistoryIndex];
+                    resizeChatPromptInput();
+                    e.preventDefault();
+                }
+            }
+        } else if (e.key === 'ArrowDown') {
+            if (chatPromptInput.selectionStart === chatPromptInput.value.length && chatPromptInput.selectionEnd === chatPromptInput.value.length) {
+                if (promptHistoryIndex >= 0 && promptHistoryIndex < promptHistory.length) {
+                    promptHistoryIndex++;
+                    if (promptHistoryIndex === promptHistory.length) {
+                        chatPromptInput.value = promptCurrentDraft;
+                    } else {
+                        chatPromptInput.value = promptHistory[promptHistoryIndex];
+                    }
+                    resizeChatPromptInput();
+                    e.preventDefault();
+                }
+            }
         }
     });
 
@@ -2124,6 +2157,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const urgency = urgencyEnabled ? getChatUrgencyConfig().id : null;
 
         _chatBusy = true;
+        
+        if (promptHistory.length === 0 || promptHistory[promptHistory.length - 1] !== prompt) {
+            promptHistory.push(prompt);
+            if (promptHistory.length > PROMPT_HISTORY_MAX) {
+                promptHistory.shift();
+            }
+        }
+        promptHistoryIndex = promptHistory.length;
+        promptCurrentDraft = "";
+        
         chatPromptInput.value = '';
         resizeChatPromptInput();
         chatPromptInput.disabled = true;
