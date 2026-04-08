@@ -99,7 +99,7 @@ _TIMEOUT_RESPONSE_FILENAME = "tool_timeout_response.json"
 _TIMEOUT_DECISION_POLL_SECONDS = 0.25
 _CANCEL_REQUEST_FILENAME = "tool_cancel_request.json"
 _PROCESS_CANCEL_POLL_SECONDS = 0.25
-_DEFAULT_INTERACTIVE_SESSION_START_TOOLS = {"msf_run"}
+_DEFAULT_INTERACTIVE_SESSION_START_TOOLS = {"msf_run", "shell", "shell_sequence", "shell_extended"}
 _INTERACTIVE_SESSION_HISTORY_LIMIT = 200000
 _INTERACTIVE_SESSION_PENDING_LIMIT = 65536
 _INTERACTIVE_SESSION_DEFAULT_WAIT_SECONDS = 0.35
@@ -875,6 +875,12 @@ def _run_subprocess_with_timeout_prompt(cmd: list[str], timeout_seconds: int, to
 def _run_interactive_subprocess_with_timeout_prompt(cmd: list[str], timeout_seconds: int, tool_name: str, arguments: dict) -> dict:
     t0 = time.time()
     master_fd, slave_fd = pty.openpty()
+    import tty
+    try:
+        tty.setraw(master_fd)
+        tty.setraw(slave_fd)
+    except Exception:
+        pass
     _set_nonblocking(master_fd)
 
     proc = subprocess.Popen(
@@ -1063,12 +1069,21 @@ def _run_shell_sequence(arguments: dict, timeout_seconds: int) -> tuple[str, int
             break
 
         try:
-            execution = _run_subprocess_with_timeout_prompt(cmd, timeout_seconds, "shell_sequence", {"args": command}, preserve_interactive=False)
+            execution = _run_subprocess_with_timeout_prompt(cmd, timeout_seconds, "shell_sequence", {"args": command}, preserve_interactive=True)
         except subprocess.TimeoutExpired:
             output_chunks.append(
                 f"Step {index}: {command}\nExecution error: Command timed out after {int(timeout_seconds)} seconds"
             )
             overall_exit_code = -1
+            break
+            
+        if execution.get("interactive_preserved"):
+            session_id = execution.get("interactive_session_id")
+            step_output = f"Interactive session preserved as {session_id}."
+            if execution.get('stdout'):
+                step_output += f"\nSTDOUT:\n{execution.get('stdout')}"
+            output_chunks.append(f"Step {index}: {command}\n{step_output}")
+            overall_exit_code = 0
             break
 
         if execution.get("timed_out_kill"):
