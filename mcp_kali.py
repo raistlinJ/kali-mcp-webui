@@ -185,6 +185,12 @@ def _looks_like_preservable_interactive_session(tool_name: str, stdout: str, std
 
     if _INTERACTIVE_SESSION_OPEN_RE.search(combined):
         return True
+    if "You have active sessions open" in combined:
+        return True
+    if "created in the background" in combined and "Session " in combined:
+        return True
+    if tool_name == "msf_run" and _MSF_PROMPT_RE.search(combined):
+        return True
     if _METERPRETER_PROMPT_RE.search(combined):
         return True
     if _SHELL_PROMPT_RE.search(combined):
