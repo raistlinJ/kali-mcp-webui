@@ -183,6 +183,7 @@ def _looks_like_preservable_interactive_session(tool_name: str, stdout: str, std
     if not combined:
         return False
 
+    # Positive success indicators
     if _INTERACTIVE_SESSION_OPEN_RE.search(combined):
         return True
     if "You have active sessions open" in combined:
@@ -195,6 +196,20 @@ def _looks_like_preservable_interactive_session(tool_name: str, stdout: str, std
         return True
     if _SHELL_PROMPT_RE.search(combined):
         return True
+
+    # Error/Failure indicators that suggest the tool is stuck at a prompt after a fail
+    failure_patterns = [
+        "[-] Unknown command:",
+        "[-] Unknown option:",
+        "[-] Exploit failed",
+        "[-] Exploit completed, but no session was created",
+        "[-] No sessions were created",
+        "command not found",
+        "Syntax error:",
+    ]
+    if any(p in combined for p in failure_patterns):
+        return True
+
     lines = [line.rstrip() for line in combined.splitlines() if line.strip()]
     if not lines:
         return False
@@ -446,7 +461,28 @@ def _builtin_interactive_tools(enabled: bool) -> list[Tool]:
 
 
 def _interactive_session_tool_result(name: str, arguments: dict) -> tuple[str, int]:
-    session_id = str((arguments or {}).get("session_id") or "").strip()
+    arguments = arguments or {}
+    session_id = str(arguments.get("session_id") or "").strip()
+
+    # Fallback: the agent often sends {"args": "isess-001"} via the generic tool schema
+    # instead of {"session_id": "isess-001"}.  Parse session_id (and optional input) from args.
+    if not session_id:
+        raw_args = str(arguments.get("args") or "").strip()
+        if raw_args:
+            parts = raw_args.split(None, 1)
+            candidate = parts[0]
+            # Accept anything that looks like an isess-XXX id
+            if candidate.startswith("isess-") or candidate in _interactive_sessions:
+                session_id = candidate
+                # For write commands, the remainder after the session_id is the input
+                if name == "interactive_session_write" and not arguments.get("input") and len(parts) > 1:
+                    arguments = dict(arguments)
+                    arguments["input"] = parts[1]
+            elif name == "interactive_session_list":
+                pass  # list doesn't need a session_id
+            else:
+                # Maybe the whole args string is the session_id
+                session_id = raw_args
 
     if name == "interactive_session_list":
         if not _interactive_sessions:
