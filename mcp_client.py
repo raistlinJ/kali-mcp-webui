@@ -1392,6 +1392,26 @@ class MCPSession:
             return list(self.messages)
         return [{"role": "system", "content": turn_directive}, *self.messages]
 
+    async def call_tool_direct(self, name: str, arguments: dict):
+        """Execute an MCP tool directly (e.g., from manual UI interaction) without a model."""
+        if not self._session:
+            return {"error": "No active MCP session"}
+        
+        try:
+            result = await self._session.call_tool(name, arguments)
+            result_text = ""
+            if result.content:
+                result_text = "\n".join(
+                    getattr(c, "text", str(c))
+                    for c in result.content
+                )
+            return {
+                "success": not getattr(result, "isError", False),
+                "content": result_text
+            }
+        except Exception as e:
+            return {"error": str(e), "success": False}
+
     async def _retry_empty_reply_after_tools(self, prompt: str, tool_results: list[dict]) -> str | None:
         _emit(self.event_callback, "status", {
             "message": "Model returned an empty post-tool reply; retrying once without tools for a final answer …"
@@ -2200,6 +2220,13 @@ class MCPSession:
                         duration_ms=duration_ms,
                         exit_code=exit_code,
                     )
+
+                    if "Interactive session preserved as" in result_text:
+                        # Detect isess-XXX ID
+                        isess_match = re.search(r"preserved as (isess-\w+)", result_text)
+                        if isess_match:
+                            isess_id = isess_match.group(1)
+                            _emit(self.event_callback, "isess_created", {"session_id": isess_id})
 
                     context_result = _truncate_tool_output(result_text)
                     self.messages.append({

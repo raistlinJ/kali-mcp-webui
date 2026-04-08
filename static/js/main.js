@@ -77,6 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatUrgencyHelp = document.getElementById('chat-urgency-help');
     const chatPromptInput = document.getElementById('chat-prompt-input');
     const sendPromptBtn = document.getElementById('chat-send-btn');
+    const chatTabBar = document.getElementById('chat-tab-bar');
+    const chatTabsContent = document.getElementById('chat-tabs-content');
+    const mainChatPanel = document.getElementById('chat-tab-main');
     const annotateBtn = document.getElementById('chat-annotate-btn');
     const annotationMenu = document.getElementById('annotation-menu');
     const annotationModalOverlay = document.getElementById('annotation-modal-overlay');
@@ -1571,6 +1574,144 @@ document.addEventListener('DOMContentLoaded', () => {
         policyBadge.style.display = 'inline-block';
     }
 
+    // ---------------------------------------------------------------
+    // Chat Tab Management
+    // ---------------------------------------------------------------
+    function switchChatTab(tabId) {
+        // Update tab buttons
+        const tabs = chatTabBar.querySelectorAll('.chat-tab');
+        tabs.forEach(t => {
+            if (t.dataset.tabId === tabId) {
+                t.classList.add('active');
+            } else {
+                t.classList.remove('active');
+            }
+        });
+
+        // Update tab panels
+        const panels = chatTabsContent.querySelectorAll('.chat-tab-panel');
+        panels.forEach(p => {
+            if (p.id === `chat-tab-${tabId}`) {
+                p.classList.add('active');
+            } else {
+                p.classList.remove('active');
+            }
+        });
+
+        // Toggle chat console bar visibility
+        // We only show the main chat console for the "main" tab
+        if (tabId === 'main') {
+            chatConsoleBar.style.display = 'block';
+        } else {
+            chatConsoleBar.style.display = 'none';
+        }
+    }
+
+    function createTerminalTab(sessionId) {
+        if (document.querySelector(`.chat-tab[data-tab-id="${sessionId}"]`)) return;
+
+        // Create Tab Button
+        const tabBtn = document.createElement('button');
+        tabBtn.type = 'button';
+        tabBtn.className = 'chat-tab';
+        tabBtn.dataset.tabId = sessionId;
+        tabBtn.innerHTML = `
+            <i class="ph ph-terminal-window"></i>
+            <span>Terminal: ${sessionId}</span>
+            <i class="ph ph-x chat-tab-close" title="Close Session"></i>
+        `;
+
+        tabBtn.addEventListener('click', (e) => {
+            if (e.target.classList.contains('chat-tab-close')) {
+                closeTerminalTab(sessionId);
+            } else {
+                switchChatTab(sessionId);
+            }
+        });
+
+        chatTabBar.appendChild(tabBtn);
+
+        // Create Tab Panel
+        const tabPanel = document.createElement('div');
+        tabPanel.className = 'chat-tab-panel';
+        tabPanel.id = `chat-tab-${sessionId}`;
+        tabPanel.innerHTML = `
+            <div class="isess-log-viewer" id="log-viewer-${sessionId}">
+                <div class="log-entry log-status">Direct interaction with ${sessionId} started. Output will appear here.</div>
+            </div>
+            <div class="isess-input-row">
+                <span class="isess-prompt-indicator">></span>
+                <input type="text" class="isess-input" id="input-${sessionId}" placeholder="Type a command for ${sessionId} and press Enter...">
+            </div>
+        `;
+
+        chatTabsContent.appendChild(tabPanel);
+
+        // Setup input handler
+        const inputEl = tabPanel.querySelector('.isess-input');
+        inputEl.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const val = inputEl.value.trim();
+                if (!val) return;
+                
+                inputEl.value = '';
+                appendIsessLog(sessionId, `\n> ${val}\n`, 'log-user-input');
+                
+                try {
+                    const res = await fetch('/api/session/isess/write', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: sessionId, input: val })
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        appendIsessLog(sessionId, `Error: ${data.error || 'Failed to send command.'}\n`, 'log-error-text');
+                    }
+                } catch (err) {
+                    appendIsessLog(sessionId, `Network error: ${err.message}\n`, 'log-error-text');
+                }
+            }
+        });
+
+        // Auto-switch to new tab
+        switchChatTab(sessionId);
+    }
+
+    function closeTerminalTab(sessionId) {
+        if (!confirm(`Are you sure you want to close the interactive session ${sessionId}?`)) return;
+
+        // Call backend to close
+        fetch('/api/session/isess/write', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId, input: 'exit' }) // Best effort exit
+        });
+
+        // Remove UI elements
+        const tab = document.querySelector(`.chat-tab[data-tab-id="${sessionId}"]`);
+        const panel = document.getElementById(`chat-tab-${sessionId}`);
+        if (tab) tab.remove();
+        if (panel) panel.remove();
+
+        // Switch back to main
+        switchChatTab('main');
+    }
+
+    function appendIsessLog(sessionId, text, cssClass = '') {
+        const viewer = document.getElementById(`log-viewer-${sessionId}`);
+        if (!viewer) return;
+
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${cssClass}`;
+        entry.style.whiteSpace = 'pre-wrap';
+        entry.textContent = text;
+        viewer.appendChild(entry);
+        viewer.scrollTop = viewer.scrollHeight;
+    }
+
+    // Add event listener to main tab
+    document.querySelector('.chat-tab[data-tab-id="main"]').addEventListener('click', () => switchChatTab('main'));
+
     function appendLog(html, cssClass = '') {
         if (!_logInitialCleared) {
             liveLogViewer.innerHTML = '';
@@ -2516,6 +2657,13 @@ document.addEventListener('DOMContentLoaded', () => {
         setLiveToolsBadge([]);
         setLivePolicyBadge(null);
         
+        // Clear isess tabs
+        const isessTabs = chatTabBar.querySelectorAll('.chat-tab:not([data-tab-id="main"])');
+        isessTabs.forEach(t => t.remove());
+        const isessPanels = chatTabsContent.querySelectorAll('.chat-tab-panel:not(#chat-tab-main)');
+        isessPanels.forEach(p => p.remove());
+        switchChatTab('main');
+        
         // Disable active chat inputs
         updateChatControlAvailability();
         chatPromptInput.disabled = true;
@@ -2634,6 +2782,10 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'watcher_note_complete':
                 if (typeof window.watcherNoteComplete === 'function') window.watcherNoteComplete(event);
                 break;
+            case 'isess_created':
+                createTerminalTab(event.data.session_id); break;
+            case 'isess_output':
+                appendIsessLog(event.data.session_id, event.data.output, 'log-tool-result'); break;
             case 'watcher_analysis_note':
                 if (typeof window.watcherAddAnalysisNote === 'function') window.watcherAddAnalysisNote(event);
                 break;

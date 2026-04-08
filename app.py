@@ -76,6 +76,7 @@ _session_state = {
     "llm_provider": "",
     "api_key": None,
     "ssl_verify": True,
+    "isess_sessions": set(), # Set of active isess-XXX IDs
 }
 _session_lock = threading.Lock()
 _analysis_jobs = {} # job_id -> {status, result, error, run_id, start_time}
@@ -497,6 +498,14 @@ def _make_run_id(server_type: str) -> str:
 def _event_callback(event: dict):
     """Push an event onto the SSE queue."""
     event["timestamp"] = datetime.now().isoformat()
+    
+    # Track isess sessions for background polling
+    if event.get("type") == "isess_created":
+        session_id = event.get("data", {}).get("session_id")
+        if session_id:
+            with _session_lock:
+                _session_state["isess_sessions"].add(session_id)
+    
     q = _session_state.get("queue")
     if q:
         try:
@@ -1310,11 +1319,44 @@ def session_start():
             finally:
                 start_done.set()
 
+        async def _poll_isess_output():
+            """Periodically poll active isess sessions for output."""
+            app.logger.debug("Started isess polling task for run_id=%s", run_id)
+            try:
+                while True:
+                    with _session_lock:
+                        active_ids = list(_session_state.get("isess_sessions") or [])
+                        status = _session_state.get("status")
+
+                    if status not in ("starting", "running"):
+                        break
+
+                    if active_ids:
+                        # Use call_tool_direct to skip LLM
+                        for sid in active_ids:
+                            try:
+                                res = await session.call_tool_direct("interactive_session_read", {"session_id": sid})
+                                if res.get("success") and res.get("content"):
+                                    output = res["content"].strip()
+                                    if output:
+                                        _event_callback({"type": "isess_output", "data": {"session_id": sid, "output": output}})
+                            except Exception as e:
+                                app.logger.error(f"Error polling isess {sid}: {e}")
+
+                    await asyncio.sleep(0.5)
+            except asyncio.CancelledError:
+                pass
+            finally:
+                app.logger.debug("Stopped isess polling task for run_id=%s", run_id)
+
         loop.run_until_complete(_start())
 
         if not start_result["success"]:
             loop.close()
             return
+        
+        # Start background polling
+        loop.create_task(_poll_isess_output())
 
         # Keep the loop running so we can schedule chat() coroutines on it
         try:
@@ -1417,6 +1459,37 @@ def session_chat():
         'success': True,
         'message': 'Prompt submitted.',
     })
+
+@app.route('/api/session/isess/write', methods=['POST'])
+def session_isess_write():
+    """Execute interactive_session_write directly to a backgrounded session."""
+    with _session_lock:
+        if _session_state["status"] != "running":
+            return jsonify({'success': False, 'error': 'No active session.'}), 409
+        session = _session_state["session"]
+        loop = _session_state["loop"]
+
+    data = request.json or {}
+    session_id = data.get('session_id')
+    user_input = data.get('input')
+
+    if not session_id or user_input is None:
+        return jsonify({'success': False, 'error': 'Missing session_id or input.'}), 400
+
+    app.logger.info('Direct isess write run_id=%s session_id=%s input=%s', _session_state.get('run_id'), session_id, user_input)
+
+    # Call the tool directly on the client loop
+    future = asyncio.run_coroutine_threadsafe(
+        session.call_tool_direct("interactive_session_write", {"session_id": session_id, "input": user_input}),
+        loop
+    )
+
+    try:
+        res = future.result(timeout=10)
+        return jsonify(res)
+    except Exception as e:
+        app.logger.error(f"Error writing to isess {session_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/session/cancel_prompt', methods=['POST'])
 def session_cancel_prompt():

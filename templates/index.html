@@ -691,24 +691,40 @@
                             </div>
                         </div>
                         
-                        <div class="chat-layout-wrapper" style="display: flex; flex: 1; min-height: 0; min-width: 0; overflow: hidden; position: relative;">
-                            <div class="live-log-viewer" id="live-log-viewer" style="flex: 1; min-width: 0;">
-                                <div class="log-entry log-status">Waiting for service to start...</div>
-                            </div>
-                            <!-- Tool Checkpoints Sidebar -->
-                            <div class="chat-sidebar" id="chat-sidebar">
-                                <div class="chat-sidebar-header">
-                                    <i class="ph ph-git-commit"></i> Tool Checkpoints
-                                </div>
-                                <div id="timeline-container" class="timeline-container">
-                                    <!-- timeline items will be populated here -->
-                                </div>
-                            </div>
-                            
-                            <!-- Floating Edge Toggle -->
-                            <button type="button" id="btn-toggle-timeline" class="timeline-edge-toggle" title="Toggle Timelines">
-                                <i class="ph ph-caret-left"></i>
+                        <!-- Chat Tab Bar -->
+                        <div class="chat-tab-bar" id="chat-tab-bar">
+                            <button type="button" class="chat-tab active" data-tab-id="main">
+                                <i class="ph ph-chat-text"></i>
+                                <span>Main Agent</span>
                             </button>
+                            <!-- Dynamic isess tabs will be injected here -->
+                        </div>
+
+                        <div class="chat-tabs-content" id="chat-tabs-content">
+                            <!-- Main Agent Chat Tab -->
+                            <div class="chat-tab-panel active" id="chat-tab-main">
+                                <div class="chat-layout-wrapper" style="display: flex; flex: 1; min-height: 0; min-width: 0; overflow: hidden; position: relative;">
+                                    <div class="live-log-viewer" id="live-log-viewer" style="flex: 1; min-width: 0;">
+                                        <div class="log-entry log-status">Waiting for service to start...</div>
+                                    </div>
+                                    <!-- Tool Checkpoints Sidebar -->
+                                    <div class="chat-sidebar" id="chat-sidebar">
+                                        <div class="chat-sidebar-header">
+                                            <i class="ph ph-git-commit"></i> Tool Checkpoints
+                                        </div>
+                                        <div id="timeline-container" class="timeline-container">
+                                            <!-- timeline items will be populated here -->
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Floating Edge Toggle -->
+                                    <button type="button" id="btn-toggle-timeline" class="timeline-edge-toggle" title="Toggle Timelines">
+                                        <i class="ph ph-caret-left"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Terminal Tabs Content (Dynamic) -->
                         </div>
 
                         <!-- Docked Chat Console -->
