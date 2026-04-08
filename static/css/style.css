@@ -1140,8 +1140,6 @@ option {
 
 .detail-content {
     padding: 1rem;
-    max-height: 380px;
-    overflow-y: auto;
     font-size: 0.85rem;
     line-height: 1.6;
     background: var(--bg-dark);
@@ -1262,8 +1260,6 @@ option {
     word-wrap: break-word;
     word-break: break-word;
     overflow-wrap: break-word;
-    max-height: 140px;
-    overflow-y: auto;
     background: var(--input-bg);
     border-radius: 5px;
     padding: 0.5rem;
