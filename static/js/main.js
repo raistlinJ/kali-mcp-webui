@@ -116,6 +116,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const analysisJobsList = document.getElementById('analysis-jobs-list');
     const analysisJobsSummary = document.getElementById('analysis-jobs-summary');
     const clearJobsBtn = document.getElementById('clear-jobs-btn');
+    const btnZenMode = document.getElementById('btn-zen-mode');
+    
+    if (btnZenMode) {
+        btnZenMode.addEventListener('click', () => {
+            document.body.classList.toggle('zen-mode');
+            const icon = btnZenMode.querySelector('i');
+            if (document.body.classList.contains('zen-mode')) {
+                icon.classList.remove('ph-corners-out');
+                icon.classList.add('ph-corners-in');
+            } else {
+                icon.classList.remove('ph-corners-in');
+                icon.classList.add('ph-corners-out');
+            }
+        });
+    }
     
     let _analysisCache = {};
     let _analysisJobsInterval = null;

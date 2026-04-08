@@ -2733,3 +2733,37 @@ option {
     0%, 100% { background: rgba(139, 92, 246, 0.03); }
     50% { background: rgba(139, 92, 246, 0.08); }
 }
+
+/* Zen Mode (Fullscreen Chat) */
+body.zen-mode .header,
+body.zen-mode #main-navigation,
+body.zen-mode .background-decorations {
+    display: none !important;
+}
+
+body.zen-mode .container {
+    padding: 0 !important;
+    max-width: 100% !important;
+    height: 100vh !important;
+}
+
+body.zen-mode .layout-wrapper {
+    height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 1rem !important;
+}
+
+body.zen-mode .content-area,
+body.zen-mode .tab-pane {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+}
+
+body.zen-mode .live-log-viewer {
+    max-height: none !important;
+    flex: 1 !important;
+}
