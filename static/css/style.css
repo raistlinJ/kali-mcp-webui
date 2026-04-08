@@ -1449,8 +1449,6 @@ option {
     background: rgba(0, 0, 0, 0.2);
     border-radius: 4px;
     padding: 0.4rem;
-    max-height: 200px;
-    overflow-y: auto;
 }
 
 .log-prompt {
