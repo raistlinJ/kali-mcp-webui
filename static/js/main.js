@@ -2361,7 +2361,13 @@ document.addEventListener('DOMContentLoaded', () => {
         updateChatControlAvailability();
         chatPromptInput.disabled = true;
         chatPromptInput.placeholder = "Start the service in the Configuration tab to begin...";
+        
+        sendPromptBtn.classList.remove('btn-danger', 'btn-secondary');
+        sendPromptBtn.classList.add('btn-primary');
+        sendPromptBtn.title = "Send";
+        sendPromptBtn.innerHTML = ICON_SVG.SEND;
         sendPromptBtn.disabled = true;
+        
         annotateBtn.disabled = true;
         chatStopBtn.disabled = true;
         chatDownloadBtn.style.display = 'none';
