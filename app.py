@@ -1403,11 +1403,12 @@ def session_chat():
     with _session_lock:
         _session_state["cancel_event"] = cancel_event
 
-    # Schedule the chat coroutine on the session's event loop
     future = asyncio.run_coroutine_threadsafe(
         session.chat(prompt, cancel_event=cancel_event, scope=scope, urgency=urgency),
         loop,
     )
+    with _session_lock:
+        _session_state["chat_future"] = future
 
     # Return immediately — the client follows progress via SSE
     return jsonify({
@@ -1439,6 +1440,12 @@ def session_cancel_prompt():
             except Exception as exc:
                 app.logger.warning('Failed to write tool cancel request for run_id=%s: %s', run_id, exc)
         loop.call_soon_threadsafe(cancel_event.set)
+        
+        # Actively cancel the asyncio task if it is waiting on a blocking thread
+        future = _session_state.get("chat_future")
+        if future:
+            future.cancel()
+            
         return jsonify({'success': True, 'message': 'Cancel signal sent.'})
     else:
         return jsonify({'success': False, 'error': 'No prompt currently running to cancel.'}), 400

@@ -1849,6 +1849,11 @@ class MCPSession:
         async with self._chat_lock:
             try:
                 await self._run_agent_loop(prompt, cancel_event, scope=scope, urgency=urgency)
+            except asyncio.CancelledError:
+                # Top level task was aborted violently, cleanly exit
+                if cancel_event:
+                    cancel_event.set()
+                _emit_chat_cancelled(self.event_callback)
             except Exception as e:
                 _emit(self.event_callback, "error", {
                     "message": "The session hit an internal runtime error. Check server logs for details."
