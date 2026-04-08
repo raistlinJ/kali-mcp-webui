@@ -416,6 +416,14 @@
                                             value="msf_search" class="tool-checkbox"> msf_search</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="msf_run"
                                             value="msf_run" class="tool-checkbox"> msf_run</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="builtin"
+                                            value="interactive_session_list" class="tool-checkbox"> isess_list</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="builtin"
+                                            value="interactive_session_read" class="tool-checkbox"> isess_read</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="builtin"
+                                            value="interactive_session_write" class="tool-checkbox"> isess_write</label>
+                                    <label class="checkbox-container"><input type="checkbox" data-cmd="builtin"
+                                            value="interactive_session_close" class="tool-checkbox"> isess_close</label>
                                     <label class="checkbox-container"><input type="checkbox" data-cmd="/usr/bin/commix"
                                             value="commix" class="tool-checkbox"> commix</label>
                                     </div>
@@ -673,12 +681,18 @@
                                 style="display:none; font-size: 0.75rem;"></span>
                             <button type="button" id="btn-zen-mode" class="btn btn-secondary"
                                 style="padding: 0.3rem 0.6rem; font-size: 0.82rem;" title="Toggle Fullscreen">
-                                <i class="ph ph-corners-out"></i> Fullscreen
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256" style="margin-right: 2px;">
+                                    <path d="M152,48a8,8,0,0,1,8-8h56a8,8,0,0,1,8,8v56a8,8,0,0,1-16,0V56H160A8,8,0,0,1,152,48ZM48,104a8,8,0,0,0,16,0V56H104a8,8,0,0,0,0-16H48a8,8,0,0,0-8,8V96A8,8,0,0,0,48,104ZM208,152a8,8,0,0,0-8,8v40H160a8,8,0,0,0,0,16h56a8,8,0,0,0,8-8V160A8,8,0,0,0,208,152ZM104,208H64V160a8,8,0,0,0-16,0v56a8,8,0,0,0,8,8h56a8,8,0,0,0,0-16Z"></path>
+                                </svg> 
+                                <span>Fullscreen</span>
                             </button>
                             <button type="button" id="chat-download-btn" class="btn btn-secondary"
                                 style="padding: 0.3rem 0.6rem; font-size: 0.82rem; display: none;"
                                 title="Download Full Session Archive (.zip)">
-                                <i class="ph ph-file-zip"></i> Download Archive
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256" style="margin-right: 2px;">
+                                    <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM152,44l44,44H152ZM200,216H56V40h80V96a8,8,0,0,0,8,8h56V216Zm-72-80h16v16H128Zm16,16v16h-8V152Zm-8,16h16v16H136Zm16,16v16h-8V184Zm-8,16h16v16H144Z"></path>
+                                </svg>
+                                <span>Download Archive</span>
                             </button>
                         </div>
                         <div class="context-usage-bar" id="context-usage-bar" style="display:none;">
@@ -719,7 +733,9 @@
                                     
                                     <!-- Floating Edge Toggle -->
                                     <button type="button" id="btn-toggle-timeline" class="timeline-edge-toggle" title="Toggle Timelines">
-                                        <i class="ph ph-caret-left"></i>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
+                                            <path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"></path>
+                                        </svg>
                                     </button>
                                 </div>
                             </div>

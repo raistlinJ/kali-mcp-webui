@@ -2840,20 +2840,21 @@ body.zen-mode .live-log-viewer {
     right: 0;
     top: 50%;
     transform: translateY(-50%);
-    width: 20px;
-    height: 48px;
-    background: var(--surface-bg);
-    border: 1px solid var(--border-color);
+    width: 22px;
+    height: 54px;
+    background: rgba(30, 41, 59, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--panel-border);
     border-right: none;
-    border-radius: 8px 0 0 8px;
+    border-radius: 10px 0 0 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-    color: var(--text-color);
-    transition: right 0.2s ease-in-out, background 0.15s ease-in-out, color 0.15s;
-    z-index: 10;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.4);
+    color: var(--accent-primary);
+    transition: all var(--transition-fast);
+    z-index: 100;
 }
 
 .timeline-edge-toggle:hover {

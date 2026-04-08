@@ -1309,7 +1309,11 @@ async def list_tools() -> list[Tool]:
                 }
             }
         ))
-    tools.extend(_builtin_interactive_tools(bool(config.get("tools")) or bool(_interactive_sessions)))
+    existing_tool_names = {t.name for t in tools}
+    builtin_tools = _builtin_interactive_tools(bool(config.get("tools")) or bool(_interactive_sessions))
+    for bt in builtin_tools:
+        if bt.name not in existing_tool_names:
+            tools.append(bt)
     return tools
 
 @server.call_tool()

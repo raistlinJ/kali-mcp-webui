@@ -123,15 +123,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnZenMode = document.getElementById('btn-zen-mode');
     
     if (btnZenMode) {
+        const svgPathCornersOut = "M152,48a8,8,0,0,1,8-8h56a8,8,0,0,1,8,8v56a8,8,0,0,1-16,0V56H160A8,8,0,0,1,152,48ZM48,104a8,8,0,0,0,16,0V56H104a8,8,0,0,0,0-16H48a8,8,0,0,0-8,8V96A8,8,0,0,0,48,104ZM208,152a8,8,0,0,0-8,8v40H160a8,8,0,0,0,0,16h56a8,8,0,0,0,8-8V160A8,8,0,0,0,208,152ZM104,208H64V160a8,8,0,0,0-16,0v56a8,8,0,0,0,8,8h56a8,8,0,0,0,0-16Z";
+        const svgPathCornersIn = "M216,96a8,8,0,0,1-8,8H160a8,8,0,0,1-8-8V40a8,8,0,0,1,16,0V88h40A8,8,0,0,1,216,96ZM96,152H40a8,8,0,0,0,0,16H88v48a8,8,0,0,0,16,0V160A8,8,0,0,0,96,152ZM216,160a8,8,0,0,0-8-8H160a8,8,0,0,0-8,8v56a8,8,0,0,0,16,0V168h40A8,8,0,0,0,216,160ZM88,96V40a8,8,0,0,0-16,0V88H32a8,8,0,0,0,0,16H96a8,8,0,0,0,0-16Z";
+
         btnZenMode.addEventListener('click', () => {
             document.body.classList.toggle('zen-mode');
-            const icon = btnZenMode.querySelector('i');
-            if (document.body.classList.contains('zen-mode')) {
-                icon.classList.remove('ph-corners-out');
-                icon.classList.add('ph-corners-in');
-            } else {
-                icon.classList.remove('ph-corners-in');
-                icon.classList.add('ph-corners-out');
+            const pathElement = btnZenMode.querySelector('path');
+            if (pathElement) {
+                if (document.body.classList.contains('zen-mode')) {
+                    pathElement.setAttribute('d', svgPathCornersIn);
+                } else {
+                    pathElement.setAttribute('d', svgPathCornersOut);
+                }
             }
         });
     }
@@ -515,6 +518,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     command: cmd,
                     args: ['{args}'],
                     timeout_seconds: 120,
+                    allow_args: true
+                };
+            } else if (name === 'interactive_session_list') {
+                toolDefinition = {
+                    name: "interactive_session_list",
+                    description: "List preserved interactive sessions created by prior tool calls, such as a Meterpreter or Metasploit console session.",
+                    command: "builtin"
+                };
+            } else if (name === 'interactive_session_read') {
+                toolDefinition = {
+                    name: "interactive_session_read",
+                    description: "Read newly available output from a preserved interactive session.",
+                    command: "builtin",
+                    allow_args: true
+                };
+            } else if (name === 'interactive_session_write') {
+                toolDefinition = {
+                    name: "interactive_session_write",
+                    description: "Send a command to a preserved interactive session and return any resulting output.",
+                    command: "builtin",
+                    allow_args: true
+                };
+            } else if (name === 'interactive_session_close') {
+                toolDefinition = {
+                    name: "interactive_session_close",
+                    description: "Terminate a preserved interactive session and return any final buffered output.",
+                    command: "builtin",
                     allow_args: true
                 };
             } else {
@@ -2301,14 +2331,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnToggleTimeline = document.getElementById('btn-toggle-timeline');
     const chatSidebar = document.getElementById('chat-sidebar');
     if (btnToggleTimeline && chatSidebar) {
+        const svgPathLeft = "M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z";
+        const svgPathRight = "M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z";
+
         btnToggleTimeline.addEventListener('click', () => {
             chatSidebar.classList.toggle('is-visible');
-            if (chatSidebar.classList.contains('is-visible')) {
+            const isVisible = chatSidebar.classList.contains('is-visible');
+            const pathElem = btnToggleTimeline.querySelector('path');
+
+            if (isVisible) {
                 btnToggleTimeline.style.right = '260px'; /* match sidebar width */
-                btnToggleTimeline.innerHTML = '<i class="ph ph-caret-right"></i>';
+                if (pathElem) pathElem.setAttribute('d', svgPathRight);
             } else {
                 btnToggleTimeline.style.right = '0';
-                btnToggleTimeline.innerHTML = '<i class="ph ph-caret-left"></i>';
+                if (pathElem) pathElem.setAttribute('d', svgPathLeft);
             }
         });
     }
