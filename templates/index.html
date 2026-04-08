@@ -166,15 +166,6 @@
                                     <span class="input-hint" id="provider-api-key-help-text">Used only for outbound model discovery and LLM requests. It is not written to session logs.</span>
                                 </div>
 
-                                <button type="button" id="fetch-models-btn" class="btn btn-secondary">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
-                                        viewBox="0 0 256 256" class="reload-icon">
-                                        <path
-                                            d="M224,128a96,96,0,0,1-144.07,83.11l-3.37-2.31a8,8,0,0,1,9.15-13.15l3.38,2.32A80,80,0,1,0,52.56,92H80a8,8,0,0,1,0,16H32a8,8,0,0,1-8-8V52a8,8,0,0,1,16,0V79.43A95.78,95.78,0,0,1,224,128Z">
-                                        </path>
-                                    </svg>
-                                    <span>Fetch Available LLMs</span>
-                                </button>
                                 <div id="ollama-fetch-error" class="error-label"
                                     style="display: none; color: var(--status-error); font-size: 0.82rem; margin-top: 0.6rem; padding: 0.4rem 0.6rem; border-radius: 4px; background: rgba(var(--status-error-rgb, 255, 68, 68), 0.1);">
                                 </div>
@@ -190,12 +181,24 @@
 
                                 <div class="input-group">
                                     <label for="model-select">Select Model</label>
-                                    <div class="select-wrapper">
-                                        <i class="ph ph-robot icon-left"></i>
-                                        <select id="model-select" disabled>
-                                            <option value="" disabled selected>Click 'Fetch' to load models</option>
-                                        </select>
-                                        <i class="ph ph-caret-down icon-right"></i>
+                                    <div style="display: flex; gap: 0.5rem; align-items: stretch;">
+                                        <div class="select-wrapper" style="flex: 1; min-width: 0;">
+                                            <i class="ph ph-robot icon-left"></i>
+                                            <select id="model-select" disabled>
+                                                <option value="" disabled selected>Click 'Fetch' to load models</option>
+                                            </select>
+                                            <i class="ph ph-caret-down icon-right"></i>
+                                        </div>
+                                        <button type="button" id="fetch-models-btn" class="btn btn-secondary"
+                                            style="padding: 0 0.75rem; white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 0.35rem;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                                                viewBox="0 0 256 256" class="reload-icon">
+                                                <path
+                                                    d="M224,128a96,96,0,0,1-144.07,83.11l-3.37-2.31a8,8,0,0,1,9.15-13.15l3.38,2.32A80,80,0,1,0,52.56,92H80a8,8,0,0,1,0,16H32a8,8,0,0,1-8-8V52a8,8,0,0,1,16,0V79.43A95.78,95.78,0,0,1,224,128Z">
+                                                </path>
+                                            </svg>
+                                            <span>Fetch</span>
+                                        </button>
                                     </div>
                                 </div>
 
