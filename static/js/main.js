@@ -977,7 +977,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateProviderUi();
         modelSelect.innerHTML = '<option value="" disabled selected>Click \'Fetch\' to load models</option>';
         modelSelect.disabled = true;
-        startBtn.disabled = true;
+        if (!_serviceRunning) {
+            startBtn.disabled = true;
+        }
         if (ollamaFetchError) {
             ollamaFetchError.style.display = 'none';
             ollamaFetchError.innerText = '';
@@ -1184,7 +1186,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 startBtn.disabled = false;
                 persistLastSettings();
             },
-            onFailure: () => { startBtn.disabled = true; },
+            onFailure: () => {
+                if (!_serviceRunning) {
+                    startBtn.disabled = true;
+                }
+            },
         });
     });
 
