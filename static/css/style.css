@@ -2756,7 +2756,7 @@ body.zen-mode .layout-wrapper {
 }
 
 body.zen-mode .content-area,
-body.zen-mode .tab-pane {
+body.zen-mode .tab-pane.active {
     flex: 1 !important;
     display: flex !important;
     flex-direction: column !important;
