@@ -1211,6 +1211,7 @@ class MCPSession:
         context_window: int = DEFAULT_CONTEXT_WINDOW,
         max_turns: int = DEFAULT_MAX_TURNS,
         network_policy: dict | None = None,
+        extended_msf_prompt: bool = False,
     ):
         self.llm_provider = str(llm_provider or "ollama_direct").strip() or "ollama_direct"
         self.ollama_url = _normalize_provider_base_url(self.llm_provider, ollama_url)
@@ -1223,6 +1224,7 @@ class MCPSession:
         self.event_callback = event_callback
         self.run_id = run_id or make_run_id("agent")
         self.network_policy = _normalize_network_policy(network_policy)
+        self.extended_msf_prompt = bool(extended_msf_prompt)
         
         # Initialize with a strong system prompt to ensure tools aren't sent to the background
         allow_text = ", ".join(self.network_policy['allow'])
@@ -1230,7 +1232,7 @@ class MCPSession:
         self.messages: list[dict] = [
             {
                 "role": "system",
-                "content": "You are a network security assistant. You must wait for all tools to finish executing. NEVER attempt to run tools in the background (e.g., using `&` or `nohup`). You MUST allow the system to execute the tool synchronously so you can read and analyze the output before replying. The shell_dangerous tool requires explicit user verification before execution; do not try to bypass this gate with less privileged tools like `shell_extended` if you need to run complex, write-enabled, or blocked commands. Use `shell_dangerous` when necessary and expect an approval gate. If a tool reports that an interactive session was preserved with an id such as `isess-001`, continue through the dedicated interactive_session_list, interactive_session_read, interactive_session_write, and interactive_session_close tools instead of rerunning the exploit. IMPORTANT: If you are interacting with Metasploit (msfconsole) or Meterpreter, ALWAYS run the `help` command first to enumerate available commands. Standard Linux commands like `grep` or `cat` may not work natively in Meterpreter unless you drop into a system shell. You must obey the target access policy without exception. Allowed targets: " + allow_text + ". Disallowed targets: " + disallow_text + ". If a target is out of scope, do not attempt the action."
+                "content": self._build_initial_system_prompt(allow_text, disallow_text)
             }
         ]
         
@@ -1251,6 +1253,28 @@ class MCPSession:
         self._pending_post_tool_reply = None
         self._pending_dangerous_tool_approval = None
         self._pending_tool_timeout_decision = None
+
+    def _build_initial_system_prompt(self, allow_text: str, disallow_text: str) -> str:
+        prompt = (
+            "You are a network security assistant. You must wait for all tools to finish executing. "
+            "NEVER attempt to run tools in the background (e.g., using `&` or `nohup`). "
+            "You MUST allow the system to execute the tool synchronously so you can read and analyze the output before replying. "
+            "The shell_dangerous tool requires explicit user verification before execution; do not try to bypass this gate "
+            "with less privileged tools like `shell_extended` if you need to run complex, write-enabled, or blocked commands. "
+            "Use `shell_dangerous` when necessary and expect an approval gate. If a tool reports that an interactive session "
+            "was preserved with an id such as `isess-001`, continue through the dedicated interactive_session_list, "
+            "interactive_session_read, interactive_session_write, and interactive_session_close tools instead of rerunning the exploit."
+        )
+        
+        if self.extended_msf_prompt:
+            prompt += (
+                " IMPORTANT: If you are interacting with Metasploit (msfconsole) or Meterpreter, ALWAYS run the `help` "
+                "command first to enumerate available commands. Standard Linux commands like `grep` or `cat` may not work "
+                "natively in Meterpreter unless you drop into a system shell."
+            )
+
+        prompt += f" You must obey the target access policy without exception. Allowed targets: {allow_text}. Disallowed targets: {disallow_text}. If a target is out of scope, do not attempt the action."
+        return prompt
 
     def _client_headers(self) -> dict | None:
         headers = _provider_headers(self.llm_provider, self.api_key)

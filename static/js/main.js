@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Keylogger references
     const keyloggerEnableToggle = document.getElementById('keylogger-enable-toggle');
+    const extendedMsfPromptToggle = document.getElementById('extended-msf-prompt-toggle');
     const configSubtabBtns = document.querySelectorAll('.config-subtab-btn');
     const configSubtabPanels = document.querySelectorAll('.config-subtab-panel');
 
@@ -545,6 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 policyDraft: normalizePolicy(_policyDraft),
                 toolCheckboxStates,
                 toolsJson: toolsJsonArea?.value || '',
+                extendedMsfPrompt: Boolean(extendedMsfPromptToggle?.checked),
                 activeConfigSubtab: document.querySelector('.config-subtab-btn.active')?.dataset.configTarget || 'config-runtime-panel',
                 savedAt: Date.now(),
             };
@@ -603,6 +605,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (kaliCommandType && payload.kaliCommandType) {
                 kaliCommandType.value = payload.kaliCommandType === 'apt' ? 'apt' : 'python';
                 kaliCommandType.dispatchEvent(new Event('change'));
+            }
+
+            if (extendedMsfPromptToggle && typeof payload.extendedMsfPrompt === 'boolean') {
+                extendedMsfPromptToggle.checked = payload.extendedMsfPrompt;
             }
 
             const toolCheckboxStates = payload.toolCheckboxStates;
@@ -2042,7 +2048,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/session/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, provider, api_key: apiKey, ssl_verify: sslVerify, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, max_turns: maxTurns, network_policy: networkPolicy, keylogger_enabled: keyloggerEnabled })
+                body: JSON.stringify({ url, provider, api_key: apiKey, ssl_verify: sslVerify, model, server_command: command, tools_config: toolsConfig, context_window: contextWindow, max_turns: maxTurns, network_policy: networkPolicy, keylogger_enabled: keyloggerEnabled, extended_msf_prompt: Boolean(extendedMsfPromptToggle?.checked) })
             });
             const data = await response.json();
 
