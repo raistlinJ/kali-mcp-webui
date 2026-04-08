@@ -2136,11 +2136,11 @@ document.addEventListener('DOMContentLoaded', () => {
         btnToggleTimeline.addEventListener('click', () => {
             chatSidebar.classList.toggle('is-visible');
             if (chatSidebar.classList.contains('is-visible')) {
-                btnToggleTimeline.classList.add('btn-primary');
-                btnToggleTimeline.classList.remove('btn-secondary');
+                btnToggleTimeline.style.right = '260px'; /* match sidebar width */
+                btnToggleTimeline.innerHTML = '<i class="ph ph-caret-right"></i>';
             } else {
-                btnToggleTimeline.classList.add('btn-secondary');
-                btnToggleTimeline.classList.remove('btn-primary');
+                btnToggleTimeline.style.right = '0';
+                btnToggleTimeline.innerHTML = '<i class="ph ph-caret-left"></i>';
             }
         });
     }
