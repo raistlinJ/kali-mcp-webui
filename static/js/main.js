@@ -1715,11 +1715,26 @@ document.addEventListener('DOMContentLoaded', () => {
         // Append to timeline sidebar
         const timelineContainer = document.getElementById('timeline-container');
         if (timelineContainer && event?.tool) {
+            let previewStr = '';
+            if (event.args && Object.keys(event.args).length > 0) {
+                const joinedArgs = Object.values(event.args)
+                    .map(v => typeof v === 'string' ? v : JSON.stringify(v))
+                    .join(' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                if (joinedArgs) {
+                    previewStr = joinedArgs.length > 28 ? ` ${joinedArgs.slice(0, 25)}...` : ` ${joinedArgs}`;
+                }
+            }
+            
             const tlItem = document.createElement('div');
             tlItem.className = 'timeline-item';
             tlItem.id = `timeline-ref-${callId}`;
             tlItem.innerHTML = `
-                <div class="timeline-item-title"><i class="ph ph-wrench"></i> ${escapeHtml(event.tool)}</div>
+                <div class="timeline-item-title" style="flex-wrap: wrap;">
+                    <span><i class="ph ph-wrench"></i> ${escapeHtml(event.tool)}</span>
+                    <span style="font-weight: normal; font-size: 0.75rem; opacity: 0.7;">${escapeHtml(previewStr)}</span>
+                </div>
                 <div class="timeline-item-status" id="timeline-status-${callId}">Running...</div>
             `;
             tlItem.addEventListener('click', () => {
