@@ -197,7 +197,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let _eventSource = null;
     let _serviceRunning = false;
     let _chatBusy = false;
+    let _activeToolEntry = null;
     let _logInitialCleared = false;
+    let _toolTimelineCounter = 0;
 
     function getChatScopeIndex() {
         const rawValue = Number.parseInt(chatScopeSlider?.value ?? '2', 10);
@@ -296,7 +298,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let _awaitingToolTimeoutDecision = false;
     let _activeToolState = null;
     let _activeToolTicker = null;
-    let _activeToolEntry = null;
     const LIVE_LOG_STORAGE_PREFIX = 'live-log:';
     const LAST_ACTIVE_RUN_STORAGE_KEY = 'live-log:last-active-run';
     const LAST_SETTINGS_STORAGE_KEY = 'runtime:last-settings:v2';
@@ -1569,12 +1570,18 @@ document.addEventListener('DOMContentLoaded', () => {
         liveLogViewer.appendChild(entry);
         while (liveLogViewer.children.length > MAX_LIVE_LOG_ENTRIES) {
             const firstChild = liveLogViewer.firstElementChild;
-            if (!firstChild) {
-                break;
-            }
+            if (!firstChild) break;
+            
             if (_activeToolEntry === firstChild) {
                 _activeToolEntry = null;
             }
+            
+            // Auto drop timeline nodes for removed tool calls
+            if (firstChild.id && firstChild.id.startsWith('tool-call-')) {
+                const tlRef = document.getElementById(`timeline-ref-${firstChild.id}`);
+                if (tlRef) tlRef.remove();
+            }
+            
             liveLogViewer.removeChild(firstChild);
         }
         liveLogViewer.scrollTop = liveLogViewer.scrollHeight;
@@ -1653,6 +1660,19 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="log-tool-call-meta">args: <code>${escapeHtml(argsJson)}</code></div>
             <div class="log-tool-call-note">${escapeHtml(note)}</div>
         `;
+        
+        // Update timeline sidebar
+        if (_activeToolState.callId) {
+            const statusEl = document.getElementById(`timeline-status-${_activeToolState.callId}`);
+            if (statusEl) {
+                statusEl.textContent = `${phaseLabel} (${runtime})`;
+                if (phaseClass.includes('error') || phaseClass.includes('danger')) {
+                    statusEl.style.color = '#e74c3c';
+                } else if (phaseClass.includes('success') || phaseClass === 'is-complete') {
+                    statusEl.style.color = '#2ecc71';
+                }
+            }
+        }
     }
 
     function stopActiveToolTicker() {
@@ -1676,14 +1696,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function beginActiveTool(event, entry) {
+        _toolTimelineCounter++;
+        const callId = `tool-call-${_toolTimelineCounter}`;
+        
         _activeToolState = {
             tool: String(event?.tool || 'Running tool'),
             args: event?.args || {},
             startedAt: Date.now(),
             phase: 'running',
             note: '',
+            callId: callId
         };
         _activeToolEntry = entry || null;
+        if (_activeToolEntry) {
+            _activeToolEntry.id = callId;
+        }
+        
+        // Append to timeline sidebar
+        const timelineContainer = document.getElementById('timeline-container');
+        if (timelineContainer && event?.tool) {
+            const tlItem = document.createElement('div');
+            tlItem.className = 'timeline-item';
+            tlItem.id = `timeline-ref-${callId}`;
+            tlItem.innerHTML = `
+                <div class="timeline-item-title"><i class="ph ph-wrench"></i> ${escapeHtml(event.tool)}</div>
+                <div class="timeline-item-status" id="timeline-status-${callId}">Running...</div>
+            `;
+            tlItem.addEventListener('click', () => {
+                const target = document.getElementById(callId);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Optional flash / highlight effect
+                    target.style.background = 'var(--panel-bg)';
+                    setTimeout(() => target.style.background = '', 1000);
+                }
+            });
+            timelineContainer.appendChild(tlItem);
+            timelineContainer.scrollTop = timelineContainer.scrollHeight;
+        }
+
         renderActiveToolEntry();
         ensureActiveToolTicker();
     }
@@ -2075,6 +2126,23 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchBtn.removeAttribute('data-originally-disabled');
         }
         configPanel.classList.toggle('config-disabled', !enabled);
+    }
+
+    // ---------------------------------------------------------------
+    // Sidebar Action Toggles
+    const btnToggleTimeline = document.getElementById('btn-toggle-timeline');
+    const chatSidebar = document.getElementById('chat-sidebar');
+    if (btnToggleTimeline && chatSidebar) {
+        btnToggleTimeline.addEventListener('click', () => {
+            chatSidebar.classList.toggle('is-visible');
+            if (chatSidebar.classList.contains('is-visible')) {
+                btnToggleTimeline.classList.add('btn-primary');
+                btnToggleTimeline.classList.remove('btn-secondary');
+            } else {
+                btnToggleTimeline.classList.add('btn-secondary');
+                btnToggleTimeline.classList.remove('btn-primary');
+            }
+        });
     }
 
     // ---------------------------------------------------------------
