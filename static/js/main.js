@@ -1764,9 +1764,9 @@ document.addEventListener('DOMContentLoaded', () => {
         entry.textContent = text;
         viewer.appendChild(entry);
 
-        // Reliable auto-scroll: wait for layout, then scroll the new entry into view
+        // Auto-scroll within the log viewer only (not the outer page)
         requestAnimationFrame(() => {
-            entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            viewer.scrollTop = viewer.scrollHeight;
         });
     }
 
