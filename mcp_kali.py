@@ -370,6 +370,17 @@ def _refresh_interactive_session(session: dict, wait_seconds: float = 0.0) -> st
         session["closed_at"] = time.time()
         _close_session_master_fd(session)
 
+        # Log the auto-close so the session lifecycle is fully captured
+        sid = session.get("id", "unknown")
+        rc = session["returncode"]
+        _logger.log_tool_call(
+            name="interactive_session_auto_close",
+            args={"session_id": sid, "reason": "process_exited"},
+            result=f"Interactive session {sid} closed automatically (process exited with code {rc}).",
+            duration_ms=0,
+            exit_code=rc,
+        )
+
     return chunk
 
 
