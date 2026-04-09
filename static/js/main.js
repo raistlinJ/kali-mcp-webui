@@ -1719,6 +1719,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = await res.json();
                     if (!data.success) {
                         appendIsessLog(sessionId, `Error: ${data.error || 'Failed to send command.'}\n`, 'log-error-text');
+                    } else if (data.content) {
+                        // Display the output returned by the write handler
+                        appendIsessLog(sessionId, data.content + '\n', 'log-tool-result');
                     }
                 } catch (err) {
                     appendIsessLog(sessionId, `Network error: ${err.message}\n`, 'log-error-text');
