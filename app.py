@@ -501,7 +501,8 @@ def _event_callback(event: dict):
     
     # Track isess sessions for background polling
     if event.get("type") == "isess_created":
-        session_id = event.get("data", {}).get("session_id")
+        # _emit() spreads data into top-level, so session_id is at event level
+        session_id = event.get("session_id") or event.get("data", {}).get("session_id")
         if session_id:
             with _session_lock:
                 _session_state["isess_sessions"].add(session_id)

@@ -2818,10 +2818,18 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'watcher_note_complete':
                 if (typeof window.watcherNoteComplete === 'function') window.watcherNoteComplete(event);
                 break;
-            case 'isess_created':
-                createTerminalTab(event.data.session_id); break;
-            case 'isess_output':
-                appendIsessLog(event.data.session_id, event.data.output, 'log-tool-result'); break;
+            case 'isess_created': {
+                // _emit() spreads fields to top-level; handle both shapes for safety
+                const sid = event.session_id || (event.data && event.data.session_id);
+                if (sid) createTerminalTab(sid);
+                break;
+            }
+            case 'isess_output': {
+                const osid = (event.data && event.data.session_id) || event.session_id;
+                const otext = (event.data && event.data.output) || event.output || '';
+                if (osid && otext) appendIsessLog(osid, otext, 'log-tool-result');
+                break;
+            }
             case 'watcher_analysis_note':
                 if (typeof window.watcherAddAnalysisNote === 'function') window.watcherAddAnalysisNote(event);
                 break;
