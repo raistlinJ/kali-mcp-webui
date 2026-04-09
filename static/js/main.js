@@ -1650,7 +1650,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Create Tab Button
         const tabBtn = document.createElement('button');
         tabBtn.type = 'button';
-        tabBtn.className = 'chat-tab';
+        tabBtn.className = 'chat-tab status-active';
         tabBtn.dataset.tabId = sessionId;
         tabBtn.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256" style="flex-shrink:0">
@@ -1775,10 +1775,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Append closed banner
         appendIsessLog(sessionId, `\n— Session ${sessionId} has been closed —`, 'log-status');
 
-        // Dim the tab label
+        // Dim and color the tab label
         const tab = document.querySelector(`.chat-tab[data-tab-id="${sessionId}"]`);
         if (tab) {
-            tab.style.opacity = '0.6';
+            tab.classList.remove('status-active');
+            tab.classList.add('status-closed');
             // Replace close X with a label
             const closeEl = tab.querySelector('.chat-tab-close');
             if (closeEl) closeEl.textContent = '⏹';

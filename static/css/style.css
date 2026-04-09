@@ -1414,6 +1414,33 @@ option {
     border-radius: 2px 2px 0 0;
 }
 
+/* Session Status Colors */
+.chat-tab.status-active {
+    color: var(--success);
+}
+.chat-tab.status-active:hover {
+    color: #34d399; /* emerald-400 */
+}
+.chat-tab.status-active.active::after {
+    background: var(--success);
+}
+
+.chat-tab.status-closed {
+    color: var(--error);
+    opacity: 0.7;
+}
+.chat-tab.status-closed:hover {
+    color: #f87171; /* red-400 */
+    opacity: 1;
+}
+.chat-tab.status-closed.active::after {
+    background: var(--error);
+}
+.chat-tab.status-closed svg,
+.chat-tab.status-closed .chat-tab-close {
+    color: var(--error);
+}
+
 .chat-tab i,
 .chat-tab svg {
     font-size: 0.9rem;
