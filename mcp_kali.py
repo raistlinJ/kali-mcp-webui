@@ -1365,13 +1365,23 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     if name in _BUILTIN_INTERACTIVE_TOOLS:
         t0 = time.time()
         output, exit_code = _interactive_session_tool_result(name, arguments or {})
-        _logger.log_tool_call(
-            name=name,
-            args=arguments or {},
-            result=output or "Command executed successfully (no output)",
-            duration_ms=int((time.time() - t0) * 1000),
-            exit_code=exit_code,
-        )
+        duration_ms = int((time.time() - t0) * 1000)
+
+        # Only log meaningful interactions — skip noisy polling reads
+        should_log = True
+        if name in ("interactive_session_read", "interactive_session_list"):
+            # Don't log polling reads that return status messages (no real output)
+            if not output or "has no new output" in output or "no preserved interactive sessions" in output.lower():
+                should_log = False
+
+        if should_log:
+            _logger.log_tool_call(
+                name=name,
+                args=arguments or {},
+                result=output or "Command executed successfully (no output)",
+                duration_ms=duration_ms,
+                exit_code=exit_code,
+            )
         return [TextContent(type="text", text=output or "Command executed successfully (no output)")]
 
     try:

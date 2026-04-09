@@ -1348,8 +1348,10 @@ def session_start():
                                         closed_ids.append(sid)
                             except Exception as e:
                                 app.logger.error(f"Error polling isess {sid}: {e}")
-                        # Stop polling sessions that are closed
+                        # Stop polling sessions that are closed, and notify the frontend
                         if closed_ids:
+                            for cid in closed_ids:
+                                _event_callback({"type": "isess_closed", "data": {"session_id": cid}})
                             with _session_lock:
                                 for cid in closed_ids:
                                     _session_state["isess_sessions"].discard(cid)

@@ -1741,17 +1741,31 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch('/api/session/isess/write', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: sessionId, input: 'exit' }) // Best effort exit
+            body: JSON.stringify({ session_id: sessionId, input: 'exit' })
         });
 
-        // Remove UI elements
-        const tab = document.querySelector(`.chat-tab[data-tab-id="${sessionId}"]`);
-        const panel = document.getElementById(`chat-tab-${sessionId}`);
-        if (tab) tab.remove();
-        if (panel) panel.remove();
+        markSessionClosed(sessionId);
+    }
 
-        // Switch back to main
-        switchChatTab('main');
+    function markSessionClosed(sessionId) {
+        const panel = document.getElementById(`chat-tab-${sessionId}`);
+        if (!panel) return;
+
+        // Remove input row
+        const inputRow = panel.querySelector('.isess-input-row');
+        if (inputRow) inputRow.remove();
+
+        // Append closed banner
+        appendIsessLog(sessionId, `\n— Session ${sessionId} has been closed —`, 'log-status');
+
+        // Dim the tab label
+        const tab = document.querySelector(`.chat-tab[data-tab-id="${sessionId}"]`);
+        if (tab) {
+            tab.style.opacity = '0.6';
+            // Replace close X with a label
+            const closeEl = tab.querySelector('.chat-tab-close');
+            if (closeEl) closeEl.textContent = '⏹';
+        }
     }
 
     function appendIsessLog(sessionId, text, cssClass = '') {
@@ -2861,6 +2875,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const osid = (event.data && event.data.session_id) || event.session_id;
                 const otext = (event.data && event.data.output) || event.output || '';
                 if (osid && otext) appendIsessLog(osid, otext, 'log-tool-result');
+                break;
+            }
+            case 'isess_closed': {
+                const csid = (event.data && event.data.session_id) || event.session_id;
+                if (csid) markSessionClosed(csid);
                 break;
             }
             case 'watcher_analysis_note':
