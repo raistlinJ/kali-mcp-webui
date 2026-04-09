@@ -1692,9 +1692,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="log-entry log-status">Waiting for output… You can type commands below once the session is ready.</div>
             </div>
-            <div class="isess-input-row">
+            <div class="isess-input-row" id="input-row-${sessionId}">
                 <span class="isess-prompt-indicator">></span>
-                <input type="text" class="isess-input" id="input-${sessionId}" placeholder="Type a command for ${sessionId} and press Enter...">
+                <input type="text" class="isess-input" id="input-${sessionId}" 
+                    placeholder="Waiting for session to initialize..." disabled>
             </div>
         `;
 
@@ -2874,7 +2875,21 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'isess_output': {
                 const osid = (event.data && event.data.session_id) || event.session_id;
                 const otext = (event.data && event.data.output) || event.output || '';
-                if (osid && otext) appendIsessLog(osid, otext, 'log-tool-result');
+                if (osid && otext) {
+                    appendIsessLog(osid, otext, 'log-tool-result');
+                    
+                    // Enable input once real output arrives
+                    const inputEl = document.getElementById(`input-${osid}`);
+                    if (inputEl && inputEl.disabled) {
+                        inputEl.disabled = false;
+                        inputEl.placeholder = `Type a command for ${osid} and press Enter...`;
+                        // Focus if current tab
+                        const activeTab = document.querySelector('.chat-tab.active');
+                        if (activeTab && activeTab.dataset.tabId === osid) {
+                            inputEl.focus();
+                        }
+                    }
+                }
                 break;
             }
             case 'isess_closed': {
