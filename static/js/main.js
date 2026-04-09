@@ -1763,7 +1763,11 @@ document.addEventListener('DOMContentLoaded', () => {
         entry.style.whiteSpace = 'pre-wrap';
         entry.textContent = text;
         viewer.appendChild(entry);
-        viewer.scrollTop = viewer.scrollHeight;
+
+        // Reliable auto-scroll: wait for layout, then scroll the new entry into view
+        requestAnimationFrame(() => {
+            entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        });
     }
 
     // Add event listener to main tab
