@@ -2201,13 +2201,32 @@ option {
    ============================================================ */
 
 .config-disabled {
-    opacity: 0.5;
+    position: relative;
+}
+
+/* Dim all config content EXCEPT the action footer */
+.config-disabled .form-section,
+.config-disabled .divider,
+.config-disabled .config-subtab-bar {
+    opacity: 0.4;
     filter: grayscale(0.3);
+    pointer-events: none;
     transition: opacity var(--transition-smooth), filter var(--transition-smooth);
+}
+
+/* Keep the action footer (Start/Stop button) fully visible */
+.config-disabled .action-footer {
+    opacity: 1;
+    filter: none;
+    pointer-events: auto;
 }
 
 .config-disabled #start-service-btn {
     pointer-events: auto;
+    opacity: 1;
+    filter: none;
+    position: relative;
+    z-index: 5;
 }
 
 #fetch-models-btn {
