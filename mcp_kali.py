@@ -191,8 +191,8 @@ def _looks_like_preservable_interactive_session(tool_name: str, stdout: str, std
         return True
     if "created in the background" in combined and "Session " in combined:
         return True
-    if tool_name == "msf_run" and _MSF_PROMPT_RE.search(combined):
-        return True
+    # We no longer auto-preserve 'msf_run' just because it returns to the msf prompt.
+    # This prevents idle consoles from spawning tabs. Real sessions are caught above.
     if _METERPRETER_PROMPT_RE.search(combined):
         return True
     if _SHELL_PROMPT_RE.search(combined):
