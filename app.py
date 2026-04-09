@@ -1333,15 +1333,25 @@ def session_start():
 
                     if active_ids:
                         # Use call_tool_direct to skip LLM
+                        closed_ids = []
                         for sid in active_ids:
                             try:
                                 res = await session.call_tool_direct("interactive_session_read", {"session_id": sid})
                                 if res.get("success") and res.get("content"):
                                     output = res["content"].strip()
-                                    if output:
+                                    # Filter out status messages — only forward actual output
+                                    if output and "has no new output" not in output and "is closed and no new output" not in output:
                                         _event_callback({"type": "isess_output", "data": {"session_id": sid, "output": output}})
+                                    # Track closed sessions for removal
+                                    if "is closed" in (output or ""):
+                                        closed_ids.append(sid)
                             except Exception as e:
                                 app.logger.error(f"Error polling isess {sid}: {e}")
+                        # Stop polling sessions that are closed
+                        if closed_ids:
+                            with _session_lock:
+                                for cid in closed_ids:
+                                    _session_state["isess_sessions"].discard(cid)
 
                     await asyncio.sleep(0.5)
             except asyncio.CancelledError:

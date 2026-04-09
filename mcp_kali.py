@@ -1335,6 +1335,9 @@ async def list_tools() -> list[Tool]:
     
     tools = []
     for t in config.get("tools", []):
+        # Skip interactive session tools from kali_tools.json — always use builtins
+        if t["name"] in _BUILTIN_INTERACTIVE_TOOLS:
+            continue
         tools.append(Tool(
             name=t["name"],
             description=t.get("description", f"Run {t['name']}"),
