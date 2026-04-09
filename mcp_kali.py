@@ -30,6 +30,7 @@ _ALLOWED_SHELL_COMMANDS = {
     "pwd",
     "whoami",
     "find",
+    "netstat",
 }
 _ALLOWED_EXTENDED_SHELL_COMMANDS = {
     "curl",
@@ -1109,7 +1110,7 @@ def _resolve_shell_delegation(config: dict, current_tool_name: str, arguments: d
     return requested_command, delegated_tool, {"args": delegated_args}
 
 
-def _run_shell_sequence(arguments: dict, timeout_seconds: int) -> tuple[str, int, int]:
+def _run_shell_sequence(arguments: dict, timeout_seconds: int, config: dict | None = None) -> tuple[str, int, int]:
     raw_args = arguments.get("args", "")
     commands, parse_error = _parse_shell_sequence(raw_args)
     if parse_error:
@@ -1119,8 +1120,18 @@ def _run_shell_sequence(arguments: dict, timeout_seconds: int) -> tuple[str, int
     t0 = time.time()
     overall_exit_code = 0
 
+    # Check if shell_dangerous is available for fallback
+    has_dangerous = False
+    if config:
+        has_dangerous = any(t.get("name") == "shell_dangerous" for t in config.get("tools", []))
+
     for index, command in enumerate(commands, start=1):
         cmd, error_text = _build_shell_command("shell_extended", {"args": command})
+        
+        if error_text and has_dangerous:
+            # Fall back to dangerous command if allowed
+            cmd, error_text = _build_dangerous_shell_command({"args": command})
+
         if error_text:
             output_chunks.append(f"Step {index}: {command}\n{error_text}")
             overall_exit_code = -1
@@ -1418,10 +1429,22 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         else:
             cmd, error_text = _build_shell_command(name, arguments)
             if error_text:
-                return [TextContent(type="text", text=error_text)]
+                # Auto-delegate to shell_dangerous if it's available in the config
+                dangerous_config = next(
+                    (t for t in config.get("tools", []) if t.get("name") == "shell_dangerous"),
+                    None,
+                )
+                if dangerous_config:
+                    name = "shell_dangerous"
+                    tool_config = dangerous_config
+                    cmd, error_text = _build_dangerous_shell_command(arguments)
+                    if error_text:
+                        return [TextContent(type="text", text=error_text)]
+                else:
+                    return [TextContent(type="text", text=error_text)]
     elif name == "shell_sequence":
         timeout_seconds = int(tool_config.get("timeout_seconds", 120) or 120)
-        output, exit_code, duration_ms = _run_shell_sequence(arguments, timeout_seconds)
+        output, exit_code, duration_ms = _run_shell_sequence(arguments, timeout_seconds, config=config)
         _logger.log_tool_call(
             name=name,
             args=arguments,
