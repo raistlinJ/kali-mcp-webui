@@ -1540,6 +1540,18 @@ option {
     opacity: 0.6;
 }
 
+/* New-tab attention pulse */
+@keyframes tab-pulse {
+    0%, 100% {
+        background: transparent;
+        box-shadow: none;
+    }
+    50% {
+        background: rgba(59, 130, 246, 0.15);
+        box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+    }
+}
+
 .chat-header-actions {
     display: flex;
     justify-content: flex-end;

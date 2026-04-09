@@ -1637,8 +1637,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function createTerminalTab(sessionId) {
+    function createTerminalTab(sessionId, tool = '', argsSummary = '') {
         if (document.querySelector(`.chat-tab[data-tab-id="${sessionId}"]`)) return;
+
+        // Build a descriptive tab label
+        let tabLabel = sessionId;
+        if (tool) {
+            const shortArgs = argsSummary.length > 30 ? argsSummary.substring(0, 30) + '…' : argsSummary;
+            tabLabel = `${tool}` + (shortArgs ? ` · ${shortArgs}` : '');
+        }
 
         // Create Tab Button
         const tabBtn = document.createElement('button');
@@ -1646,9 +1653,11 @@ document.addEventListener('DOMContentLoaded', () => {
         tabBtn.className = 'chat-tab';
         tabBtn.dataset.tabId = sessionId;
         tabBtn.innerHTML = `
-            <i class="ph ph-terminal-window"></i>
-            <span>Terminal: ${sessionId}</span>
-            <i class="ph ph-x chat-tab-close" title="Close Session"></i>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256" style="flex-shrink:0">
+                <path d="M128,128a8,8,0,0,1-3.12.65,8,8,0,0,1-6.94-4A8,8,0,0,1,120.84,116l80-48a8,8,0,0,1,8.32,13.66ZM232,56V200a16,16,0,0,1-16,16H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216A16,16,0,0,1,232,56ZM216,200V56H40V200Z"></path>
+            </svg>
+            <span title="${escapeHtml(sessionId)}${tool ? ' — ' + escapeHtml(tool) : ''}">${escapeHtml(tabLabel)}</span>
+            <span class="chat-tab-close" title="Close Session">✕</span>
         `;
 
         tabBtn.addEventListener('click', (e) => {
@@ -1661,13 +1670,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chatTabBar.appendChild(tabBtn);
 
+        // Build creation context banner
+        const now = new Date().toLocaleTimeString();
+        let contextHtml = `<strong>${escapeHtml(sessionId)}</strong> created at ${now}`;
+        if (tool) {
+            contextHtml += ` via <strong>${escapeHtml(tool)}</strong>`;
+        }
+        if (argsSummary) {
+            const safeArgs = escapeHtml(argsSummary.length > 120 ? argsSummary.substring(0, 120) + '…' : argsSummary);
+            contextHtml += `<br><span style="color: var(--text-secondary); font-size: 0.75rem;">Args: <code>${safeArgs}</code></span>`;
+        }
+
         // Create Tab Panel
         const tabPanel = document.createElement('div');
         tabPanel.className = 'chat-tab-panel';
         tabPanel.id = `chat-tab-${sessionId}`;
         tabPanel.innerHTML = `
             <div class="isess-log-viewer" id="log-viewer-${sessionId}">
-                <div class="log-entry log-status">Direct interaction with ${sessionId} started. Output will appear here.</div>
+                <div class="log-entry log-status" style="border-left: 3px solid var(--accent-primary); padding-left: 0.6rem; margin-bottom: 0.4rem;">
+                    ${contextHtml}
+                </div>
+                <div class="log-entry log-status">Waiting for output… You can type commands below once the session is ready.</div>
             </div>
             <div class="isess-input-row">
                 <span class="isess-prompt-indicator">></span>
@@ -1703,8 +1726,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Auto-switch to new tab
-        switchChatTab(sessionId);
+        // Do NOT auto-switch — keep the user on the main agent tab.
+        // Highlight the new tab so the user notices it.
+        tabBtn.style.animation = 'tab-pulse 1.5s ease-in-out 3';
     }
 
     function closeTerminalTab(sessionId) {
@@ -2821,7 +2845,9 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'isess_created': {
                 // _emit() spreads fields to top-level; handle both shapes for safety
                 const sid = event.session_id || (event.data && event.data.session_id);
-                if (sid) createTerminalTab(sid);
+                const tool = event.tool || (event.data && event.data.tool) || '';
+                const argsSummary = event.args_summary || (event.data && event.data.args_summary) || '';
+                if (sid) createTerminalTab(sid, tool, argsSummary);
                 break;
             }
             case 'isess_output': {

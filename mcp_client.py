@@ -2226,7 +2226,17 @@ class MCPSession:
                         isess_match = re.search(r"preserved as (isess-\w+)", result_text)
                         if isess_match:
                             isess_id = isess_match.group(1)
-                            _emit(self.event_callback, "isess_created", {"session_id": isess_id})
+                            # Build a short summary of the args for the tab label
+                            args_summary = ""
+                            if isinstance(tool_args, dict):
+                                args_summary = str(tool_args.get("args", ""))[:80]
+                            elif isinstance(tool_args, str):
+                                args_summary = tool_args[:80]
+                            _emit(self.event_callback, "isess_created", {
+                                "session_id": isess_id,
+                                "tool": tool_name or "",
+                                "args_summary": args_summary,
+                            })
 
                     context_result = _truncate_tool_output(result_text)
                     self.messages.append({
