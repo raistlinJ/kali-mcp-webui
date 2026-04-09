@@ -1736,6 +1736,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closeTerminalTab(sessionId) {
+        const tab = document.querySelector(`.chat-tab[data-tab-id="${sessionId}"]`);
+        const closeEl = tab ? tab.querySelector('.chat-tab-close') : null;
+        
+        // If it's already closed/dimmed (⏹ icon), clicking again deletes the tab entirely
+        if (closeEl && closeEl.textContent === '⏹') {
+            const panel = document.getElementById(`chat-tab-${sessionId}`);
+            if (tab) tab.remove();
+            if (panel) panel.remove();
+            
+            // Switch back to main if we closed the active tab
+            if (tab && tab.classList.contains('active')) {
+                switchChatTab('main');
+            }
+            return;
+        }
+
         if (!confirm(`Are you sure you want to close the interactive session ${sessionId}?`)) return;
 
         // Call backend to close
