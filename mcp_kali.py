@@ -418,16 +418,16 @@ def _builtin_interactive_tools(enabled: bool) -> list[Tool]:
     return [
         Tool(
             name="interactive_session_list",
-            description="List preserved interactive sessions created by prior tool calls, such as a Meterpreter or Metasploit console session.",
+            description="List all preserved interactive sessions (isess-XXX). These are sessions created by prior tool calls such as msf_run. Returns session IDs in the format isess-001, isess-002, etc.",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="interactive_session_read",
-            description="Read newly available output from a preserved interactive session.",
+            description="Read newly available output from a preserved interactive session. IMPORTANT: The session_id MUST be an isess-XXX identifier (e.g. isess-001) as returned by the preservation message or interactive_session_list. Do NOT use Metasploit session numbers like '1' or commands like 'sessions -i 1'.",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "session_id": {"type": "string", "description": "Interactive session id, for example isess-001"},
+                    "session_id": {"type": "string", "description": "The isess-XXX identifier, e.g. isess-001. NOT a Metasploit session number."},
                     "wait_seconds": {"type": "number", "description": "Optional short wait before reading, between 0 and 2 seconds"},
                 },
                 "required": ["session_id"],
@@ -435,12 +435,12 @@ def _builtin_interactive_tools(enabled: bool) -> list[Tool]:
         ),
         Tool(
             name="interactive_session_write",
-            description="Send a command to a preserved interactive session and return any resulting output.",
+            description="Send a command or input to a preserved interactive session and return any resulting output. IMPORTANT: The session_id MUST be an isess-XXX identifier (e.g. isess-001). The 'input' field is the command to run inside the session (e.g. 'sysinfo', 'ls', 'whoami'). Do NOT use Metasploit session numbers or commands like 'sessions -i 1' as the session_id.",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "session_id": {"type": "string", "description": "Interactive session id, for example isess-001"},
-                    "input": {"type": "string", "description": "The command or input to send to the session"},
+                    "session_id": {"type": "string", "description": "The isess-XXX identifier, e.g. isess-001. NOT a Metasploit session number."},
+                    "input": {"type": "string", "description": "The command or input to send to the session, e.g. 'sysinfo', 'ls -la', 'whoami'"},
                     "wait_seconds": {"type": "number", "description": "Optional short wait after sending input, between 0 and 2 seconds"},
                 },
                 "required": ["session_id", "input"],
@@ -448,11 +448,11 @@ def _builtin_interactive_tools(enabled: bool) -> list[Tool]:
         ),
         Tool(
             name="interactive_session_close",
-            description="Terminate a preserved interactive session and return any final buffered output.",
+            description="Terminate a preserved interactive session and return any final buffered output. The session_id MUST be an isess-XXX identifier (e.g. isess-001).",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "session_id": {"type": "string", "description": "Interactive session id, for example isess-001"},
+                    "session_id": {"type": "string", "description": "The isess-XXX identifier, e.g. isess-001. NOT a Metasploit session number."},
                 },
                 "required": ["session_id"],
             },
@@ -494,11 +494,16 @@ def _interactive_session_tool_result(name: str, arguments: dict) -> tuple[str, i
         return "\n".join(lines), 0
 
     if not session_id:
-        return "Error: session_id is required.", -1
+        return "Error: session_id is required. Use interactive_session_list to see available sessions (format: isess-001, isess-002, etc).", -1
 
     session = _interactive_sessions.get(session_id)
     if not session:
-        return f"Error: Interactive session {session_id} was not found.", -1
+        available = ", ".join(_interactive_sessions.keys()) if _interactive_sessions else "none"
+        return (
+            f"Error: Interactive session '{session_id}' was not found. "
+            f"Available sessions: [{available}]. "
+            f"IMPORTANT: Use the isess-XXX identifier (e.g. isess-001), NOT a Metasploit session number or 'sessions -i' command."
+        ), -1
 
     if name == "interactive_session_read":
         wait_seconds = _coerce_wait_seconds((arguments or {}).get("wait_seconds", 0), 0.0)
@@ -1446,9 +1451,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         if execution.get("interactive_preserved"):
             session_id = str(execution.get("interactive_session_id") or "").strip()
             preserved_message = (
-                f"Interactive session preserved as {session_id}. Use interactive_session_write to send commands, "
-                f"interactive_session_read to collect output, interactive_session_list to inspect active sessions, "
-                f"and interactive_session_close when you are done."
+                f"Interactive session preserved as {session_id}.\n"
+                f"IMPORTANT: To interact with this session, you MUST use session_id=\"{session_id}\" (not a Metasploit session number).\n"
+                f"- Use interactive_session_write with session_id=\"{session_id}\" and input=\"<your command>\" to send commands.\n"
+                f"- Use interactive_session_read with session_id=\"{session_id}\" to collect output.\n"
+                f"- Use interactive_session_list to see all active sessions.\n"
+                f"- Use interactive_session_close with session_id=\"{session_id}\" when you are done."
             )
             output = preserved_message
             if execution.get("stdout"):
